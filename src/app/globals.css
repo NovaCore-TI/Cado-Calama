@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,600&family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Poppins:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-montserrat: 'Montserrat', sans-serif;
+  --font-cormorant: 'Cormorant Garamond', Georgia, serif;
+  --font-caveat: 'Caveat', cursive;
+  --font-poppins: 'Poppins', sans-serif;
+  
+  /* CADO Official Colors */
+  --cado-purple: #A14B92;
+  --cado-silver: #B3BFBF;
+  --cado-dark: #513D49;
+  --cado-white: #FFFFFF;
+}
+
+body {
+  font-family: var(--font-montserrat);
+  background-color: #FFFFFF;
+  color: #333333;
+  -webkit-font-smoothing: antialiased;
+}
+
+html { scroll-behavior: smooth; }
+
+.glass-panel {
+  background: rgba(255, 255, 255, .78);
+  border: 1px solid rgba(255, 255, 255, .88);
+  box-shadow: 0 18px 44px rgba(81, 61, 73, .16), inset 0 1px 0 rgba(255, 255, 255, .9);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.soft-card {
+  background: #fff;
+  border: 1px solid #E2E7E7;
+  box-shadow: 0 14px 38px rgba(81, 61, 73, .055);
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.soft-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 22px 44px rgba(81, 61, 73, .10);
+}
+
+/* Relief on selected cards complements the translucent glass surfaces. */
+.clay-card {
+  background: linear-gradient(145deg, #FFFFFF 0%, #F6F8F8 100%);
+  border: 1px solid rgba(255, 255, 255, .95);
+  box-shadow: 12px 12px 28px rgba(81, 61, 73, .10),
+    -12px -12px 28px rgba(255, 255, 255, .92),
+    inset 2px 2px 3px rgba(255, 255, 255, .95),
+    inset -2px -2px 4px rgba(179, 191, 191, .16);
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.clay-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 15px 15px 32px rgba(81, 61, 73, .14),
+    -12px -12px 28px rgba(255, 255, 255, .95),
+    inset 2px 2px 3px rgba(255, 255, 255, .95);
+}
+
+.clay-icon {
+  background: linear-gradient(145deg, #FFFFFF, #E6EBEB);
+  box-shadow: 5px 5px 11px rgba(81, 61, 73, .12),
+    -5px -5px 11px rgba(255, 255, 255, .95),
+    inset 1px 1px 2px rgba(255, 255, 255, .85);
+}
+
+.section-eyebrow {
+  color: #A14B92;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+
+:focus-visible { outline: 2px solid #A14B92; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .soft-card, .soft-card:hover, .clay-card, .clay-card:hover { transition: none; transform: none; }
+}
+
+/* Tipografías del Brand Book */
+.font-title {
+  font-family: 'Romaria Stylish', var(--font-cormorant);
+}
+
+.font-script {
+  font-family: 'Bright Sunshine', var(--font-caveat);
+}
+
+.font-testimonial {
+  font-family: var(--font-poppins);
+}
+
+/* Botones y acentos del Brand Book */
+.btn-cado-primary {
+  background-color: #A14B92;
+  color: #FFFFFF;
+  transition: all 0.2s ease-in-out;
+}
+.btn-cado-primary:hover {
+  background-color: #8C3C7E;
+  box-shadow: 0 4px 12px rgba(161, 75, 146, 0.25);
+}
+
+.btn-cado-secondary {
+  background-color: #FFFFFF;
+  color: #513D49;
+  border: 1.5px solid #B3BFBF;
+  transition: all 0.2s ease-in-out;
+}
+.btn-cado-secondary:hover {
+  background-color: #F6F8F8;
+  border-color: #A14B92;
+  color: #A14B92;
+}
+
+.bg-cado-surface {
+  background-color: #F8FAFA;
+}
+
+.border-cado-silver {
+  border-color: #E2E7E7;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F6F8F8;
+}
+::-webkit-scrollbar-thumb {
+  background: #B3BFBF;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A14B92;
+}

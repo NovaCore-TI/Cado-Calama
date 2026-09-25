@@ -1,0 +1,6 @@
+import Link from 'next/link';
+import { ArrowRight, Compass } from 'lucide-react';
+
+export default function NotFound() {
+  return <main className="bg-[#F6F8F8] px-6 py-24 text-[#513D49]"><div className="mx-auto max-w-3xl text-center"><span className="clay-icon mx-auto flex h-16 w-16 items-center justify-center rounded-2xl text-[#A14B92]"><Compass className="h-8 w-8" /></span><p className="section-eyebrow mt-8">Página no encontrada · 404</p><h1 className="mt-3 font-title text-5xl font-semibold">Volvamos a un lugar conocido.</h1><p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-[#665D66]">La dirección puede haber cambiado o no existir. Puedes volver al inicio, revisar la información de CADO o contactar directamente.</p><div className="mt-8 flex flex-wrap justify-center gap-3"><Link href="/" className="btn-cado-primary inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold">Ir al inicio <ArrowRight className="h-4 w-4" /></Link><Link href="/equipo" className="btn-cado-secondary rounded-xl px-5 py-3 text-sm font-semibold">Conocer CADO</Link><a href="https://wa.me/56944657815" className="btn-cado-secondary rounded-xl px-5 py-3 text-sm font-semibold">Contactar</a></div></div></main>;
+}

@@ -1,0 +1,12 @@
+import Link from 'next/link';
+import { ArrowRight, BookOpen, FileText, HeartHandshake, ShieldCheck } from 'lucide-react';
+
+const plannedGuides = [
+  { icon: FileText, title: 'Cuidados posteriores', text: 'Orientaciones para revisar con el profesional después de una atención.' },
+  { icon: ShieldCheck, title: 'Primeros pasos ante una urgencia', text: 'Una guía de consulta rápida que requiere validación clínica antes de publicarse.' },
+  { icon: HeartHandshake, title: 'Prepararse para la consulta', text: 'Recursos sobre preguntas y preferencias que el paciente desea compartir.' },
+];
+
+export default function RecursosPage() {
+  return <div className="min-h-[70vh] bg-[#F6F8F8] px-6 py-16 text-[#513D49] sm:py-24"><div className="mx-auto max-w-6xl"><div className="max-w-2xl space-y-5"><p className="section-eyebrow">Recursos prácticos</p><h1 className="font-title text-5xl font-semibold leading-tight sm:text-6xl">Información clara para acompañarte.</h1><p className="leading-8 text-[#665D66]">La biblioteca de guías descargables forma parte del prototipo. Los documentos se publicarán después de que CADO valide sus contenidos clínicos. Por ahora no hay archivos PDF disponibles.</p></div><div className="mt-12 grid gap-5 md:grid-cols-3">{plannedGuides.map(({icon: Icon,title,text}) => <div key={title} className="soft-card rounded-3xl p-7"><span className="mb-7 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E6EBEB] text-[#A14B92]"><Icon className="h-6 w-6" /></span><h2 className="font-title text-2xl font-semibold">{title}</h2><p className="mt-3 text-sm leading-7 text-[#665D66]">{text}</p><span className="mt-6 inline-flex rounded-full bg-[#F6F8F8] px-3 py-1.5 text-xs font-semibold text-[#8A3D7D]">Pendiente de revisión</span></div>)}</div><div className="glass-panel mt-12 flex flex-col items-start justify-between gap-5 rounded-3xl p-7 sm:flex-row sm:items-center"><div className="flex items-start gap-3"><BookOpen className="mt-1 h-6 w-6 shrink-0 text-[#A14B92]" /><div><h2 className="font-semibold">¿Buscas orientación ahora?</h2><p className="mt-1 text-sm leading-6 text-[#665D66]">Puedes consultar la sección de preguntas frecuentes o contactar directamente a CADO.</p></div></div><Link href="/faq" className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#8A3D7D] hover:underline">Ver preguntas frecuentes <ArrowRight className="h-4 w-4" /></Link></div></div></div>;
+}

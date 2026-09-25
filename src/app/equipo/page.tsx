@@ -1,0 +1,16 @@
+import Image from 'next/image';
+import Link from 'next/link';
+import { ArrowRight, HeartHandshake, MapPin, ShieldCheck } from 'lucide-react';
+
+export default function EquipoPage() {
+  return (
+    <div className="bg-white text-[#513D49]">
+      <section className="relative overflow-hidden bg-[#F6F8F8] px-6 py-16 sm:py-24"><div className="absolute -right-20 top-0 h-72 w-72 rounded-full bg-[#B3BFBF]/50 blur-3xl" aria-hidden="true" /><div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2"><div className="space-y-6"><p className="section-eyebrow">Conoce a tu equipo</p><h1 className="font-title text-5xl font-semibold leading-tight sm:text-6xl">Una atención cercana comienza con escuchar.</h1><p className="max-w-xl leading-8 text-[#665D66]">El Dr. Javier Beiza Ayala atiende en CADO Odontología, en Calama. Su propuesta de atención se centra en la empatía, el respeto y la claridad, especialmente para personas que sienten temor o han postergado una consulta dental.</p><div className="flex flex-wrap gap-3"><Link href="/cuestionario" className="btn-cado-primary inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold">Conocer cuestionario <ArrowRight className="h-4 w-4" /></Link><Link href="/agendar" className="btn-cado-secondary inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold">Orientación virtual</Link></div></div><div className="relative"><Image src="/brand/photo_doctor_talking.png" alt="El Dr. Javier Beiza conversa con una persona en CADO" width={900} height={700} priority className="aspect-[5/4] w-full rounded-[2rem] object-cover shadow-[0_24px_60px_rgba(81,61,73,.15)]" /><div className="glass-panel absolute -bottom-5 left-5 right-5 rounded-2xl p-5 sm:right-auto sm:max-w-xs"><strong className="block text-sm">Dr. Javier Beiza Ayala</strong><p className="mt-1 text-xs text-[#665D66]">Cirujano dentista · CADO Odontología</p></div></div></div></section>
+      <section className="mx-auto max-w-7xl px-6 py-24"><div className="mb-10 max-w-2xl space-y-3"><p className="section-eyebrow">La forma de atender</p><h2 className="font-title text-4xl font-semibold sm:text-5xl">Más que dientes, cuidamos personas.</h2><p className="leading-7 text-[#665D66]">Este principio del Brand Book orienta la comunicación y la experiencia que CADO busca ofrecer.</p></div><div className="grid gap-5 md:grid-cols-3">{[
+        { icon: HeartHandshake, title: 'Escucha sin juicios', text: 'Cada persona puede expresar su historia y sus dudas con respeto.' },
+        { icon: ShieldCheck, title: 'Información clara', text: 'El lenguaje cercano ayuda a comprender las opciones antes de decidir.' },
+        { icon: MapPin, title: 'Atención en Calama', text: 'La consulta presencial se coordina en CADO, Vivar #1580, oficina 203.' },
+      ].map(({icon: Icon,title,text}) => <div key={title} className="clay-card rounded-[2rem] p-7"><span className="clay-icon mb-6 flex h-12 w-12 items-center justify-center rounded-2xl text-[#A14B92]"><Icon className="h-6 w-6" /></span><h3 className="font-title text-2xl font-semibold">{title}</h3><p className="mt-3 text-sm leading-7 text-[#665D66]">{text}</p></div>)}</div></section>
+    </div>
+  );
+}
