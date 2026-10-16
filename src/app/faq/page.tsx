@@ -34,25 +34,44 @@ const FAQS_DATA: FAQItem[] = [
 export default function FaqPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('todas');
-  const [openIds, setOpenIds] = useState<number[]>([1, 2]); // Primeras dos abiertas por defecto
+  const [openIds, setOpenIds] = useState<number[]>([1, 2]);
+  const [backendFaqs, setBackendFaqs] = useState<FAQItem[]>(FAQS_DATA);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams();
+    if (searchTerm.trim()) params.set('q', searchTerm.trim());
+    if (selectedCategory !== 'todas') params.set('category', selectedCategory);
+
+    fetch(`/api/faq?${params.toString()}`, { signal: controller.signal })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.ok && Array.isArray(json.data)) {
+          setBackendFaqs(json.data);
+        }
+      })
+      .catch(() => {});
+
+    return () => controller.abort();
+  }, [searchTerm, selectedCategory]);
 
   const toggleAccordion = (id: number) => {
-    setOpenIds(prev => 
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    setOpenIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
   const filteredFaqs = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
-    return FAQS_DATA.filter((item) => {
+    return backendFaqs.filter((item) => {
       const matchesCategory = selectedCategory === 'todas' || item.category === selectedCategory;
-      const matchesSearch = 
-        !term || 
-        item.q.toLowerCase().includes(term) || 
+      const matchesSearch =
+        !term ||
+        item.q.toLowerCase().includes(term) ||
         item.a.toLowerCase().includes(term);
       return matchesCategory && matchesSearch;
     });
-  }, [searchTerm, selectedCategory]);
+  }, [backendFaqs, searchTerm, selectedCategory]);
 
   return (
     <div className="bg-white text-gray-800 space-y-10 sm:space-y-14 pb-24 max-w-4xl mx-auto px-6 pt-10 sm:pt-14">
