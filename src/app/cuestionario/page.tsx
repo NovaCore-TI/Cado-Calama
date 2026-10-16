@@ -31,7 +31,7 @@ export default function CuestionarioPage() {
   const [previousExperience, setPreviousExperience] = useState('Prefiero no responder');
   const [painSensitivity, setPainSensitivity] = useState('Prefiero no responder');
   const [communicationPreference, setCommunicationPreference] = useState('Explicación paso a paso con lenguaje sencillo');
-  const [consent, setConsent] = useState(false); // RF-09: Casilla inicialmente desmarcada
+  const [consent, setConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export default function CuestionarioPage() {
     <main className="bg-[#F6F8F8] px-6 py-14 text-[#513D49] sm:py-20">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-3xl">
-          <p className="section-eyebrow">RF-06 · RF-08 · RF-09 · Cuestionario previo conectado a Backend</p>
+          <p className="section-eyebrow">Cuestionario Previo de Perfilamiento</p>
           <h1 className="mt-3 font-title text-5xl font-semibold leading-tight sm:text-6xl">
             Conocerte antes de conversar.
           </h1>
@@ -127,7 +127,7 @@ export default function CuestionarioPage() {
                 <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#F6F8F8] px-3.5 py-1 text-xs font-semibold text-[#8A3D7D]">
                   <Database className="h-3.5 w-3.5" />
                   <span>
-                    Registro #{savedRecordId} · {syncedToCloud ? 'Guardado en Supabase' : 'Procesado por API /api/cuestionario'}
+                    Registro #{savedRecordId} · {syncedToCloud ? 'Guardado en Supabase' : 'Registrado correctamente'}
                   </span>
                 </div>
                 <h2 className="mt-4 font-title text-3xl font-semibold">
@@ -202,7 +202,7 @@ export default function CuestionarioPage() {
                       ¿Qué te gustaría conversar con el doctor?
                     </h2>
                     <p className="mt-2 text-sm leading-7 text-[#665D66]">
-                      Motivo general de consulta · campo obligatorio validado en cliente y servidor (RF-08).
+                      Motivo general de consulta · campo obligatorio para preparar tu orientación.
                     </p>
                     <label className="mt-6 block text-sm font-semibold">
                       Motivo de consulta <span className="text-[#A14B92]">*</span>
@@ -224,7 +224,7 @@ export default function CuestionarioPage() {
                       ¿Cómo te sientes ante una consulta dental?
                     </h2>
                     <p className="mt-2 text-sm leading-7 text-[#665D66]">
-                      Lenguaje empático no clínico (RF-06). Puedes elegir «Prefiero no responder» sin bloquear tu avance.
+                      Puedes elegir «Prefiero no responder» sin bloquear tu avance.
                     </p>
                     <div className="mt-6 grid gap-3 sm:grid-cols-2">
                       {[
@@ -264,7 +264,7 @@ export default function CuestionarioPage() {
                       ¿Cómo han sido tus experiencias dentales anteriores?
                     </h2>
                     <p className="mt-2 text-sm leading-7 text-[#665D66]">
-                      Pregunta sensible opcional (RF-08). Puedes omitir detalles seleccionando «Prefiero no responder».
+                      Pregunta opcional. Puedes omitir detalles seleccionando «Prefiero no responder».
                     </p>
                     <div className="mt-5 space-y-2.5">
                       {[
@@ -375,7 +375,7 @@ export default function CuestionarioPage() {
                       <ShieldCheck className="h-6 w-6" />
                     </span>
                     <h2 className="mt-4 font-title text-3xl font-semibold">
-                      Consentimiento Informado y Privacidad (RF-09)
+                      Consentimiento Informado y Privacidad
                     </h2>
                     <p className="mt-3 text-sm leading-7 text-[#665D66]">
                       En cumplimiento con la <strong>Ley N° 19.628</strong> sobre Protección de la Vida Privada y la <strong>Ley N° 20.584</strong> de Derechos y Deberes del Paciente en Chile, tus respuestas solo se almacenarán tras tu aceptación explícita y se vincularán únicamente a tu solicitud de orientación.
@@ -393,7 +393,7 @@ export default function CuestionarioPage() {
                       </span>
                     </label>
                     <p className="mt-4 rounded-xl border border-[#E2E7E7] bg-white p-3.5 text-xs leading-6 text-[#665D66]">
-                      <strong>Aviso de alcance clínico (RF-08):</strong> Este cuestionario es estrictamente orientativo y de confort; no entrega diagnósticos médicos ni presupuestos clínicos automáticos.
+                      <strong>Aviso de alcance clínico:</strong> Este cuestionario es estrictamente orientativo y de confort; no entrega diagnósticos médicos ni presupuestos clínicos automáticos.
                     </p>
                   </div>
                 )}
@@ -415,7 +415,7 @@ export default function CuestionarioPage() {
                   >
                     <span>
                       {isSubmitting
-                        ? 'Guardando en Backend...'
+                        ? 'Guardando respuestas...'
                         : step === steps.length - 1
                         ? 'Guardar y Vincular Cuestionario'
                         : 'Continuar'}
@@ -456,7 +456,7 @@ export default function CuestionarioPage() {
               <HeartHandshake className="h-6 w-6 text-[#A14B92]" />
               <h2 className="mt-3 font-title text-2xl font-semibold">¿Y la comodidad en el box?</h2>
               <p className="mt-2 text-sm leading-6 text-[#665D66]">
-                Música suave, pausas periódicas y acompañante presencial se personalizan en el Test de Confort (RF-07).
+                Música suave, pausas periódicas y acompañante presencial se personalizan en el Test de Confort.
               </p>
               <Link
                 href="/test-confort"

@@ -38,7 +38,7 @@ export default function OrientacionPage() {
   );
   const [date, setDate] = useState(today);
   const [slot, setSlot] = useState('');
-  const [consent, setConsent] = useState(false); // RF-09: Casilla inicialmente desmarcada
+  const [consent, setConsent] = useState(false);
   const [stage, setStage] = useState<'seleccion' | 'resumen' | 'final'>('seleccion');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -123,7 +123,7 @@ export default function OrientacionPage() {
       <div className="mx-auto max-w-6xl">
         <div className="grid items-start gap-9 lg:grid-cols-[1fr_320px]">
           <div>
-            <p className="section-eyebrow">RF-09 · RF-10 · RF-12 · Orientación virtual conectada a Supabase</p>
+            <p className="section-eyebrow">Orientación Virtual de 15 Minutos</p>
             <h1 className="mt-3 font-title text-5xl font-semibold leading-tight sm:text-6xl">
               Una conversación antes de la consulta.
             </h1>
@@ -133,7 +133,7 @@ export default function OrientacionPage() {
 
             <div className="mt-8 rounded-[2rem] border border-white bg-white p-6 shadow-[0_18px_45px_rgba(81,61,73,.07)] sm:p-9">
               <div className="mb-7 flex flex-wrap gap-3 text-xs font-semibold">
-                {['1 · Horario', '2 · Datos y Consentimiento (Sin RUT)', '3 · Confirmación'].map(
+                {['1 · Horario', '2 · Datos y Consentimiento', '3 · Confirmación'].map(
                   (label, index) => (
                     <span
                       key={label}
@@ -223,7 +223,7 @@ export default function OrientacionPage() {
               {stage === 'resumen' && (
                 <>
                   <h2 className="font-title text-3xl font-semibold">
-                    Datos de contacto y vinculación (RNF-15: Sin RUT)
+                    Datos de contacto y vinculación
                   </h2>
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl bg-[#F6F8F8] p-4">
@@ -291,7 +291,7 @@ export default function OrientacionPage() {
                   </div>
 
                   <div className="mt-5 rounded-2xl border border-[#E2E7E7] bg-[#F8EFF6]/50 p-4 text-xs leading-6 text-[#513D49]">
-                    <strong>Preferencias de Confort vinculadas (RF-07 / RF-09):</strong> Ambiente:{' '}
+                    <strong>Preferencias de Confort vinculadas:</strong> Ambiente:{' '}
                     {activeComfortProfile.soundPreference === 'silencio'
                       ? 'Silencio'
                       : 'Música suave'}{' '}
@@ -333,7 +333,7 @@ export default function OrientacionPage() {
                     >
                       <Database className="h-4 w-4" />
                       <span>
-                        {isSubmitting ? 'Registrando en Supabase...' : 'Confirmar Reserva Telemática'}
+                        {isSubmitting ? 'Registrando reserva...' : 'Confirmar Reserva Telemática'}
                       </span>
                     </button>
                   </div>
@@ -418,12 +418,12 @@ export default function OrientacionPage() {
               <HeartHandshake className="h-6 w-6 text-[#A14B92]" />
               <h2 className="mt-4 font-title text-2xl font-semibold">Privacidad garantizada</h2>
               <p className="mt-2 text-sm leading-7 text-[#665D66]">
-                Cumplimos con la minimización de datos (RNF-15): solicitamos únicamente nombre, correo, teléfono y tu consentimiento explícito, sin pedir RUT.
+                Cumplimos con la minimización de datos: solicitamos únicamente nombre, correo, teléfono y tu consentimiento explícito, sin pedir RUT.
               </p>
             </div>
             <p className="flex items-start gap-2 text-xs leading-6 text-[#665D66]">
               <ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-[#A14B92]" />
-              Conectado a Supabase y API Backend `/api/orientaciones`.
+              Conectado a Supabase y servicio de orientaciones.
             </p>
           </aside>
         </div>

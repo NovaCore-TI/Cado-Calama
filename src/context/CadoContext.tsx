@@ -77,7 +77,7 @@ export interface CadoContextType {
   cancelAppointment: (id: string) => void;
   rescheduleAppointment: (id: string, newDate: string, newTime: string) => boolean;
 
-  // Questionnaire & Comfort Profile (MOD-02: RF-06, RF-07, RF-08, RF-09)
+  // Questionnaire & Comfort Profile
   activeComfortProfile: ComfortProfile;
   setActiveComfortProfile: React.Dispatch<React.SetStateAction<ComfortProfile>>;
   saveComfortPreferences: (profile: ComfortProfile) => Promise<void>;
@@ -87,14 +87,14 @@ export interface CadoContextType {
   patientDraftInfo: { name: string; email: string; phone: string };
   setPatientDraftInfo: React.Dispatch<React.SetStateAction<{ name: string; email: string; phone: string }>>;
 
-  // Doctor Availability & Blocked Days (RF-10, RF-19)
+  // Doctor Availability & Blocked Days
   availableSlots: string[];
   toggleSlotAvailability: (slot: string) => void;
   blockedDates: string[];
   addBlockedDate: (date: string, reason?: string) => void;
   removeBlockedDate: (date: string) => void;
 
-  // Blog Posts (RF-02, RF-24)
+  // Blog Posts
   blogPosts: BlogPost[];
   addBlogPost: (post: Omit<BlogPost, 'id' | 'date'>) => void;
   updateBlogPost: (id: string, post: Partial<BlogPost>) => void;
@@ -427,7 +427,7 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = [newApp, ...appointments];
     saveAppointments(updated);
 
-    // Remove the booked slot from availableSlots (RF-11 collision prevention)
+    // Remove the booked slot from availableSlots
     const slotKey = `${data.date}|${data.time}`;
     setAvailableSlots((prev) => {
       const next = prev.filter((s) => s !== slotKey);
@@ -502,7 +502,7 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const cancelAppointment = (id: string) => {
     const target = appointments.find((a) => a.id === id);
     if (target) {
-      // Release the slot back to availableSlots (RF-14)
+      // Release the slot back to availableSlots
       const slotKey = `${target.date}|${target.time}`;
       setAvailableSlots((prev) => {
         if (prev.includes(slotKey)) return prev;

@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// SCRUM-48 (RF-05): Backend de Urgencias Dentales, canales prioritarios y registro de derivación urgente
+// Backend de Urgencias Dentales, canales prioritarios y registro de derivación urgente
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    rf: 'RF-05',
-    jiraKey: 'SCRUM-48',
     canalesPrioritarios: {
       telefonoDirecto: '+56944657815',
       telHref: 'tel:+56944657815',
@@ -42,8 +40,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      rf: 'RF-05',
-      jiraKey: 'SCRUM-48',
       loggedInSupabase: !error,
       timestamp: new Date().toISOString(),
     });

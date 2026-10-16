@@ -40,7 +40,7 @@ const SEED_ARTICLES = [
   },
 ];
 
-// SCRUM-39 (RF-02): Backend Publicación cronológica y lectura individual de artículos del blog
+// Backend de publicación cronológica y lectura individual de artículos del blog
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug');
@@ -64,8 +64,6 @@ export async function GET(request: NextRequest) {
   if (!error && data && data.length > 0) {
     return NextResponse.json({
       ok: true,
-      rf: 'RF-02',
-      jiraKey: 'SCRUM-39',
       source: 'supabase',
       count: data.length,
       data,
@@ -78,8 +76,6 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    rf: 'RF-02',
-    jiraKey: 'SCRUM-39',
     source: error ? 'supabase_fallback_seed' : 'supabase_empty_seed',
     supabaseStatus: error?.message || 'OK',
     count: fallback.length,
@@ -123,8 +119,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ok: true,
-        rf: 'RF-02',
-        jiraKey: 'SCRUM-39',
         syncedToSupabase: !error,
         supabaseError: error?.message || null,
         data: data || { id: `local-${Date.now()}`, ...payload, created_at: new Date().toISOString() },

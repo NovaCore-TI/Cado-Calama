@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// SCRUM-54 (RF-07) & SCRUM-60 (RF-09):
-// Backend Recolección de preferencias de confort ambiental vinculadas a la solicitud del paciente
+// Backend de recolección de preferencias de confort ambiental vinculadas a la solicitud del paciente
 export async function GET() {
   const { data, error } = await supabase
     .from('preferencias_confort')
@@ -12,8 +11,6 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    rf: 'RF-07',
-    jiraKey: 'SCRUM-54',
     source: !error && data ? 'supabase' : 'empty_or_pending_schema',
     supabaseStatus: error?.message || 'OK',
     data: data || [],
@@ -38,7 +35,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          rf: 'RF-09',
           error: 'Se requiere consentimiento explícito para almacenar las preferencias de confort.',
         },
         { status: 400 }
@@ -65,8 +61,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ok: true,
-        rfs: ['RF-07', 'RF-09'],
-        jiraKeys: ['SCRUM-54', 'SCRUM-60'],
         syncedToSupabase: !error,
         supabaseError: error?.message || null,
         data: data || {

@@ -28,7 +28,7 @@ const GUIAS_CLINICAS = [
   },
 ];
 
-// SCRUM-45 (RF-04): Backend de Catálogo y Registro de Descarga de Guías Clínicas PDF
+// Backend de catálogo y registro de descarga de guías clínicas PDF
 export async function GET() {
   const { data, error } = await supabase
     .from('guias_clinicas')
@@ -38,8 +38,6 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    rf: 'RF-04',
-    jiraKey: 'SCRUM-45',
     source: !error && data && data.length > 0 ? 'supabase' : 'backend_catalog',
     data: !error && data && data.length > 0 ? data : GUIAS_CLINICAS,
   });
@@ -54,7 +52,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: 'Se requiere guiaId' }, { status: 400 });
     }
 
-    // Registrar evento de descarga en logs_auditoria de Supabase
     const { error } = await supabase.from('logs_auditoria').insert({
       accion: 'DESCARGA_GUIA_PDF',
       entidad: 'guias_clinicas',
@@ -64,8 +61,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      rf: 'RF-04',
-      jiraKey: 'SCRUM-45',
       guiaId,
       loggedInSupabase: !error,
       timestamp: new Date().toISOString(),

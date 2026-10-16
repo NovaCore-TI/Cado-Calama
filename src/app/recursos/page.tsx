@@ -225,7 +225,7 @@ export default function RecursosPage() {
         <div className="max-w-2xl space-y-5">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#B3BFBF] bg-white px-3.5 py-1.5 text-xs font-semibold text-[#513D49]">
             <Sparkles className="h-3.5 w-3.5 text-[#A14B92]" />
-            <span>RF-04 · Biblioteca Pública de Guías Clínicas PDF</span>
+            <span>Biblioteca Pública de Guías Clínicas PDF</span>
           </div>
           <h1 className="font-title text-5xl font-semibold leading-tight sm:text-6xl">
             Información clara para acompañarte.

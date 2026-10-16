@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-// Backend de Vinculación de Reserva Telemática con Cuestionario y Confort (RF-09, RNF-15 sin RUT)
+// Backend de vinculación de reserva telemática con cuestionario y confort (sin RUT)
 export async function GET() {
   const { data, error } = await supabase
     .from('orientaciones_citas')
@@ -10,8 +10,6 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    rf: 'RF-09',
-    jiraKey: 'SCRUM-60',
     source: !error && data ? 'supabase' : 'local_fallback',
     supabaseStatus: error?.message || 'OK',
     data: data || [],
@@ -32,13 +30,12 @@ export async function POST(request: NextRequest) {
       comfortProfile = {},
     } = body;
 
-    // RNF-15: Rechazar estrictamente si se intenta enviar RUT
+    // Rechazar estrictamente si se intenta enviar RUT por política de minimización de datos
     if ('rut' in body || 'RUT' in body) {
       return NextResponse.json(
         {
           ok: false,
-          rnf: 'RNF-15',
-          error: 'Por política de minimización de datos (RNF-15), no se solicita ni almacena el RUT en reservas telemáticas.',
+          error: 'Por política de minimización de datos, no se solicita ni almacena el RUT en reservas telemáticas.',
         },
         { status: 400 }
       );
@@ -58,7 +55,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          rf: 'RF-09',
           error: 'Debe aceptar el consentimiento informado de privacidad para vincular sus respuestas a la reserva.',
         },
         { status: 400 }
@@ -100,8 +96,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ok: true,
-        rf: 'RF-09',
-        jiraKey: 'SCRUM-60',
         syncedToSupabase: !error,
         supabaseError: error?.message || null,
         data: cita || {

@@ -8,8 +8,7 @@ const NIVELES_VALIDOS = [
   'Prefiero no responder',
 ];
 
-// SCRUM-51 (RF-06), SCRUM-57 (RF-08), SCRUM-60 (RF-09):
-// Backend Cuestionario de perfilamiento, validación de campos sensibles ("Prefiero no responder") y consentimiento obligatorio Ley 19.628
+// Backend de cuestionario de perfilamiento, validación de campos sensibles ("Prefiero no responder") y consentimiento obligatorio Ley 19.628
 export async function GET() {
   const { data, error } = await supabase
     .from('cuestionarios_perfilamiento')
@@ -19,8 +18,6 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    rfs: ['RF-06', 'RF-08', 'RF-09'],
-    jiraKeys: ['SCRUM-51', 'SCRUM-57', 'SCRUM-60'],
     source: !error && data ? 'supabase' : 'empty_or_pending_schema',
     supabaseStatus: error?.message || 'OK',
     data: data || [],
@@ -39,12 +36,11 @@ export async function POST(request: NextRequest) {
       consent,
     } = body;
 
-    // RF-08 (SCRUM-57): Validación estricta de campos obligatorios sin bloquear "Prefiero no responder" en sensibles
+    // Validación estricta de campos obligatorios sin bloquear "Prefiero no responder" en preguntas sensibles
     if (!reason || typeof reason !== 'string' || reason.trim().length < 3) {
       return NextResponse.json(
         {
           ok: false,
-          rf: 'RF-08',
           field: 'reason',
           error: 'El motivo general de consulta es obligatorio (mínimo 3 caracteres).',
         },
@@ -56,7 +52,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          rf: 'RF-08',
           field: 'feeling',
           error: 'Debes seleccionar una opción válida o «Prefiero no responder».',
         },
@@ -64,12 +59,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // RF-09 (SCRUM-60): Exigir aceptación explícita de consentimiento informado de privacidad (Ley 19.628 y 20.584)
+    // Exigir aceptación explícita de consentimiento informado de privacidad (Ley 19.628 y 20.584)
     if (consent !== true) {
       return NextResponse.json(
         {
           ok: false,
-          rf: 'RF-09',
           field: 'consent',
           error: 'Debes aceptar explícitamente el consentimiento informado de privacidad para almacenar tus respuestas.',
         },
@@ -98,8 +92,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ok: true,
-        rfs: ['RF-06', 'RF-08', 'RF-09'],
-        jiraKeys: ['SCRUM-51', 'SCRUM-57', 'SCRUM-60'],
         syncedToSupabase: !error,
         supabaseError: error?.message || null,
         disclaimer: 'El cuestionario no entrega diagnósticos ni presupuestos clínicos.',

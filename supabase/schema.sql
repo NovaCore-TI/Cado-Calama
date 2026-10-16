@@ -1,9 +1,9 @@
 -- =============================================================================
--- CADO ODONTOLOGÍA - SCHEMA SQL PARA SUPABASE (SPRINT 1 & MODELO DE DATOS)
+-- CADO ODONTOLOGÍA - SCHEMA SQL PARA SUPABASE
 -- Ejecuta este script en el SQL Editor de tu panel de Supabase
 -- =============================================================================
 
--- 1. Tabla de Pacientes (Minimización de datos RNF-15: sin RUT)
+-- 1. Tabla de Pacientes (Minimización de datos: sin RUT)
 CREATE TABLE IF NOT EXISTS public.pacientes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nombre_completo varchar(150) NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.pacientes (
   created_at timestamptz DEFAULT now()
 );
 
--- 2. Tabla de Cuestionarios de Perfilamiento (RF-06, RF-08, RF-09)
+-- 2. Tabla de Cuestionarios de Perfilamiento
 CREATE TABLE IF NOT EXISTS public.cuestionarios_perfilamiento (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   paciente_id uuid REFERENCES public.pacientes(id) ON DELETE SET NULL,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.cuestionarios_perfilamiento (
   created_at timestamptz DEFAULT now()
 );
 
--- 3. Tabla de Preferencias de Confort (RF-07, RF-09)
+-- 3. Tabla de Preferencias de Confort
 CREATE TABLE IF NOT EXISTS public.preferencias_confort (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   cuestionario_id uuid REFERENCES public.cuestionarios_perfilamiento(id) ON DELETE CASCADE,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.doctores (
   ultimo_acceso timestamptz DEFAULT now()
 );
 
--- 5. Tabla de Bloques de Disponibilidad (RF-10, RF-19)
+-- 5. Tabla de Bloques de Disponibilidad
 CREATE TABLE IF NOT EXISTS public.bloques_disponibilidad (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   doctor_id uuid REFERENCES public.doctores(id) ON DELETE SET NULL,
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS public.bloques_disponibilidad (
   UNIQUE(fecha, hora_inicio)
 );
 
--- 6. Tabla de Orientaciones / Citas Telemáticas (RF-12, RF-20, RF-21, RF-23)
+-- 6. Tabla de Orientaciones / Citas Telemáticas
 CREATE TABLE IF NOT EXISTS public.orientaciones_citas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   codigo varchar(40) UNIQUE NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS public.orientaciones_citas (
   updated_at timestamptz DEFAULT now()
 );
 
--- 7. Tabla de Artículos del Blog (RF-02, RF-24)
+-- 7. Tabla de Artículos del Blog
 CREATE TABLE IF NOT EXISTS public.articulos_blog (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   autor_id uuid REFERENCES public.doctores(id) ON DELETE SET NULL,
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS public.articulos_blog (
   published_at timestamptz DEFAULT now()
 );
 
--- 8. Tabla de Preguntas Frecuentes FAQ (RF-03)
+-- 8. Tabla de Preguntas Frecuentes FAQ
 CREATE TABLE IF NOT EXISTS public.preguntas_frecuentes (
   id serial PRIMARY KEY,
   categoria varchar(40) NOT NULL,
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS public.preguntas_frecuentes (
   created_at timestamptz DEFAULT now()
 );
 
--- 9. Tabla de Guías Clínicas PDF (RF-04)
+-- 9. Tabla de Guías Clínicas PDF
 CREATE TABLE IF NOT EXISTS public.guias_clinicas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   titulo varchar(160) NOT NULL,
@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS public.guias_clinicas (
   created_at timestamptz DEFAULT now()
 );
 
--- 10. Tabla de Logs de Auditoría (RF-16, RF-23)
+-- 10. Tabla de Logs de Auditoría
 CREATE TABLE IF NOT EXISTS public.logs_auditoria (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id uuid REFERENCES public.doctores(id) ON DELETE SET NULL,
@@ -137,10 +137,11 @@ CREATE TABLE IF NOT EXISTS public.logs_auditoria (
   created_at timestamptz DEFAULT now()
 );
 
--- Habilitar RLS y políticas públicas de demostración para lectura/escritura con anon/publishable key
+-- Habilitar RLS y políticas públicas de acceso para la clave publishable/anon
 ALTER TABLE public.pacientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cuestionarios_perfilamiento ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.preferencias_confort ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.doctores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bloques_disponibilidad ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.orientaciones_citas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.articulos_blog ENABLE ROW LEVEL SECURITY;
@@ -152,14 +153,19 @@ DO $$
 DECLARE
   t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['pacientes','cuestionarios_perfilamiento','preferencias_confort','bloques_disponibilidad','orientaciones_citas','articulos_blog','preguntas_frecuentes','guias_clinicas','logs_auditoria']
+  FOREACH t IN ARRAY ARRAY['pacientes','cuestionarios_perfilamiento','preferencias_confort','doctores','bloques_disponibilidad','orientaciones_citas','articulos_blog','preguntas_frecuentes','guias_clinicas','logs_auditoria']
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Acceso publico demo %I" ON public.%I;', t, t);
     EXECUTE format('CREATE POLICY "Acceso publico demo %I" ON public.%I FOR ALL USING (true) WITH CHECK (true);', t, t);
   END LOOP;
 END $$;
 
--- Datos semilla iniciales (Blog RF-02, FAQ RF-03, Guías PDF RF-04)
+-- Datos semilla iniciales: Doctor
+INSERT INTO public.doctores (nombre, email, rol)
+VALUES ('Dr. Javier Beiza Ayala', 'jbeiza@cado.cl', 'Cirujano Dentista Titular - 13 años en Calama')
+ON CONFLICT (email) DO NOTHING;
+
+-- Datos semilla iniciales: Blog Educativo
 INSERT INTO public.articulos_blog (titulo, slug, categoria, resumen, cuerpo, autor_nombre, tiempo_lectura, publicado)
 VALUES
   (
@@ -193,3 +199,13 @@ VALUES
     true
   )
 ON CONFLICT (slug) DO NOTHING;
+
+-- Datos semilla iniciales: Preguntas Frecuentes
+INSERT INTO public.preguntas_frecuentes (categoria, pregunta, respuesta, orden)
+VALUES
+  ('miedo', '¿Puedo contar que siento miedo o fobia al dentista?', 'Sí. CADO plantea un trato respetuoso y sin juicios. El cuestionario previo de perfilamiento y el test de confort permiten adaptar el ritmo, acordar una señal de parada con la mano y preparar un ambiente tranquilo.', 1),
+  ('miedo', '¿Puedo pedir pausas durante una atención?', 'Por supuesto. Puedes solicitar pausas periódicas para descansar la mandíbula y acordar una señal manual con el Dr. Javier Beiza para detener el procedimiento inmediatamente cuando lo necesites.', 2),
+  ('vespertino', '¿Cómo funcionan los horarios vespertinos en Calama?', 'CADO ofrece bloques de orientación virtual de 15 minutos en horario compatible con jornadas laborales y turnos, además de coordinación presencial vespertina (19:00 y 20:00 hrs) en Edificio Espacio Parque.', 3),
+  ('miedo', '¿Qué privacidad tienen mis respuestas en el cuestionario previo?', 'Tus respuestas están protegidas bajo la Ley N° 19.628 y N° 20.584. Siempre puedes elegir «Prefiero no responder» en preguntas sensibles y solo se almacenan con tu consentimiento explícito.', 4),
+  ('dentalink', '¿Cómo se reserva una consulta presencial después de la orientación?', 'Tras la orientación telemática, el doctor habilita la derivación hacia la agenda oficial en Dentalink o mediante coordinación directa asistida por WhatsApp.', 5),
+  ('procedimientos', '¿Qué hacer si tengo dolor dental agudo o una urgencia hoy?', 'Dirígete a nuestra sección de Urgencias Dentales donde encontrarás contacto telefónico directo de un toque (+56 9 4465 7815), WhatsApp prioritario y guías PDF de primeros auxilios.', 6);

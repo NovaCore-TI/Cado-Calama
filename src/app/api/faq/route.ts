@@ -11,7 +11,7 @@ const DEFAULT_FAQS = [
   { id: 7, category: 'procedimientos', q: '¿Dónde consulto por un tratamiento específico o sus costos?', a: 'Los planes de tratamiento y presupuestos clínicos se entregan tras una evaluación profesional personalizada; el sitio web y el cuestionario previo son orientativos y no emiten diagnósticos automáticos.' },
 ];
 
-// SCRUM-42 (RF-03): Backend Buscador interactivo de preguntas frecuentes (FAQ)
+// Backend de buscador interactivo de preguntas frecuentes (FAQ)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const q = (searchParams.get('q') || '').toLowerCase().trim();
@@ -35,8 +35,6 @@ export async function GET(request: NextRequest) {
   if (!error && sbFaqs && sbFaqs.length > 0) {
     return NextResponse.json({
       ok: true,
-      rf: 'RF-03',
-      jiraKey: 'SCRUM-42',
       source: 'supabase',
       count: sbFaqs.length,
       data: sbFaqs.map((row: Record<string, unknown>) => ({
@@ -56,8 +54,6 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    rf: 'RF-03',
-    jiraKey: 'SCRUM-42',
     source: 'backend_filtered',
     query: { q, category },
     count: filtered.length,

@@ -30,15 +30,13 @@ const PERFIL_INSTITUCIONAL = {
   ],
 };
 
-// SCRUM-36 (RF-01): Backend de Perfil Profesional, Identidad de CADO y Canales de Contacto
+// Backend de Perfil Profesional, Identidad de CADO y Canales de Contacto
 export async function GET() {
   const { data: doctores, error } = await supabase.from('doctores').select('*').limit(1);
 
   return NextResponse.json({
     ok: true,
-    rf: 'RF-01',
-    jiraKey: 'SCRUM-36',
-    source: !error && doctores && doctores.length > 0 ? 'supabase' : ' institutional_config',
+    source: !error && doctores && doctores.length > 0 ? 'supabase' : 'institutional_config',
     data: {
       ...PERFIL_INSTITUCIONAL,
       doctorDb: doctores?.[0] || null,

@@ -77,12 +77,12 @@ export default function TestConfortPage() {
     <main className="bg-white pb-24 text-[#513D49]">
       <section className="bg-[#F6F8F8] px-6 py-16 sm:py-20">
         <div className="mx-auto max-w-5xl">
-          <p className="section-eyebrow">RF-07 · Test de Confort Ambiental Conectado a Backend</p>
+          <p className="section-eyebrow">Test de Confort Ambiental</p>
           <h1 className="mt-4 max-w-3xl font-title text-5xl font-semibold leading-tight sm:text-6xl">
             Tu comodidad también importa.
           </h1>
           <p className="mt-5 max-w-2xl leading-8 text-[#665D66]">
-            Personaliza el ambiente de tu futura atención en CADO: música o silencio, pausas periódicas y asistencia con acompañante. Tus elecciones se guardan en el Backend y quedan vinculadas a tu reserva para que el Dr. Javier Beiza las vea en su bandeja privada.
+            Personaliza el ambiente de tu futura atención en CADO: música o silencio, pausas periódicas y asistencia con acompañante. Tus elecciones se guardan y quedan vinculadas a tu reserva para que el Dr. Javier Beiza las vea en su bandeja privada.
           </p>
         </div>
       </section>
@@ -225,7 +225,7 @@ export default function TestConfortPage() {
               className="btn-cado-primary mt-6 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-semibold"
             >
               {isSaving ? (
-                <span>Guardando en /api/confort...</span>
+                <span>Guardando preferencias...</span>
               ) : savedSuccess ? (
                 <>
                   <CheckCircle2 className="h-4 w-4" />
@@ -253,7 +253,7 @@ export default function TestConfortPage() {
 
             <p className="mt-6 flex items-start gap-2 border-t border-[#E2E7E7] pt-5 text-xs leading-6 text-[#665D66]">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#A14B92]" />
-              Asociado unívocamente a tu solicitud bajo consentimiento informado (RF-07, RF-09).
+              Asociado unívocamente a tu solicitud bajo consentimiento informado.
             </p>
           </div>
         </aside>
