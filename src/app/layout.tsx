@@ -114,6 +114,12 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col bg-cado-light text-cado-text antialiased selection:bg-cado-purple/20 selection:text-cado-dark">
+        <a 
+          href="#main-content" 
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-xl focus:bg-[#A14B92] focus:px-4 focus:py-2.5 focus:text-white focus:text-xs focus:font-semibold focus:shadow-xl focus:outline-none"
+        >
+          Saltar al contenido principal
+        </a>
         <CadoProvider>
           <SiteShell>{children}</SiteShell>
         </CadoProvider>
