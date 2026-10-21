@@ -24,8 +24,6 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { label: 'Inicio', path: '/' },
     { label: 'Conoce al Doctor', path: '/equipo' },
-    { label: 'Cuestionario previo', path: '/cuestionario' },
-    { label: 'Test de Confort', path: '/test-confort' },
     { label: 'Orientación virtual', path: '/agendar' },
     { label: 'Preguntas Frecuentes', path: '/faq' },
     { label: 'Recursos', path: '/recursos' },
@@ -80,7 +78,7 @@ export const Navbar: React.FC = () => {
         </Link>
 
         {/* NAVEGACIÓN DESKTOP (SIN ENLACE A ADMIN) */}
-        <nav className="hidden xl:flex items-center gap-6 text-[13px] font-medium text-[#513D49]">
+        <nav className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-[#513D49]">
           {navLinks.map((item) => (
             <Link
               key={item.path}
@@ -122,7 +120,7 @@ export const Navbar: React.FC = () => {
         {/* BOTÓN HAMBURGUESA MOBILE */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="xl:hidden p-2 rounded-xl text-[#513D49] hover:bg-[#F6F8F8] focus:outline-none focus:ring-2 focus:ring-[#A14B92]"
+          className="lg:hidden p-2 rounded-xl text-[#513D49] hover:bg-[#F6F8F8] focus:outline-none focus:ring-2 focus:ring-[#A14B92]"
           aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
         >
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -131,7 +129,7 @@ export const Navbar: React.FC = () => {
 
       {/* MENÚ DESPLEGABLE MOBILE */}
       {isMobileMenuOpen && (
-        <div className="xl:hidden bg-white border-b border-cado-silver-border px-4 py-4 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-200">
+        <div className="lg:hidden bg-white border-b border-cado-silver-border px-4 py-4 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-200">
           <div className="space-y-1">
             {navLinks.map((item) => (
               <Link
