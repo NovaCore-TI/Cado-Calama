@@ -114,6 +114,24 @@ export default function CuestionarioPage() {
           </p>
         </div>
 
+        <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-[#A14B92]/30 bg-[#F8EFF6] p-4 text-xs text-[#513D49] sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#A14B92] text-xs font-bold text-white">
+              ✨
+            </span>
+            <span>
+              <strong>Flujo de reserva unificado disponible:</strong> Ahora puedes completar este cuestionario, personalizar tu confort y elegir tu horario en un solo recorrido continuo desde <strong>Agendar</strong>.
+            </span>
+          </div>
+          <Link
+            href="/agendar"
+            className="btn-cado-primary inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold"
+          >
+            <span>Ir a Agendamiento Unificado</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
           <section
             className="rounded-[2rem] border border-white bg-white p-6 shadow-[0_18px_45px_rgba(81,61,73,.08)] sm:p-9"
@@ -138,16 +156,17 @@ export default function CuestionarioPage() {
                 </p>
                 <div className="mt-7 flex flex-wrap justify-center gap-3">
                   <Link
-                    href="/test-confort"
-                    className="btn-cado-primary rounded-xl px-5 py-3 text-sm font-semibold"
+                    href="/agendar?step=2"
+                    className="btn-cado-primary inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold shadow-md"
                   >
-                    Configurar Preferencias de Confort →
+                    <span>Continuar a Test de Confort y Reserva</span>
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                   <Link
-                    href="/agendar"
+                    href="/test-confort"
                     className="btn-cado-secondary rounded-xl px-5 py-3 text-sm font-semibold"
                   >
-                    Ir a Reserva Telemática
+                    Ver Test de Confort individual
                   </Link>
                   <button
                     type="button"
