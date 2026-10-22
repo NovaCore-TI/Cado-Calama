@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -198,6 +198,16 @@ export default function RecursosPage() {
   const [downloadedId, setDownloadedId] = useState<string | null>(null);
   const [selectedGuide, setSelectedGuide] = useState<ClinicalGuide | null>(null);
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setSelectedGuide(null);
+    }
+    if (selectedGuide) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [selectedGuide]);
+
   const handleDownloadPdf = (guide: ClinicalGuide) => {
     const blob = generateValidPdfBlob(guide);
     const url = URL.createObjectURL(blob);
@@ -296,6 +306,9 @@ export default function RecursosPage() {
           <div
             role="dialog"
             aria-modal="true"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setSelectedGuide(null);
+            }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
           >
             <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-9">
@@ -367,10 +380,10 @@ export default function RecursosPage() {
               Ver preguntas frecuentes <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/cuestionario"
-              className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[#A14B92] hover:underline"
+              href="/agendar"
+              className="btn-cado-primary inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold"
             >
-              Ir al cuestionario <ArrowRight className="h-4 w-4" />
+              Orientación virtual guiada <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>

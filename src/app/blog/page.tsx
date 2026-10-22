@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useCado, BlogPost } from '@/context/CadoContext';
 import { 
@@ -22,6 +22,16 @@ export default function BlogPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activePost, setActivePost] = useState<BlogPost | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setActivePost(null);
+    }
+    if (activePost) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [activePost]);
 
   const categories = ['Todos', 'Miedo Dental', 'Cuidados', 'Bruxismo', 'Urgencias'];
 
@@ -156,7 +166,14 @@ export default function BlogPage() {
 
       {/* 4. MODAL DE LECTURA COMPLETA */}
       {activePost && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActivePost(null);
+          }}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-10 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl border border-[#E2E7E7] animate-in zoom-in-95 duration-200">
             <div className="flex items-start justify-between gap-4 border-b border-[#E2E7E7] pb-4">
               <div className="space-y-1">
@@ -178,6 +195,7 @@ export default function BlogPage() {
               <button
                 type="button"
                 onClick={() => setActivePost(null)}
+                aria-label="Cerrar lectura"
                 className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-700 shrink-0"
               >
                 <X className="w-5 h-5" />
@@ -196,11 +214,11 @@ export default function BlogPage() {
                 <span className="text-[11px] text-gray-500">Puedes agendar una orientación virtual de 15 min sin compromiso.</span>
               </div>
               <Link
-                href="/cuestionario"
+                href="/agendar"
                 onClick={() => setActivePost(null)}
                 className="px-4 py-2.5 rounded-xl bg-[#A14B92] hover:bg-[#8C3C7E] text-white text-xs font-bold shadow-xs hover:shadow-sm whitespace-nowrap font-sans"
               >
-                Cuestionario previo
+                Orientación virtual
               </Link>
             </div>
 

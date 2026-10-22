@@ -22,13 +22,13 @@ interface FAQItem {
 }
 
 const FAQS_DATA: FAQItem[] = [
-  { id: 1, category: 'miedo', q: '¿Puedo contar que siento miedo al dentista?', a: 'Sí. CADO plantea un trato respetuoso y sin juicios. El cuestionario previo del doctor buscará conocer al paciente; el test de confort permite explorar preferencias para una posible atención.' },
-  { id: 2, category: 'miedo', q: '¿Puedo pedir pausas durante una atención?', a: 'Puedes expresar que necesitas pausas y conversar esa preferencia con el profesional antes de la atención.' },
-  { id: 3, category: 'vespertino', q: '¿Las orientaciones virtuales son a las 19:00 y 20:00?', a: 'No. Esos bloques corresponden a consultas presenciales. El horario de las orientaciones virtuales de 15 minutos aún debe confirmarlo el doctor.' },
-  { id: 4, category: 'miedo', q: '¿El cuestionario envía mis respuestas al doctor?', a: 'Todavía no. Las preguntas del doctor están pendientes de incorporación. El test de confort funciona solo como demostración local: no envía respuestas ni crea una reserva.' },
-  { id: 5, category: 'dentalink', q: '¿Cómo se reserva una consulta presencial?', a: 'La agenda presencial se gestiona fuera de este sitio, mediante Dentalink. CADO debe proporcionar el acceso oficial antes de habilitar una derivación directa desde el prototipo.' },
-  { id: 6, category: 'vespertino', q: '¿Ya funciona la reserva con Google Calendar y Meet?', a: 'La integración está prevista para una etapa de implementación. Este prototipo explica el recorrido, pero no crea eventos ni enlaces reales.' },
-  { id: 7, category: 'procedimientos', q: '¿Dónde consulto por un tratamiento o sus costos?', a: 'Puedes comunicarte directamente con CADO. Los tratamientos, valores y condiciones se aclaran con el profesional según cada caso; el sitio no entrega diagnósticos ni presupuestos clínicos.' },
+  { id: 1, category: 'miedo', q: '¿Puedo contar que siento miedo o fobia al dentista?', a: 'Sí. CADO plantea un trato respetuoso y sin juicios. El cuestionario previo de perfilamiento y el test de confort permiten adaptar el ritmo, acordar una señal de parada con la mano y preparar un ambiente tranquilo.' },
+  { id: 2, category: 'miedo', q: '¿Puedo pedir pausas durante una atención?', a: 'Por supuesto. Puedes solicitar pausas periódicas para descansar la mandíbula y acordar una señal manual con el Dr. Javier Beiza para detener el procedimiento inmediatamente cuando lo necesites.' },
+  { id: 3, category: 'vespertino', q: '¿Cómo funcionan los horarios de orientación en Calama?', a: 'CADO ofrece bloques de orientación virtual de 15 minutos en horario vespertino adaptado a turnos y jornadas laborales, además de coordinación presencial en Edificio Espacio Parque.' },
+  { id: 4, category: 'miedo', q: '¿Cómo se vincula el cuestionario y el test de confort a mi reserva?', a: 'El flujo de reserva en Agendar está unificado: al completar el cuestionario y test de confort, tus respuestas quedan directamente enlazadas a tu cita para que el doctor las revise antes de iniciar la videollamada.' },
+  { id: 5, category: 'dentalink', q: '¿Cómo se reserva una consulta presencial después de la orientación?', a: 'Tras la orientación telemática, el doctor habilita la derivación hacia la agenda oficial en Dentalink o mediante coordinación asistida por WhatsApp según tu caso.' },
+  { id: 6, category: 'vespertino', q: '¿Cómo accedo a mi orientación telemática por Google Meet?', a: 'Al confirmar tu reserva se genera automáticamente tu enlace seguro de Google Meet y se envía a tu correo, además de disponer de un botón directo de acceso en la pantalla de confirmación.' },
+  { id: 7, category: 'procedimientos', q: '¿Dónde consulto por un tratamiento o sus costos?', a: 'Los planes de tratamiento y presupuestos clínicos se entregan tras una evaluación profesional personalizada; el sitio web y el cuestionario previo son orientativos y no emiten diagnósticos automáticos.' },
 ];
 
 export default function FaqPage() {
