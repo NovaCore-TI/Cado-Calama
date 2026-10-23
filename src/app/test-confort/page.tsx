@@ -257,7 +257,7 @@ export default function TestConfortPage() {
                 </>
               ) : (
                 <>
-                  <Database className="h-4 w-4" />
+                  <HeartHandshake className="h-4 w-4" />
                   <span>Guardar Preferencias de Confort</span>
                 </>
               )}
