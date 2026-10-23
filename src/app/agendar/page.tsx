@@ -853,7 +853,7 @@ function BookingWizard() {
               >
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                 <span>
-                  {isSubmitting ? 'Registrando cita en Supabase...' : 'Confirmar Reserva de Orientación'}
+                  {isSubmitting ? 'Registrando reserva...' : 'Confirmar Reserva de Orientación'}
                 </span>
               </button>
             </div>

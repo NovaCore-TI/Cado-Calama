@@ -466,7 +466,7 @@ export default function AdminPage() {
               <div className="flex items-start gap-2.5">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" aria-hidden="true" />
                 <span>
-                  Protección de datos bajo la Ley N° 19.628 y N° 20.584. Sincronizado de extremo a extremo con Supabase PostgreSQL.
+                  Protección de datos bajo la Ley N° 19.628 y N° 20.584. Conexión cifrada de extremo a extremo con base de datos clínica.
                 </span>
               </div>
             </div>
@@ -545,7 +545,7 @@ export default function AdminPage() {
                 ) : (
                   <LockKeyhole className="h-4 w-4" aria-hidden="true" />
                 )}
-                <span>{isLoggingIn ? 'Verificando con Supabase Auth…' : 'Entrar al panel de gestión'}</span>
+                <span>{isLoggingIn ? 'Verificando credenciales…' : 'Entrar al panel de gestión'}</span>
               </button>
             </form>
 
@@ -647,7 +647,7 @@ export default function AdminPage() {
               }`}
             />
             <span className="truncate">
-              {realtimeConnected ? 'Realtime en vivo' : supabaseStatus.connected ? 'Supabase conectado' : 'Modo local'}
+              {realtimeConnected ? 'En vivo (Automático)' : supabaseStatus.connected ? 'Base de datos en línea' : 'Modo local'}
             </span>
           </div>
 
@@ -673,7 +673,7 @@ export default function AdminPage() {
               <p className="text-sm font-semibold text-[#513D49]">Portal de Gestión Clínica</p>
               <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-800">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {authMethod === 'supabase' ? 'Supabase Auth' : 'Sesión Clínica'} · {doctorUser?.email || 'Dr. Javier Beiza'}
+                {authMethod === 'supabase' ? 'Sesión Verificada' : 'Sesión Clínica'} · {doctorUser?.email || 'Dr. Javier Beiza'}
               </span>
             </div>
           </div>
@@ -686,7 +686,7 @@ export default function AdminPage() {
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                   : 'border-amber-200 bg-amber-50 text-amber-800'
               }`}
-              title={realtimeConnected ? 'Conectado a Supabase Realtime por WebSockets (sincronización instantánea)' : 'Conectando con Supabase Realtime...'}
+              title={realtimeConnected ? 'Sincronización instantánea activa' : 'Conectando sincronización en vivo...'}
             >
               <span className="relative flex h-2 w-2">
                 {realtimeConnected && (
@@ -711,7 +711,7 @@ export default function AdminPage() {
                 className={`h-3.5 w-3.5 text-[#A14B92] ${isRefreshing ? 'animate-spin' : ''}`}
                 aria-hidden="true"
               />
-              <span className="hidden sm:inline">Sincronizar Supabase</span>
+              <span className="hidden sm:inline">Sincronizar Datos</span>
             </button>
 
             <button
@@ -861,7 +861,7 @@ export default function AdminPage() {
                     <Zap className="h-5 w-5" aria-hidden="true" />
                   </span>
                   <h2 className="font-title text-2xl font-semibold text-[#513D49]">
-                    Backend & Supabase
+                    Base de Datos en la Nube
                   </h2>
                   <p className="text-xs leading-relaxed text-[#665D66]">
                     {supabaseStatus.message}
@@ -1556,7 +1556,7 @@ export default function AdminPage() {
                     {editingPostId ? 'Editar artículo' : 'Redactar nuevo artículo'}
                   </h2>
                   <p className="text-xs text-[#766C75]">
-                    Los artículos guardados se sincronizan con Supabase (`articulos_blog`).
+                    Los artículos guardados se sincronizan con la base de datos clínica (`articulos_blog`).
                   </p>
                 </div>
 
