@@ -270,10 +270,10 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setBlogPosts(mappedPosts);
       }
 
-      // Load appointments from Supabase (con desduplicación estricta por ID y bloque horario)
+      // Load appointments from Supabase (con desduplicación estricta y cuestionarios vinculados)
       const { data: sbApps } = await supabase
         .from('orientaciones_citas')
-        .select('*')
+        .select('*, cuestionarios_perfilamiento (*)')
         .order('created_at', { ascending: false });
 
       if (sbApps && sbApps.length > 0) {
@@ -299,6 +299,26 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
             seenSlots.add(slotKey);
           }
 
+          // Mapear cuestionario de perfilamiento sensible vinculado
+          let questionnaire: QuestionnaireSubmission | undefined = undefined;
+          const qRow = row.cuestionarios_perfilamiento as Record<string, unknown> | null;
+          if (qRow && qRow.motivo_consulta) {
+            const extras = (qRow.respuestas_adicionales as Record<string, string>) || {};
+            questionnaire = {
+              id: String(qRow.id),
+              reason: String(qRow.motivo_consulta || ''),
+              feeling: String(qRow.nivel_temor || 'nervioso'),
+              previousExperience: String(extras.previousExperience || 'Prefiero no responder'),
+              painSensitivity: String(extras.painSensitivity || 'Estándar'),
+              communicationPreference: String(extras.communicationPreference || 'Explicación paso a paso con lenguaje sencillo'),
+              consent: Boolean(qRow.consentimiento_privacidad),
+              createdAt: qRow.created_at
+                ? new Date(String(qRow.created_at)).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' })
+                : '',
+              syncedToSupabase: true,
+            };
+          }
+
           mappedApps.push({
             id,
             patientName: String(row.nombre_paciente || 'Paciente'),
@@ -313,6 +333,7 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
               companionAllowed: false,
               handSignalPledge: true,
             },
+            questionnaire,
             meetLink: String(row.meet_link || 'https://meet.google.com/cado-orientacion-demo'),
             status,
             derivationStatus:

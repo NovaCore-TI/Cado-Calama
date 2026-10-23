@@ -22,7 +22,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { useCado, type Appointment, type ComfortProfile } from '@/context/CadoContext';
+import { useCado, type Appointment, type ComfortProfile, type QuestionnaireSubmission } from '@/context/CadoContext';
 import { ConfortLiveCard } from '@/components/ConfortLiveCard';
 
 function endTime(time: string) {
@@ -92,6 +92,7 @@ function BookingWizard() {
   const [communication, setCommunication] = useState(activeQuestionnaire?.communicationPreference || 'Explicación paso a paso con lenguaje sencillo');
   const [questionnaireConsent, setQuestionnaireConsent] = useState(true);
   const [isSkippingQuestionnaire, setIsSkippingQuestionnaire] = useState(false);
+  const [savedQuestionnaire, setSavedQuestionnaire] = useState<QuestionnaireSubmission | null>(null);
 
   // Estados del Paso 2: Confort
   const [sound, setSound] = useState<'musica_suave' | 'silencio'>(
@@ -152,7 +153,7 @@ function BookingWizard() {
 
     setIsSubmitting(true);
     try {
-      await submitQuestionnaire({
+      const savedQ = await submitQuestionnaire({
         reason: reason.trim(),
         feeling,
         previousExperience: previousExp,
@@ -160,6 +161,7 @@ function BookingWizard() {
         communicationPreference: communication,
         consent: questionnaireConsent,
       });
+      setSavedQuestionnaire(savedQ);
       setIsSkippingQuestionnaire(false);
       setCurrentStep(2);
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -223,7 +225,7 @@ function BookingWizard() {
           date,
           time: slot,
           consent: finalConsent,
-          cuestionarioId: isSkippingQuestionnaire ? null : (activeQuestionnaire?.id || null),
+          cuestionarioId: isSkippingQuestionnaire ? null : ((savedQuestionnaire?.id || activeQuestionnaire?.id) || null),
           comfortProfile: comfortPayload,
         }),
       });
@@ -243,7 +245,7 @@ function BookingWizard() {
         date,
         time: slot,
         comfortProfile: comfortPayload,
-        questionnaire: isSkippingQuestionnaire ? undefined : (activeQuestionnaire || undefined),
+        questionnaire: isSkippingQuestionnaire ? undefined : (savedQuestionnaire || activeQuestionnaire || undefined),
         meetLink: json.data?.meet_link || '',
         derivationStatus: 'Sin derivación',
         skipSupabaseSync: true, // ¡Ya fue guardado e insertado por /api/orientaciones!
