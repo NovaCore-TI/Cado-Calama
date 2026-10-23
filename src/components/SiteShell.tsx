@@ -10,5 +10,5 @@ export function SiteShell({ children }: { children: ReactNode }) {
 
   if (isIntranet) return <main className="min-h-screen">{children}</main>;
 
-  return <><Navbar /><main className="flex-1">{children}</main><Footer /></>;
+  return <><Navbar /><main id="main-content" className="flex-1">{children}</main><Footer /></>;
 }
