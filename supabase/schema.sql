@@ -333,3 +333,39 @@ VALUES
   ('miedo', '¿Qué privacidad tienen mis respuestas en el cuestionario previo?', 'Tus respuestas están protegidas bajo la Ley N° 19.628 y N° 20.584. Siempre puedes elegir «Prefiero no responder» en preguntas sensibles y solo se almacenan con tu consentimiento explícito.', 4),
   ('dentalink', '¿Cómo se reserva una consulta presencial después de la orientación?', 'Tras la orientación telemática, el doctor habilita la derivación hacia la agenda oficial en Dentalink o mediante coordinación directa asistida por WhatsApp.', 5),
   ('procedimientos', '¿Qué hacer si tengo dolor dental agudo o una urgencia hoy?', 'Dirígete a nuestra sección de Urgencias Dentales donde encontrarás contacto telefónico directo de un toque (+56 9 4465 7815), WhatsApp prioritario y guías PDF de primeros auxilios.', 6);
+
+
+-- -----------------------------------------------------------------------------
+-- 8. SUPABASE REALTIME (SINCRONIZACIÓN AUTOMÁTICA EN VIVO VÍA WEBSOCKETS)
+-- -----------------------------------------------------------------------------
+-- Publicación de tablas en el canal de eventos de Supabase Realtime
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'orientaciones_citas'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.orientaciones_citas;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'bloques_disponibilidad'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.bloques_disponibilidad;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'articulos_blog'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.articulos_blog;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'cuestionarios_perfilamiento'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.cuestionarios_perfilamiento;
+  END IF;
+END $$;

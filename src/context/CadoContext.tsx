@@ -100,6 +100,10 @@ export interface CadoContextType {
   updateBlogPost: (id: string, post: Partial<BlogPost>) => void;
   deleteBlogPost: (id: string) => void;
 
+  // Realtime WebSockets (Sincronización en vivo automática)
+  realtimeConnected: boolean;
+  lastRealtimeEvent: string | null;
+
   // Auth for Doctor (RF-17 & RF-18 con Supabase Auth)
   isDoctorLoggedIn: boolean;
   doctorUser: { id?: string; email?: string } | null;
@@ -223,6 +227,10 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     email: '',
     phone: '',
   });
+
+  // Realtime WebSocket state
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [lastRealtimeEvent, setLastRealtimeEvent] = useState<string | null>(null);
 
   // Doctor Auth state (RF-17 & RF-18)
   const [isDoctorLoggedIn, setIsDoctorLoggedIn] = useState(false);
@@ -357,6 +365,61 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     void checkSupabaseSession();
 
     refreshSupabaseData();
+  }, [refreshSupabaseData]);
+
+  
+  // =========================================================================
+  // SUPABASE REALTIME (SINCRONIZACIÓN AUTOMÁTICA EN VIVO VÍA WEBSOCKETS)
+  // =========================================================================
+  useEffect(() => {
+    const channel = supabase
+      .channel('cado-realtime-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orientaciones_citas' },
+        (payload) => {
+          const action = payload.eventType === 'INSERT' ? 'Nueva cita recibida' : payload.eventType === 'UPDATE' ? 'Cita actualizada' : 'Cita modificada';
+          const time = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setLastRealtimeEvent(`${action} (${time})`);
+          void refreshSupabaseData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bloques_disponibilidad' },
+        (payload) => {
+          const time = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+          setLastRealtimeEvent(`Disponibilidad horaria actualizada (${time})`);
+          void refreshSupabaseData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'articulos_blog' },
+        (payload) => {
+          const time = new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+          setLastRealtimeEvent(`Artículo de blog actualizado (${time})`);
+          void refreshSupabaseData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cuestionarios_perfilamiento' },
+        () => {
+          void refreshSupabaseData();
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setRealtimeConnected(true);
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setRealtimeConnected(false);
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [refreshSupabaseData]);
 
   // Suscripción a cambios de estado de Supabase Auth
@@ -860,6 +923,8 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addBlogPost,
         updateBlogPost,
         deleteBlogPost,
+        realtimeConnected,
+        lastRealtimeEvent,
         isDoctorLoggedIn,
         doctorUser,
         authMethod,
