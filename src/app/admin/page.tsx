@@ -223,10 +223,63 @@ export default function AdminPage() {
     }
   }
 
-  function handleFillDemoCredentials() {
-    setEmail('demo@cado.local');
-    setPassword('DEMO');
-  }
+  
+
+  // Integración Google Calendar & Meet (RF-13)
+  const [googleDoctor, setGoogleDoctor] = useState<{
+    id: string;
+    nombre: string;
+    email: string;
+    rol?: string;
+    google_conectado: boolean;
+    google_email?: string | null;
+  } | null>(null);
+  const [googleNotification, setGoogleNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const fetchGoogleDoctorStatus = async () => {
+    try {
+      const res = await fetch('/api/doctores');
+      const json = await res.json();
+      if (json.ok && Array.isArray(json.data) && json.data.length > 0) {
+        setGoogleDoctor(json.data[0]);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchGoogleDoctorStatus();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('google_success') === 'true') {
+        const mail = params.get('email');
+        setGoogleNotification({
+          type: 'success',
+          message: `¡Cuenta de Google Calendar (${mail || ''}) vinculada exitosamente!`,
+        });
+        setSection('integraciones');
+      } else if (params.get('google_error')) {
+        setGoogleNotification({
+          type: 'error',
+          message: `Error al vincular Google Calendar: ${params.get('google_error')}`,
+        });
+        setSection('integraciones');
+      }
+    }
+  }, []);
+
+  const handleDisconnectGoogle = async (doctorId: string) => {
+    if (!confirm('¿Deseas desvincular la cuenta de Google Calendar?')) return;
+    try {
+      await fetch('/api/doctores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'desconectar', doctorId }),
+      });
+      await fetchGoogleDoctorStatus();
+    } catch {
+      alert('Error al desvincular cuenta.');
+    }
+  };
 
   async function handleRefreshBackend() {
     setIsRefreshing(true);
@@ -258,7 +311,7 @@ export default function AdminPage() {
         category: postCategory,
         excerpt,
         content: postContent.trim(),
-        author: 'Dr. Javier Beiza Ayala',
+        author: doctorUser?.nombre || 'Dr. Javier Beiza Ayala',
         readTime: `${Math.max(2, Math.ceil(postContent.trim().split(/\s+/).length / 180))} min de lectura`,
         published: false,
       });
@@ -459,7 +512,7 @@ export default function AdminPage() {
                 Gestión cercana, ética y personalizada.
               </h1>
               <p className="max-w-sm text-sm leading-relaxed text-[#665D66]">
-                Espacio de trabajo del <strong>Dr. Javier Beiza Ayala</strong> para revisar el cuestionario previo y las preferencias de confort de cada paciente antes de la orientación virtual.
+                Espacio de trabajo de <strong>{doctorUser?.nombre || 'Dr. Javier Beiza Ayala'}</strong> para revisar el cuestionario previo y las preferencias de confort de cada paciente antes de la orientación virtual.
               </p>
             </div>
 
@@ -500,7 +553,7 @@ export default function AdminPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm outline-none focus:border-[#A14B92]"
-                  placeholder="demo@cado.local"
+                  placeholder="ej: doctor@cado.cl"
                 />
               </label>
 
@@ -550,23 +603,7 @@ export default function AdminPage() {
               </button>
             </form>
 
-            <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-[#E2E7E7] bg-[#F6F8F8] p-4 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-[#513D49]">Acceso de prueba:</span>
-                <button
-                  type="button"
-                  onClick={handleFillDemoCredentials}
-                  className="text-xs font-bold text-[#A14B92] hover:underline"
-                >
-                  Rellenar automáticamente
-                </button>
-              </div>
-              <p className="text-[#766C75]">
-                Usuario: <code className="font-mono text-[#513D49]">demo@cado.local</code> · Clave:{' '}
-                <code className="font-mono text-[#513D49]">DEMO</code>
-              </p>
             </div>
-          </div>
         </div>
       </div>
     );
@@ -575,7 +612,13 @@ export default function AdminPage() {
   // =========================================================================
   // PANEL ADMINISTRATIVO PRINCIPAL (AUTENTICADO)
   // =========================================================================
-  const title = sectionTitles[section];
+  const rawTitle = sectionTitles[section];
+  const title = {
+    ...rawTitle,
+    title: section === 'resumen'
+      ? `Panel Clínico · ${doctorUser?.nombre || 'Dr. Javier Beiza'}`
+      : rawTitle.title,
+  };
 
   return (
     <div className="min-h-screen bg-[#F6F8F8] text-[#513D49] lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -599,9 +642,9 @@ export default function AdminPage() {
             Espacio Clínico
           </p>
           <h2 className="mt-1 font-title text-xl font-semibold text-[#513D49]">
-            Dr. Javier Beiza Ayala
+            {doctorUser?.nombre || 'Dr. Javier Beiza Ayala'}
           </h2>
-          <p className="text-xs text-[#766C75]">CADO Odontología · Calama</p>
+          <p className="text-xs text-[#766C75]">{doctorUser?.rol || 'CADO Odontología · Calama'}</p>
         </div>
 
         {/* MENÚ DE SECCIONES */}
@@ -674,7 +717,7 @@ export default function AdminPage() {
               <p className="text-sm font-semibold text-[#513D49]">Portal de Gestión Clínica</p>
               <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-800">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {authMethod === 'supabase' ? 'Sesión Verificada' : 'Sesión Clínica'} · {doctorUser?.email || 'Dr. Javier Beiza'}
+                {authMethod === 'supabase' ? 'Sesión Verificada' : 'Sesión Clínica'} · {doctorUser?.nombre || doctorUser?.email || 'Dr. Javier Beiza'}
               </span>
             </div>
           </div>
@@ -728,6 +771,25 @@ export default function AdminPage() {
 
         {/* CUERPO PRINCIPAL SEGÚN SECCIÓN */}
         <main className="mx-auto max-w-7xl space-y-8 px-6 py-8 sm:px-9 sm:py-10">
+          {googleNotification && (
+            <aside
+              aria-label="Notificación de Google Calendar"
+              className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-xs font-medium shadow-sm ${
+                googleNotification.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                  : 'border-rose-200 bg-rose-50 text-rose-900'
+              }`}
+            >
+              <span>{googleNotification.message}</span>
+              <button
+                type="button"
+                onClick={() => setGoogleNotification(null)}
+                className="rounded-lg px-2 py-1 hover:bg-black/5"
+              >
+                ✕
+              </button>
+            </aside>
+          )}
           {/* BANNER DE NOTIFICACIÓN DE SINCRONIZACIÓN EN TIEMPO REAL */}
           {lastRealtimeEvent && (
             <aside
@@ -1778,6 +1840,87 @@ export default function AdminPage() {
                   </div>
                 </article>
               </div>
+
+              {/* Panel de Conexión Google Calendar & Meet (RF-13) */}
+              <section className="rounded-[1.7rem] border border-[#E2E7E7] bg-white p-6 shadow-xs sm:p-8">
+                <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E2E7E7] pb-5">
+                  <div>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A14B92]">
+                      Integración Externa (RF-13)
+                    </span>
+                    <h2 className="mt-1 font-title text-2xl font-semibold sm:text-3xl text-[#513D49]">
+                      Conexión Google Calendar & Meet
+                    </h2>
+                    <p className="mt-2 max-w-3xl text-xs leading-6 text-[#665D66]">
+                      Vincula una cuenta de Google para sincronización de teleorientaciones. Al confirmarse una reserva telemática, se creará un evento automático en la agenda y se generará una sala de Google Meet oficial.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <div className="max-w-xl rounded-2xl border border-[#E2E7E7] bg-[#F6F8F8] p-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#A14B92] shadow-xs">
+                          <Video className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <h3 className="font-semibold text-[#513D49]">
+                            {doctorUser?.nombre || googleDoctor?.nombre || 'Dr. Javier Beiza Ayala'}
+                          </h3>
+                          <p className="text-xs text-[#766C75]">
+                            {doctorUser?.rol || googleDoctor?.rol || 'Cirujano Dentista · Director Clínico CADO'}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold border ${
+                          googleDoctor?.google_conectado
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-white text-[#766C75] border-[#E2E7E7]'
+                        }`}
+                      >
+                        {googleDoctor?.google_conectado ? '● Conectado a Google' : '○ No conectado'}
+                      </span>
+                    </div>
+
+                    {googleDoctor?.google_email && (
+                      <div className="mt-4 rounded-xl bg-emerald-50/70 border border-emerald-100 p-3 text-xs text-emerald-900">
+                        Cuenta vinculada: <strong>{googleDoctor.google_email}</strong>
+                      </div>
+                    )}
+
+                    <div className="mt-6 flex flex-wrap gap-3 border-t border-[#E2E7E7] pt-4">
+                      {googleDoctor?.google_conectado ? (
+                        <>
+                          <a
+                            href={`/api/auth/google?doctorId=${googleDoctor.id}`}
+                            className="btn-cado-secondary inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold"
+                          >
+                            <CalendarDays className="h-4 w-4" />
+                            <span>Re-conectar cuenta</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDisconnectGoogle(googleDoctor.id)}
+                            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                          >
+                            Desvincular
+                          </button>
+                        </>
+                      ) : (
+                        <a
+                          href={`/api/auth/google?doctorId=${googleDoctor?.id || 'e03d11e6-6409-4149-af0d-c01de4222fa8'}`}
+                          className="btn-cado-primary inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold"
+                        >
+                          <CalendarDays className="h-4 w-4" />
+                          <span>Vincular Google Calendar con cuenta de prueba</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           )}
         </main>
@@ -1951,7 +2094,7 @@ export default function AdminPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                   <a
                     href={`https://wa.me/${app.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                      `Hola ${app.patientName}, le saluda el Dr. Javier Beiza de CADO Odontología Calama respecto a su orientación telemática del día ${app.date}.`
+                      `Hola ${app.patientName}, le saluda ${doctorUser?.nombre || 'el Dr. Javier Beiza'} de CADO Odontología Calama respecto a su orientación telemática del día ${app.date}.`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"

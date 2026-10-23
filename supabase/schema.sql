@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS public.doctores (
   nombre text NOT NULL,
   email text UNIQUE NOT NULL,
   rol text DEFAULT 'Odontólogo Titular',
+  google_email text,
+  google_refresh_token text,
+  google_calendar_id text DEFAULT 'primary',
+  google_conectado boolean DEFAULT false,
   ultimo_acceso timestamptz DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -75,6 +79,7 @@ CREATE TABLE IF NOT EXISTS public.bloques_disponibilidad (
 CREATE TABLE IF NOT EXISTS public.orientaciones_citas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   codigo text UNIQUE NOT NULL,
+  doctor_id uuid REFERENCES public.doctores(id) ON DELETE SET NULL,
   paciente_id uuid REFERENCES public.pacientes(id) ON DELETE CASCADE,
   bloque_id uuid REFERENCES public.bloques_disponibilidad(id) ON DELETE SET NULL,
   cuestionario_id uuid REFERENCES public.cuestionarios_perfilamiento(id) ON DELETE SET NULL,
@@ -169,6 +174,8 @@ CREATE INDEX IF NOT EXISTS idx_bloques_disponibles ON public.bloques_disponibili
 CREATE INDEX IF NOT EXISTS idx_articulos_publicados ON public.articulos_blog (published_at DESC) WHERE publicado = true;
 CREATE INDEX IF NOT EXISTS idx_faq_activas ON public.preguntas_frecuentes (orden ASC) WHERE activo = true;
 CREATE INDEX IF NOT EXISTS idx_guias_activas ON public.guias_clinicas (categoria) WHERE activo = true;
+-- Control Transaccional de Concurrencia (RF-11): Evita duplicidad de citas activas en el mismo horario
+CREATE UNIQUE INDEX IF NOT EXISTS uq_citas_activas_fecha_hora ON public.orientaciones_citas (fecha, hora) WHERE estado_atencion = 'Programada';
 
 -- -----------------------------------------------------------------------------
 -- 3. TRIGGER AUTOMÁTICO PARA 'updated_at'
@@ -230,6 +237,9 @@ CREATE POLICY "Lectura publica guias clinicas" ON public.guias_clinicas
 CREATE POLICY "Lectura publica doctores" ON public.doctores
   FOR SELECT TO anon, authenticated USING (true);
 
+CREATE POLICY "Gestion doctores" ON public.doctores
+  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
 CREATE POLICY "Lectura publica bloques disponibles" ON public.bloques_disponibilidad
   FOR SELECT TO anon, authenticated USING (true);
 
@@ -284,9 +294,10 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authen
 -- 6. DATOS SEMILLA (Seed Data)
 -- -----------------------------------------------------------------------------
 
--- Doctor Titular
+-- Doctores del Equipo CADO
 INSERT INTO public.doctores (nombre, email, rol)
-VALUES ('Dr. Javier Beiza Ayala', 'jbeiza@cado.cl', 'Cirujano Dentista Titular - 13 años en Calama')
+VALUES 
+  ('Dr. Javier Beiza Ayala', 'jbeiza@cado.cl', 'Cirujano Dentista Titular - 13 años en Calama')
 ON CONFLICT (email) DO UPDATE SET ultimo_acceso = now();
 
 -- Artículos del Blog Educativo
@@ -334,38 +345,35 @@ VALUES
   ('dentalink', '¿Cómo se reserva una consulta presencial después de la orientación?', 'Tras la orientación telemática, el doctor habilita la derivación hacia la agenda oficial en Dentalink o mediante coordinación directa asistida por WhatsApp.', 5),
   ('procedimientos', '¿Qué hacer si tengo dolor dental agudo o una urgencia hoy?', 'Dirígete a nuestra sección de Urgencias Dentales donde encontrarás contacto telefónico directo de un toque (+56 9 4465 7815), WhatsApp prioritario y guías PDF de primeros auxilios.', 6);
 
+-- Guías Clínicas Oficiales en PDF (RF-04)
+INSERT INTO public.guias_clinicas (titulo, categoria, descripcion, url_descarga, tamano_kb, descargas, activo)
+VALUES
+  (
+    'Cuidados Posteriores a una Extracción Dental (Exodoncia)',
+    'Postoperatorio',
+    'Indicaciones paso a paso para las primeras 48 horas: control del sangrado, alimentación recomendada, higiene suave y señales de alerta.',
+    '/guias/CADO_Guia_Cuidados_Post_Exodoncia.pdf',
+    5,
+    0,
+    true
+  ),
+  (
+    'Primeros Auxilios ante Urgencias Dentales y Dolor Agudo',
+    'Urgencias y Dolor',
+    'Qué hacer de inmediato en casa ante fracturas dentales, golpes (traumatismos), dolor nocturno o inflamación antes de llegar a la consulta.',
+    '/guias/CADO_Guia_Primeros_Auxilios_Urgencias.pdf',
+    5,
+    0,
+    true
+  ),
+  (
+    'Guía de Preparación sin Ansiedad y Alivio Mandibular (TTM)',
+    'Bienestar y Confort',
+    'Ejercicios de respiración, autocuidado para el bruxismo y cómo aprovechar tu orientación virtual y preferencias de confort en CADO.',
+    '/guias/CADO_Guia_Preparacion_y_Confort_Dental.pdf',
+    5,
+    0,
+    true
+  )
+ON CONFLICT DO NOTHING;
 
--- -----------------------------------------------------------------------------
--- 8. SUPABASE REALTIME (SINCRONIZACIÓN AUTOMÁTICA EN VIVO VÍA WEBSOCKETS)
--- -----------------------------------------------------------------------------
--- Publicación de tablas en el canal de eventos de Supabase Realtime
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables 
-    WHERE pubname = 'supabase_realtime' AND tablename = 'orientaciones_citas'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.orientaciones_citas;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables 
-    WHERE pubname = 'supabase_realtime' AND tablename = 'bloques_disponibilidad'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.bloques_disponibilidad;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables 
-    WHERE pubname = 'supabase_realtime' AND tablename = 'articulos_blog'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.articulos_blog;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables 
-    WHERE pubname = 'supabase_realtime' AND tablename = 'cuestionarios_perfilamiento'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.cuestionarios_perfilamiento;
-  END IF;
-END $$;
