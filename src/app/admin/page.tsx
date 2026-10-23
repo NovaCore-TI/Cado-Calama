@@ -180,13 +180,24 @@ export default function AdminPage() {
     }
   }, [openAppointmentId, previewPost]);
 
-  const scheduled = appointments.filter((a) => a.status === 'Programada').length;
-  const completed = appointments.filter((a) => a.status === 'Realizada').length;
-  const derived = appointments.filter((a) =>
+  // Desduplicación estricta de citas para evitar duplicados en memoria o estado local
+  const uniqueAppointments = useMemo(() => {
+    const seen = new Set<string>();
+    return appointments.filter((app) => {
+      const key = app.id || `${app.date}|${app.time}|${app.email}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [appointments]);
+
+  const scheduled = uniqueAppointments.filter((a) => a.status === 'Programada').length;
+  const completed = uniqueAppointments.filter((a) => a.status === 'Realizada').length;
+  const derived = uniqueAppointments.filter((a) =>
     a.derivationStatus ? a.derivationStatus === 'Derivada a Dentalink' : a.status === 'Derivada a Dentalink'
   );
 
-  const filteredAppointments = appointments.filter((appointment) => {
+  const filteredAppointments = uniqueAppointments.filter((appointment) => {
     const term = query.toLowerCase().trim();
     const matchesQuery =
       !term ||
