@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowRight,
+  Calendar,
+  CalendarCheck,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -13,6 +15,7 @@ import {
   Eye,
   EyeOff,
   FileText,
+  Filter,
   Hand,
   HeartHandshake,
   LayoutDashboard,
@@ -25,6 +28,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Users,
   Video,
@@ -146,6 +150,8 @@ export default function AdminPage() {
   const [newSlotDate, setNewSlotDate] = useState(today);
   const [newSlot, setNewSlot] = useState('18:00');
   const [newBlockedDate, setNewBlockedDate] = useState('');
+  const [scheduleViewFilter, setScheduleViewFilter] = useState<'proximos' | 'con_citas' | 'todos'>('proximos');
+  const [slotTimeInputByDate, setSlotTimeInputByDate] = useState<Record<string, string>>({});
 
   // Blog CMS
   const [postTitle, setPostTitle] = useState('');
@@ -261,6 +267,147 @@ export default function AdminPage() {
         toggleSlotAvailability(slotKey);
       }
     });
+  }
+
+  // Agrupación y gestión avanzada de agenda por fecha
+  const scheduleByDate = useMemo(() => {
+    const datesSet = new Set<string>();
+
+    availableSlots.forEach((slot) => {
+      const [d] = slot.split('|');
+      if (d) datesSet.add(d);
+    });
+
+    appointments
+      .filter((a) => a.status === 'Programada')
+      .forEach((a) => {
+        if (a.date) datesSet.add(a.date);
+      });
+
+    let sortedDates = Array.from(datesSet).sort();
+
+    if (scheduleViewFilter === 'proximos') {
+      sortedDates = sortedDates.filter((d) => d >= today);
+    } else if (scheduleViewFilter === 'con_citas') {
+      sortedDates = sortedDates.filter((d) =>
+        appointments.some((a) => a.date === d && a.status === 'Programada')
+      );
+    }
+
+    return sortedDates.map((dateStr) => {
+      const freeTimes = availableSlots
+        .filter((s) => s.startsWith(`${dateStr}|`))
+        .map((s) => s.split('|')[1])
+        .sort();
+
+      const bookedApps = appointments.filter(
+        (a) => a.date === dateStr && a.status === 'Programada'
+      );
+
+      return {
+        date: dateStr,
+        freeTimes,
+        bookedApps,
+        totalItems: freeTimes.length + bookedApps.length,
+        isBlocked: blockedDates.includes(dateStr),
+      };
+    });
+  }, [availableSlots, appointments, blockedDates, scheduleViewFilter, today]);
+
+  function formatFullDate(dateStr: string) {
+    try {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      const formatted = dateObj.toLocaleDateString('es-CL', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+      return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    } catch {
+      return dateStr;
+    }
+  }
+
+  function getRelativeDateLabel(dateStr: string) {
+    if (dateStr === today) return 'Hoy';
+    try {
+      const [y1, m1, d1] = dateStr.split('-').map(Number);
+      const [y2, m2, d2] = today.split('-').map(Number);
+      const t1 = new Date(y1, m1 - 1, d1).getTime();
+      const t2 = new Date(y2, m2 - 1, d2).getTime();
+      const diffDays = Math.round((t1 - t2) / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) return 'Mañana';
+      if (diffDays === -1) return 'Ayer';
+      if (diffDays < -1) return 'Pasado';
+      return `En ${diffDays} días`;
+    } catch {
+      return '';
+    }
+  }
+
+  function handleClearPastSlots() {
+    const pastSlots = availableSlots.filter((slot) => {
+      const [d] = slot.split('|');
+      return d < today;
+    });
+    if (pastSlots.length === 0) {
+      alert('No hay bloques de fechas pasadas para limpiar.');
+      return;
+    }
+    if (window.confirm(`¿Deseas eliminar ${pastSlots.length} bloque(s) anteriores a hoy?`)) {
+      pastSlots.forEach((slot) => toggleSlotAvailability(slot));
+    }
+  }
+
+  function handleGenerateWeek() {
+    const now = new Date();
+    const standardTimes = ['18:00', '18:15', '18:30', '19:30'];
+    let count = 0;
+    for (let d = 0; d < 7; d++) {
+      const target = new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
+      const dayOfWeek = target.getDay();
+      if (dayOfWeek === 0) continue; // Omite domingos
+      const dateStr = target.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+      if (blockedDates.includes(dateStr)) continue;
+      standardTimes.forEach((t) => {
+        const slotKey = `${dateStr}|${t}`;
+        if (!availableSlots.includes(slotKey)) {
+          toggleSlotAvailability(slotKey);
+          count++;
+        }
+      });
+    }
+    alert(`Se añadieron ${count} nuevos bloques vespertinos para los próximos 7 días.`);
+  }
+
+  function handleClearDateSlots(dateStr: string) {
+    const dateSlots = availableSlots.filter((s) => s.startsWith(`${dateStr}|`));
+    if (dateSlots.length === 0) return;
+    if (window.confirm(`¿Quitar los ${dateSlots.length} bloques disponibles para el ${dateStr}?`)) {
+      dateSlots.forEach((s) => toggleSlotAvailability(s));
+    }
+  }
+
+  function handleAddStandardSlotsForDate(dateStr: string) {
+    const standardTimes = ['18:00', '18:15', '18:30', '19:30'];
+    standardTimes.forEach((t) => {
+      const key = `${dateStr}|${t}`;
+      if (!availableSlots.includes(key)) {
+        toggleSlotAvailability(key);
+      }
+    });
+  }
+
+  function handleAddCustomSlotToDate(dateStr: string) {
+    const time = slotTimeInputByDate[dateStr] || '19:45';
+    if (!time) return;
+    const key = `${dateStr}|${time}`;
+    if (!availableSlots.includes(key)) {
+      toggleSlotAvailability(key);
+    }
+    setSlotTimeInputByDate((prev) => ({ ...prev, [dateStr]: '' }));
   }
 
   // =========================================================================
@@ -824,108 +971,126 @@ export default function AdminPage() {
           )}
 
           {/* =============================================================== */}
-          {/* SECCIÓN 3: DISPONIBILIDAD HORARIA                               */}
+          {/* SECCIÓN 3: DISPONIBILIDAD HORARIA Y AGENDA                      */}
           {/* =============================================================== */}
           {section === 'disponibilidad' && (
             <div className="space-y-8">
-              <div className="rounded-3xl border border-[#A14B92]/30 bg-[#F8EFF6] p-6 text-xs text-[#513D49] space-y-2">
-                <strong className="block text-sm text-[#A14B92]">
-                  Configuración de Horarios Vespertinos de Calama:
-                </strong>
-                <p>
-                  Por defecto, la orientación virtual se organiza en bloques de 15 minutos entre 18:00 y 19:45 hrs. Puedes habilitar bloques individuales o generarlos en bloque para la fecha que elijas.
-                </p>
+              {/* BANNER EXPLICATIVO Y ACCIONES GLOBALES */}
+              <div className="flex flex-col gap-4 rounded-3xl border border-[#A14B92]/30 bg-[#F8EFF6] p-6 text-xs text-[#513D49] sm:flex-row sm:items-center sm:justify-between shadow-xs">
+                <div className="space-y-1 max-w-xl">
+                  <div className="flex items-center gap-2 text-[#A14B92] font-bold text-sm">
+                    <Clock3 className="h-4 w-4" />
+                    <span>Control de Agenda Telemática · Calama</span>
+                  </div>
+                  <p className="leading-relaxed text-[#513D49]">
+                    Configura los bloques vespertinos de 15 minutos (18:00 a 19:45 hrs) para las orientaciones virtuales. Los pacientes solo podrán elegir los bloques habilitados aquí.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleGenerateWeek}
+                    className="btn-cado-primary inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold shadow-sm active:scale-98"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    <span>Generar semana estándar (L–S 18:00–19:30)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearPastSlots}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[#B3BFBF] bg-white px-3.5 py-2.5 text-xs font-semibold text-[#766C75] hover:border-red-300 hover:text-red-700 hover:bg-red-50 transition"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Limpiar fechas pasadas</span>
+                  </button>
+                </div>
               </div>
 
+              {/* PANELES DE ENTRADA Y BLOQUEO DE DÍAS */}
               <div className="grid gap-6 xl:grid-cols-2">
-                {/* BLOQUES HABILITADOS */}
-                <section className="clay-card rounded-3xl p-6 sm:p-8 space-y-5">
-                  <div className="flex items-center gap-3">
-                    <Clock3 className="h-5 w-5 text-[#A14B92]" />
+                {/* AGREGAR BLOQUE ESPECÍFICO */}
+                <section className="clay-card rounded-3xl p-6 sm:p-7 space-y-4">
+                  <div className="flex items-center gap-2.5">
+                    <Plus className="h-5 w-5 text-[#A14B92]" />
                     <h2 className="font-title text-2xl font-semibold text-[#513D49]">
-                      Habilitar bloques por fecha
+                      Añadir bloque específico
                     </h2>
                   </div>
+                  <p className="text-xs text-[#766C75]">
+                    Elige una fecha y una hora para habilitarla inmediatamente en la web pública.
+                  </p>
 
-                  <div className="flex flex-wrap gap-2.5">
-                    <input
-                      type="date"
-                      min={today}
-                      value={newSlotDate}
-                      onChange={(e) => setNewSlotDate(e.target.value)}
-                      className="rounded-xl border border-[#B3BFBF] bg-white px-3 py-2 text-xs"
-                    />
-                    <input
-                      type="time"
-                      value={newSlot}
-                      onChange={(e) => setNewSlot(e.target.value)}
-                      className="rounded-xl border border-[#B3BFBF] bg-white px-3 py-2 text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (newSlot && newSlotDate) {
-                          toggleSlotAvailability(`${newSlotDate}|${newSlot}`);
-                        }
-                      }}
-                      className="btn-cado-primary inline-flex items-center gap-1 rounded-xl px-4 py-2 text-xs font-semibold shadow-sm"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Agregar bloque</span>
-                    </button>
+                  <div className="flex flex-wrap gap-2.5 pt-1">
+                    <label className="text-xs font-semibold text-[#513D49] flex-1 min-w-[140px]">
+                      Fecha
+                      <input
+                        type="date"
+                        min={today}
+                        value={newSlotDate}
+                        onChange={(e) => setNewSlotDate(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-[#B3BFBF] bg-white px-3 py-2 text-xs font-normal outline-none focus:border-[#A14B92]"
+                      />
+                    </label>
+
+                    <label className="text-xs font-semibold text-[#513D49] flex-1 min-w-[110px]">
+                      Hora (15 min)
+                      <input
+                        type="time"
+                        value={newSlot}
+                        onChange={(e) => setNewSlot(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-[#B3BFBF] bg-white px-3 py-2 text-xs font-normal outline-none focus:border-[#A14B92]"
+                      />
+                    </label>
+
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newSlot && newSlotDate) {
+                            toggleSlotAvailability(`${newSlotDate}|${newSlot}`);
+                          }
+                        }}
+                        className="btn-cado-primary inline-flex h-9 items-center gap-1.5 rounded-xl px-4 text-xs font-semibold shadow-sm"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Habilitar</span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* GENERADOR EN 1 CLIC */}
-                  <div className="pt-2">
+                  <div className="pt-2 border-t border-[#E2E7E7]">
                     <button
                       type="button"
                       onClick={handleGenerateCalamaEveningSlots}
-                      className="inline-flex items-center gap-2 rounded-xl border border-[#A14B92] bg-[#F8EFF6] px-4 py-2.5 text-xs font-semibold text-[#A14B92] hover:bg-[#A14B92] hover:text-white transition"
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-[#A14B92] hover:underline"
                     >
-                      <Zap className="h-3.5 w-3.5" />
-                      <span>Generar 4 bloques vespertinos (18:00 a 19:30) para esta fecha</span>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Rellenar automáticamente 18:00, 18:15, 18:30 y 19:30 para {newSlotDate}</span>
                     </button>
-                  </div>
-
-                  <div className="border-t border-[#E2E7E7] pt-4 space-y-2">
-                    <span className="block text-xs font-semibold text-[#766C75]">
-                      Bloques actualmente disponibles ({availableSlots.length}):
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {availableSlots.length === 0 ? (
-                        <p className="text-xs text-[#766C75]">No hay bloques configurados.</p>
-                      ) : (
-                        availableSlots.map((slot) => (
-                          <button
-                            key={slot}
-                            type="button"
-                            onClick={() => toggleSlotAvailability(slot)}
-                            className="rounded-xl border border-[#B3BFBF] bg-white px-3 py-1.5 text-xs font-semibold text-[#513D49] hover:border-red-400 hover:bg-red-50 hover:text-red-700 transition"
-                          >
-                            {slot.replace('|', ' a las ')} hrs ×
-                          </button>
-                        ))
-                      )}
-                    </div>
                   </div>
                 </section>
 
                 {/* FECHAS BLOQUEADAS */}
-                <section className="clay-card rounded-3xl p-6 sm:p-8 space-y-5">
-                  <div className="flex items-center gap-3">
+                <section className="clay-card rounded-3xl p-6 sm:p-7 space-y-4">
+                  <div className="flex items-center gap-2.5">
                     <CalendarDays className="h-5 w-5 text-[#A14B92]" />
                     <h2 className="font-title text-2xl font-semibold text-[#513D49]">
-                      Fechas bloqueadas (Feriados / Cirugías)
+                      Bloquear día completo
                     </h2>
                   </div>
+                  <p className="text-xs text-[#766C75]">
+                    Marca días de descanso, cirugías o feriados donde no se ofrecerá teleorientación.
+                  </p>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 pt-1">
                     <input
                       type="date"
                       min={today}
                       value={newBlockedDate}
                       onChange={(e) => setNewBlockedDate(e.target.value)}
-                      className="flex-1 rounded-xl border border-[#B3BFBF] bg-white px-3 py-2 text-xs"
+                      className="flex-1 rounded-xl border border-[#B3BFBF] bg-white px-3 py-2 text-xs outline-none focus:border-[#A14B92]"
                     />
                     <button
                       type="button"
@@ -935,40 +1100,311 @@ export default function AdminPage() {
                           setNewBlockedDate('');
                         }
                       }}
-                      className="btn-cado-secondary rounded-xl px-4 py-2 text-xs font-semibold"
+                      className="btn-cado-secondary rounded-xl px-4 py-2 text-xs font-semibold hover:border-red-300"
                     >
-                      Bloquear día
+                      Bloquear fecha
                     </button>
                   </div>
 
-                  <div className="border-t border-[#E2E7E7] pt-4 space-y-2">
-                    <span className="block text-xs font-semibold text-[#766C75]">
+                  <div className="pt-1 text-xs">
+                    <span className="font-semibold text-[#766C75]">
                       Días bloqueados ({blockedDates.length}):
                     </span>
-                    <div className="space-y-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       {blockedDates.length === 0 ? (
-                        <p className="text-xs text-[#766C75]">No hay fechas bloqueadas.</p>
+                        <span className="text-[#766C75] text-[11px]">No hay fechas bloqueadas.</span>
                       ) : (
                         blockedDates.map((date) => (
-                          <div
+                          <span
                             key={date}
-                            className="flex items-center justify-between rounded-xl bg-[#F6F8F8] p-3 text-xs"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-bold text-red-800"
                           >
-                            <span className="font-semibold text-[#513D49]">{date}</span>
+                            <span>{date}</span>
                             <button
                               type="button"
                               onClick={() => removeBlockedDate(date)}
-                              className="font-bold text-red-700 hover:underline"
+                              className="text-red-500 hover:text-red-800 font-black ml-0.5"
+                              title="Desbloquear"
                             >
-                              Desbloquear
+                              ×
                             </button>
-                          </div>
+                          </span>
                         ))
                       )}
                     </div>
                   </div>
                 </section>
               </div>
+
+              {/* =========================================================== */}
+              {/* TABLERO DE DISPONIBILIDAD ACTIVA AGRUPADO POR FECHA         */}
+              {/* =========================================================== */}
+              <section className="clay-card rounded-3xl p-6 sm:p-8 space-y-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#E2E7E7] pb-5">
+                  <div className="space-y-1">
+                    <h2 className="font-title text-2xl font-semibold text-[#513D49]">
+                      Tablero de Disponibilidad Activa
+                    </h2>
+                    <p className="text-xs text-[#766C75]">
+                      Visualiza tus bloques abiertos para pacientes y las citas confirmadas día por día.
+                    </p>
+                  </div>
+
+                  {/* FILTROS DE VISTA */}
+                  <div className="flex items-center gap-2 bg-[#F6F8F8] p-1 rounded-2xl border border-[#E2E7E7] text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setScheduleViewFilter('proximos')}
+                      className={`px-3 py-1.5 rounded-xl font-semibold transition ${
+                        scheduleViewFilter === 'proximos'
+                          ? 'bg-white text-[#A14B92] shadow-xs'
+                          : 'text-[#766C75] hover:text-[#513D49]'
+                      }`}
+                    >
+                      Próximos días ({scheduleByDate.length})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setScheduleViewFilter('con_citas')}
+                      className={`px-3 py-1.5 rounded-xl font-semibold transition ${
+                        scheduleViewFilter === 'con_citas'
+                          ? 'bg-white text-[#A14B92] shadow-xs'
+                          : 'text-[#766C75] hover:text-[#513D49]'
+                      }`}
+                    >
+                      Con citas reservadas
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setScheduleViewFilter('todos')}
+                      className={`px-3 py-1.5 rounded-xl font-semibold transition ${
+                        scheduleViewFilter === 'todos'
+                          ? 'bg-white text-[#A14B92] shadow-xs'
+                          : 'text-[#766C75] hover:text-[#513D49]'
+                      }`}
+                    >
+                      Todos
+                    </button>
+                  </div>
+                </div>
+
+                {/* LISTADO DE TARJETAS DE DÍA */}
+                {scheduleByDate.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-[#B3BFBF] bg-[#F6F8F8] p-10 text-center space-y-3">
+                    <Clock3 className="mx-auto h-8 w-8 text-[#B3BFBF]" />
+                    <h3 className="font-semibold text-base text-[#513D49]">
+                      No hay bloques configurados para este filtro
+                    </h3>
+                    <p className="text-xs text-[#766C75] max-w-md mx-auto">
+                      Puedes generar automáticamente los bloques vespertinos de la semana o agregar uno manualmente arriba.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleGenerateWeek}
+                      className="btn-cado-primary inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold shadow-sm"
+                    >
+                      <Zap className="h-3.5 w-3.5" />
+                      <span>Generar semana vespertina estándar</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    {scheduleByDate.map((dayItem) => {
+                      const relativeLabel = getRelativeDateLabel(dayItem.date);
+                      return (
+                        <div
+                          key={dayItem.date}
+                          className={`rounded-2xl border p-5 transition ${
+                            dayItem.isBlocked
+                              ? 'border-red-200 bg-red-50/40'
+                              : dayItem.date === today
+                              ? 'border-[#A14B92]/40 bg-[#F8EFF6]/30 shadow-xs'
+                              : 'border-[#E2E7E7] bg-white'
+                          }`}
+                        >
+                          {/* CABECERA DEL DÍA */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E2E7E7] pb-3.5">
+                            <div className="flex items-center gap-2.5">
+                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#A14B92]/10 text-[#A14B92]">
+                                <Calendar className="h-4 w-4" />
+                              </span>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <strong className="text-sm font-semibold text-[#513D49]">
+                                    {formatFullDate(dayItem.date)}
+                                  </strong>
+                                  {relativeLabel && (
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                        relativeLabel === 'Hoy'
+                                          ? 'bg-[#A14B92] text-white'
+                                          : relativeLabel === 'Mañana'
+                                          ? 'bg-purple-100 text-[#A14B92]'
+                                          : 'bg-gray-100 text-[#766C75]'
+                                      }`}
+                                    >
+                                      {relativeLabel}
+                                    </span>
+                                  )}
+                                  {dayItem.isBlocked && (
+                                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-800">
+                                      🔒 Día bloqueado
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[11px] text-[#766C75]">
+                                  {dayItem.date}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* INSIGNIAS DE CONTEO Y ACCIONES RÁPIDAS DEL DÍA */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-bold text-[#A14B92]">
+                                {dayItem.freeTimes.length} libres
+                              </span>
+
+                              {dayItem.bookedApps.length > 0 && (
+                                <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                                  {dayItem.bookedApps.length} reservadas
+                                </span>
+                              )}
+
+                              {/* BOTÓN AGREGAR 4 BLOQUES ESTÁNDAR AL DÍA */}
+                              {dayItem.freeTimes.length < 4 && !dayItem.isBlocked && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddStandardSlotsForDate(dayItem.date)}
+                                  className="inline-flex items-center gap-1 rounded-xl border border-[#B3BFBF] bg-white px-2.5 py-1 text-[11px] font-semibold text-[#513D49] hover:border-[#A14B92] hover:text-[#A14B92] transition"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  <span>+ 4 Bloques estándar</span>
+                                </button>
+                              )}
+
+                              {/* BOTÓN QUITAR TODOS LOS LIBRES DE ESTE DÍA */}
+                              {dayItem.freeTimes.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleClearDateSlots(dayItem.date)}
+                                  className="inline-flex items-center gap-1 rounded-xl px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 transition"
+                                  title="Quitar todos los bloques disponibles de esta fecha"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                  <span>Quitar libres</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* LISTA DE BLOQUES DEL DÍA (CITAS + DISPONIBLES) */}
+                          <div className="pt-3.5">
+                            {dayItem.totalItems === 0 ? (
+                              <p className="text-xs text-[#766C75] italic">
+                                No hay horarios configurados para este día.
+                              </p>
+                            ) : (
+                              <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                                {/* CITAS YA RESERVADAS POR PACIENTES */}
+                                {dayItem.bookedApps.map((bookedApp) => (
+                                  <div
+                                    key={bookedApp.id}
+                                    className="flex flex-col justify-between rounded-xl border border-emerald-300 bg-emerald-50/80 p-3 shadow-2xs space-y-2"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-mono text-xs font-bold text-emerald-900">
+                                        🕒 {bookedApp.time} hrs
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-900">
+                                        ● Cita
+                                      </span>
+                                    </div>
+                                    <div>
+                                      <strong className="block text-xs font-semibold text-emerald-950 truncate">
+                                        {bookedApp.patientName}
+                                      </strong>
+                                      <span className="text-[10px] text-emerald-800">
+                                        {bookedApp.comfortProfile.soundPreference === 'silencio'
+                                          ? 'Silencio'
+                                          : 'Música'} · {bookedApp.comfortProfile.jawBreaks ? 'Pausas 5m' : 'Sin pausas'}
+                                      </span>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setOpenAppointmentId(bookedApp.id)}
+                                      className="text-left text-[11px] font-bold text-[#A14B92] hover:underline pt-1 border-t border-emerald-200"
+                                    >
+                                      Ver Ficha Clínica →
+                                    </button>
+                                  </div>
+                                ))}
+
+                                {/* BLOQUES LIBRES PARA RESERVA PÚBLICA */}
+                                {dayItem.freeTimes.map((timeStr) => (
+                                  <div
+                                    key={timeStr}
+                                    className="group flex flex-col justify-between rounded-xl border border-[#E2E7E7] bg-white p-3 hover:border-[#A14B92] hover:shadow-2xs transition space-y-2"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-mono text-xs font-bold text-[#513D49]">
+                                        🕒 {timeStr} hrs
+                                      </span>
+                                      <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-[#A14B92] border border-purple-200">
+                                        Disponible
+                                      </span>
+                                    </div>
+                                    <span className="text-[11px] text-[#766C75]">
+                                      Orientación virtual (15 min)
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        toggleSlotAvailability(`${dayItem.date}|${timeStr}`)
+                                      }
+                                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 hover:text-red-800 hover:underline pt-1 border-t border-gray-100"
+                                    >
+                                      <span>Quitar este bloque</span>
+                                      <span>×</span>
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* AGREGAR HORA RÁPIDA A ESTE DÍA */}
+                            <div className="mt-3 flex items-center gap-2 pt-2 border-t border-[#E2E7E7]/60 text-xs">
+                              <span className="text-[#766C75] text-[11px]">
+                                Añadir hora personalizada a este día:
+                              </span>
+                              <input
+                                type="time"
+                                value={slotTimeInputByDate[dayItem.date] || ''}
+                                onChange={(e) =>
+                                  setSlotTimeInputByDate((prev) => ({
+                                    ...prev,
+                                    [dayItem.date]: e.target.value,
+                                  }))
+                                }
+                                className="rounded-lg border border-[#B3BFBF] bg-white px-2 py-1 text-xs"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleAddCustomSlotToDate(dayItem.date)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-[#513D49] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#3E2D37]"
+                              >
+                                <Plus className="h-3 w-3" />
+                                <span>Agregar</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
             </div>
           )}
 
