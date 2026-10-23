@@ -236,6 +236,7 @@ function BookingWizard() {
       }
 
       const app = addAppointment({
+        id: json.data?.codigo || undefined,
         patientName: patientDraftInfo.name.trim(),
         email: patientDraftInfo.email.trim(),
         phone: patientDraftInfo.phone.trim(),
@@ -245,6 +246,7 @@ function BookingWizard() {
         questionnaire: isSkippingQuestionnaire ? undefined : (activeQuestionnaire || undefined),
         meetLink: json.data?.meet_link || '',
         derivationStatus: 'Sin derivación',
+        skipSupabaseSync: true, // ¡Ya fue guardado e insertado por /api/orientaciones!
       });
 
       setCreatedAppointment(app);

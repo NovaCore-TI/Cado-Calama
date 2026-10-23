@@ -71,7 +71,7 @@ export interface CadoContextType {
 
   // Appointments
   appointments: Appointment[];
-  addAppointment: (app: Omit<Appointment, 'id' | 'createdAt' | 'status'>) => Appointment;
+  addAppointment: (app: Omit<Appointment, 'id' | 'createdAt' | 'status'> & { id?: string; createdAt?: string; skipSupabaseSync?: boolean }) => Appointment;
   updateAppointmentStatus: (id: string, status: Appointment['status'], notes?: string) => void;
   updateDerivationStatus: (id: string, status: NonNullable<Appointment['derivationStatus']>) => void;
   cancelAppointment: (id: string) => void;
@@ -270,40 +270,67 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setBlogPosts(mappedPosts);
       }
 
-      // Load appointments from Supabase
+      // Load appointments from Supabase (con desduplicación estricta por ID y bloque horario)
       const { data: sbApps } = await supabase
         .from('orientaciones_citas')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (sbApps && sbApps.length > 0) {
-        const mappedApps: Appointment[] = sbApps.map((row: Record<string, unknown>) => ({
-          id: String(row.codigo || row.id),
-          patientName: String(row.nombre_paciente || 'Paciente'),
-          email: String(row.email_paciente || ''),
-          phone: String(row.telefono_paciente || ''),
-          date: String(row.fecha),
-          time: String(row.hora),
-          comfortProfile: (row.preferencias_confort as ComfortProfile) || {
-            anxietyLevel: 'nervioso',
-            soundPreference: 'musica_suave',
-            jawBreaks: true,
-            companionAllowed: false,
-            handSignalPledge: true,
-          },
-          meetLink: String(row.meet_link || 'https://meet.google.com/cado-orientacion-demo'),
-          status: (row.estado_atencion as Appointment['status']) || 'Programada',
-          derivationStatus:
-            (row.estado_derivacion as Appointment['derivationStatus']) || 'Sin derivación',
-          createdAt: row.created_at
-            ? new Date(String(row.created_at)).toLocaleString('es-CL', {
-                dateStyle: 'short',
-                timeStyle: 'short',
-              })
-            : '',
-          syncedToSupabase: true,
-        }));
+        const seenIds = new Set<string>();
+        const seenSlots = new Set<string>();
+        const mappedApps: Appointment[] = [];
+
+        for (const row of sbApps as Record<string, unknown>[]) {
+          const id = String(row.codigo || row.id);
+          const date = String(row.fecha);
+          const time = String(row.hora);
+          const status = (row.estado_atencion as Appointment['status']) || 'Programada';
+          const slotKey = `${date}|${time}`;
+
+          // Desduplicar si el ID ya fue procesado
+          if (seenIds.has(id)) continue;
+
+          // Si hay más de una cita con el mismo bloque horario en estado Programada, conservar solo la más reciente
+          if (status === 'Programada' && seenSlots.has(slotKey)) continue;
+
+          seenIds.add(id);
+          if (status === 'Programada') {
+            seenSlots.add(slotKey);
+          }
+
+          mappedApps.push({
+            id,
+            patientName: String(row.nombre_paciente || 'Paciente'),
+            email: String(row.email_paciente || ''),
+            phone: String(row.telefono_paciente || ''),
+            date,
+            time,
+            comfortProfile: (row.preferencias_confort as ComfortProfile) || {
+              anxietyLevel: 'nervioso',
+              soundPreference: 'musica_suave',
+              jawBreaks: true,
+              companionAllowed: false,
+              handSignalPledge: true,
+            },
+            meetLink: String(row.meet_link || 'https://meet.google.com/cado-orientacion-demo'),
+            status,
+            derivationStatus:
+              (row.estado_derivacion as Appointment['derivationStatus']) || 'Sin derivación',
+            createdAt: row.created_at
+              ? new Date(String(row.created_at)).toLocaleString('es-CL', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })
+              : '',
+            syncedToSupabase: true,
+          });
+        }
+
         setAppointments(mappedApps);
+        try {
+          localStorage.setItem('cado_demo_appointments_v3', JSON.stringify(mappedApps));
+        } catch {}
       }
     }
   }, []);
@@ -544,8 +571,14 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return submission;
   };
 
-  const addAppointment = (data: Omit<Appointment, 'id' | 'createdAt' | 'status'>): Appointment => {
-    const code = `CADO-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+  const addAppointment = (
+    data: Omit<Appointment, 'id' | 'createdAt' | 'status'> & {
+      id?: string;
+      createdAt?: string;
+      skipSupabaseSync?: boolean;
+    }
+  ): Appointment => {
+    const code = data.id || `CADO-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
     const newApp: Appointment = {
       ...data,
       id: code,
@@ -553,12 +586,23 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       meetLink: data.meetLink || `https://meet.google.com/cado-${code.toLowerCase()}`,
       status: 'Programada',
       derivationStatus: 'Sin derivación',
-      createdAt: new Date().toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }),
+      createdAt: data.createdAt || new Date().toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }),
     };
-    const updated = [newApp, ...appointments];
-    saveAppointments(updated);
 
-    // Remove the booked slot from availableSlots
+    // Prevenir duplicidad en estado local por ID o por mismo horario
+    setAppointments((prev) => {
+      const alreadyExists = prev.some(
+        (a) => a.id === newApp.id || (a.date === newApp.date && a.time === newApp.time && a.status === 'Programada')
+      );
+      if (alreadyExists) return prev;
+      const next = [newApp, ...prev];
+      try {
+        localStorage.setItem('cado_demo_appointments_v3', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // Quitar bloque de disponibilidad pública
     const slotKey = `${data.date}|${data.time}`;
     setAvailableSlots((prev) => {
       const next = prev.filter((s) => s !== slotKey);
@@ -568,9 +612,24 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return next;
     });
 
-    // Persist asynchronously to Supabase if tables exist
+    // Si ya fue guardado en Supabase a través de /api/orientaciones, no insertar por segunda vez
+    if (data.skipSupabaseSync) {
+      return newApp;
+    }
+
+    // Persistencia en Supabase solo como fallback si se ejecuta localmente
     void (async () => {
       try {
+        const { data: colision } = await supabase
+          .from('orientaciones_citas')
+          .select('id')
+          .eq('fecha', newApp.date)
+          .eq('hora', newApp.time)
+          .eq('estado_atencion', 'Programada')
+          .maybeSingle();
+
+        if (colision) return; // Ya existe, evitar duplicación
+
         const { data: patientRow } = await supabase
           .from('pacientes')
           .insert({
@@ -596,7 +655,7 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
           estado_sync: 'Sincronizado',
         });
       } catch {
-        // Local persistence already completed
+        // Modo local activo
       }
     })();
 
