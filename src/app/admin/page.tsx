@@ -129,6 +129,8 @@ export default function AdminPage() {
     updateBlogPost,
     deleteBlogPost,
     isDoctorLoggedIn,
+    doctorUser,
+    authMethod,
     loginDoctor,
     logoutDoctor,
   } = useCado();
@@ -138,6 +140,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filtros de orientaciones
@@ -193,11 +196,14 @@ export default function AdminPage() {
     return matchesQuery && matchesStatus;
   });
 
-  function handleLogin(event: FormEvent<HTMLFormElement>) {
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const ok = loginDoctor(email, password);
-    if (!ok) {
-      setLoginError('Credenciales incorrectas. Para ingresar usa el acceso de demostración provisto.');
+    setLoginError('');
+    setIsLoggingIn(true);
+    const res = await loginDoctor(email, password);
+    setIsLoggingIn(false);
+    if (!res.ok) {
+      setLoginError(res.error || 'Credenciales no válidas. Por favor verifique sus datos.');
     } else {
       setLoginError('');
     }
@@ -518,10 +524,15 @@ export default function AdminPage() {
 
               <button
                 type="submit"
-                className="btn-cado-primary flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold shadow-md active:scale-98"
+                disabled={isLoggingIn}
+                className="btn-cado-primary flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold shadow-md active:scale-98 disabled:opacity-60"
               >
-                <LockKeyhole className="h-4 w-4" aria-hidden="true" />
-                <span>Entrar al panel de gestión</span>
+                {isLoggingIn ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <LockKeyhole className="h-4 w-4" aria-hidden="true" />
+                )}
+                <span>{isLoggingIn ? 'Verificando con Supabase Auth…' : 'Entrar al panel de gestión'}</span>
               </button>
             </form>
 
@@ -645,7 +656,13 @@ export default function AdminPage() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#A14B92]">
               CADO · {title.eyebrow}
             </span>
-            <p className="text-sm font-semibold text-[#513D49]">Portal de Gestión Clínica</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-[#513D49]">Portal de Gestión Clínica</p>
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {authMethod === 'supabase' ? 'Supabase Auth' : 'Sesión Clínica'} · {doctorUser?.email || 'Dr. Javier Beiza'}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">

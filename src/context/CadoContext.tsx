@@ -100,10 +100,12 @@ export interface CadoContextType {
   updateBlogPost: (id: string, post: Partial<BlogPost>) => void;
   deleteBlogPost: (id: string) => void;
 
-  // Auth for Doctor
+  // Auth for Doctor (RF-17 & RF-18 con Supabase Auth)
   isDoctorLoggedIn: boolean;
-  loginDoctor: (email: string, pass: string) => boolean;
-  logoutDoctor: () => void;
+  doctorUser: { id?: string; email?: string } | null;
+  authMethod: 'supabase' | 'demo' | null;
+  loginDoctor: (email: string, pass: string) => Promise<{ ok: boolean; error?: string; locked?: boolean }>;
+  logoutDoctor: () => Promise<void>;
 }
 
 function getInitialSlots(): string[] {
@@ -222,8 +224,10 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     phone: '',
   });
 
-  // Doctor Auth state
+  // Doctor Auth state (RF-17 & RF-18)
   const [isDoctorLoggedIn, setIsDoctorLoggedIn] = useState(false);
+  const [doctorUser, setDoctorUser] = useState<{ id?: string; email?: string } | null>(null);
+  const [authMethod, setAuthMethod] = useState<'supabase' | 'demo' | null>(null);
 
   const refreshSupabaseData = useCallback(async () => {
     const status = await checkSupabaseConnection();
@@ -331,13 +335,77 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const savedAuth = sessionStorage.getItem('cado_demo_session_v2');
-      if (savedAuth === 'true') setIsDoctorLoggedIn(true);
+      if (savedAuth === 'true') {
+        setIsDoctorLoggedIn(true);
+        setDoctorUser({ id: 'demo-doctor', email: 'demo@cado.local' });
+        setAuthMethod('demo');
+      }
     } catch {
       // ignore storage errors
     }
 
+    async function checkSupabaseSession() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setIsDoctorLoggedIn(true);
+          setDoctorUser({ id: session.user.id, email: session.user.email });
+          setAuthMethod('supabase');
+        }
+      } catch {}
+    }
+    void checkSupabaseSession();
+
     refreshSupabaseData();
   }, [refreshSupabaseData]);
+
+  // Suscripción a cambios de estado de Supabase Auth
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setIsDoctorLoggedIn(true);
+        setDoctorUser({ id: session.user.id, email: session.user.email });
+        setAuthMethod('supabase');
+      } else if (event === 'SIGNED_OUT') {
+        const isDemo = sessionStorage.getItem('cado_demo_session_v2');
+        if (isDemo !== 'true') {
+          setIsDoctorLoggedIn(false);
+          setDoctorUser(null);
+          setAuthMethod(null);
+        }
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  // RF-18: Cierre de sesión automático por 30 minutos de inactividad
+  useEffect(() => {
+    if (!isDoctorLoggedIn) return;
+
+    let inactivityTimer: NodeJS.Timeout;
+    const INACTIVITY_MS = 30 * 60 * 1000; // 30 minutos
+
+    const resetInactivity = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        void logoutDoctor();
+        alert('Tu sesión ha finalizado automáticamente tras 30 minutos de inactividad para proteger los datos médicos de los pacientes (RF-18).');
+      }, INACTIVITY_MS);
+    };
+
+    resetInactivity();
+
+    const activityEvents = ['mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach((ev) => window.addEventListener(ev, resetInactivity, { passive: true }));
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      activityEvents.forEach((ev) => window.removeEventListener(ev, resetInactivity));
+    };
+  }, [isDoctorLoggedIn]);
 
   const saveAppointments = (apps: Appointment[]) => {
     setAppointments(apps);
@@ -662,21 +730,105 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginDoctor = (email: string, pass: string): boolean => {
-    if (email.trim().toLowerCase() === 'demo@cado.local' && pass === 'DEMO') {
-      setIsDoctorLoggedIn(true);
-      try {
-        sessionStorage.setItem('cado_demo_session_v2', 'true');
-      } catch {}
-      return true;
+  // RF-17: Autenticación con Supabase Auth y bloqueo por fuerza bruta tras 5 intentos (15 min)
+  const loginDoctor = async (
+    email: string,
+    pass: string
+  ): Promise<{ ok: boolean; error?: string; locked?: boolean }> => {
+    // 1. Validar bloqueo temporal de 15 minutos si hubo 5 fallos previos
+    try {
+      const savedLock = localStorage.getItem('cado_auth_lockout');
+      if (savedLock) {
+        const { attempts, lockUntil } = JSON.parse(savedLock);
+        if (lockUntil && Date.now() < lockUntil) {
+          const remainingMinutes = Math.ceil((lockUntil - Date.now()) / 60000);
+          return {
+            ok: false,
+            locked: true,
+            error: `Acceso bloqueado temporalmente por motivos de seguridad tras 5 intentos fallidos (RF-17). Intente nuevamente en ${remainingMinutes} minuto${remainingMinutes > 1 ? 's' : ''}.`,
+          };
+        }
+      }
+    } catch {}
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    // 2. Intentar autenticación directa con Supabase Auth
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: pass,
+      });
+
+      if (!error && data?.session?.user) {
+        setIsDoctorLoggedIn(true);
+        setDoctorUser({ id: data.session.user.id, email: data.session.user.email });
+        setAuthMethod('supabase');
+        try {
+          localStorage.removeItem('cado_auth_lockout');
+          sessionStorage.setItem('cado_auth_method', 'supabase');
+        } catch {}
+        return { ok: true };
+      }
+    } catch {
+      // Continuar al fallback de prueba si falla la conexión de red
     }
-    return false;
+
+    // 3. Acceso clínico de prueba / demostración autorizado
+    if (cleanEmail === 'demo@cado.local' && pass === 'DEMO') {
+      setIsDoctorLoggedIn(true);
+      setDoctorUser({ id: 'demo-doctor', email: 'demo@cado.local' });
+      setAuthMethod('demo');
+      try {
+        localStorage.removeItem('cado_auth_lockout');
+        sessionStorage.setItem('cado_demo_session_v2', 'true');
+        sessionStorage.setItem('cado_auth_method', 'demo');
+      } catch {}
+      return { ok: true };
+    }
+
+    // 4. Registro de intento fallido (5 intentos -> bloqueo de 15 min)
+    let currentAttempts = 1;
+    let lockUntil = 0;
+    try {
+      const savedLock = localStorage.getItem('cado_auth_lockout');
+      if (savedLock) {
+        const parsed = JSON.parse(savedLock);
+        currentAttempts = (parsed.attempts || 0) + 1;
+      }
+      if (currentAttempts >= 5) {
+        lockUntil = Date.now() + 15 * 60 * 1000; // 15 minutos
+      }
+      localStorage.setItem(
+        'cado_auth_lockout',
+        JSON.stringify({ attempts: currentAttempts, lockUntil })
+      );
+    } catch {}
+
+    if (currentAttempts >= 5) {
+      return {
+        ok: false,
+        locked: true,
+        error: 'Acceso bloqueado temporalmente por motivos de seguridad tras 5 intentos fallidos consecutivos (RF-17). Intente nuevamente en 15 minutos.',
+      };
+    }
+
+    return {
+      ok: false,
+      error: `Credenciales no válidas. Por favor verifique sus datos. (Intento ${currentAttempts} de 5 antes de bloqueo de seguridad)`,
+    };
   };
 
-  const logoutDoctor = () => {
+  const logoutDoctor = async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     setIsDoctorLoggedIn(false);
+    setDoctorUser(null);
+    setAuthMethod(null);
     try {
       sessionStorage.removeItem('cado_demo_session_v2');
+      sessionStorage.removeItem('cado_auth_method');
     } catch {}
   };
 
@@ -709,6 +861,8 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateBlogPost,
         deleteBlogPost,
         isDoctorLoggedIn,
+        doctorUser,
+        authMethod,
         loginDoctor,
         logoutDoctor,
       }}
