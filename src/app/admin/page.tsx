@@ -38,7 +38,7 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
-import { useCado, type Appointment, type BlogPost } from '@/context/CadoContext';
+import { useCado, type Appointment, type BlogPost, type QuestionnaireSubmission } from '@/context/CadoContext';
 
 type Section = 'resumen' | 'orientaciones' | 'disponibilidad' | 'derivaciones' | 'contenidos' | 'integraciones';
 
@@ -128,6 +128,7 @@ export default function AdminPage() {
     addBlogPost,
     updateBlogPost,
     deleteBlogPost,
+    questionnaires,
     realtimeConnected,
     lastRealtimeEvent,
     isDoctorLoggedIn,
@@ -964,6 +965,16 @@ export default function AdminPage() {
                             }`}
                           >
                             {app.status}
+                          </span>
+
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                              app.questionnaire
+                                ? 'bg-purple-100 text-[#8A3D7D]'
+                                : 'bg-gray-100 text-[#766C75]'
+                            }`}
+                          >
+                            {app.questionnaire ? 'Cuestionario completado' : 'Sin cuestionario'}
                           </span>
 
                           <button
@@ -1887,40 +1898,54 @@ export default function AdminPage() {
                 </div>
 
                 {/* CUESTIONARIO DE PERFILAMIENTO */}
-                <div className="rounded-2xl border border-[#A14B92]/30 bg-[#F8EFF6] p-5 space-y-3">
-                  <h3 className="font-title text-xl font-semibold text-[#513D49]">
-                    Cuestionario Previo de Sensibilidad
-                  </h3>
-                  {app.questionnaire ? (
-                    <div className="space-y-2 text-xs text-[#513D49]">
-                      <p>
-                        <strong>Motivo de consulta:</strong> {app.questionnaire.reason}
-                      </p>
-                      <p>
-                        <strong>Nivel de ansiedad / temor:</strong> {app.questionnaire.feeling}
-                      </p>
-                      <p>
-                        <strong>Experiencias anteriores:</strong>{' '}
-                        {app.questionnaire.previousExperience}
-                      </p>
-                      <p>
-                        <strong>Sensibilidad reportada:</strong>{' '}
-                        {app.questionnaire.painSensitivity}
-                      </p>
-                      <p>
-                        <strong>Estilo de comunicación preferido:</strong>{' '}
-                        {app.questionnaire.communicationPreference}
-                      </p>
-                      <p className="text-[11px] font-semibold text-emerald-800 pt-1">
-                        ✓ Consentimiento Ley N° 19.628 / 20.584 aceptado
-                      </p>
+                {(() => {
+                  const q = app.questionnaire || questionnaires.find((item: QuestionnaireSubmission) => item.id === app.id || item.reason === app.patientName);
+                  return (
+                    <div className="rounded-2xl border border-[#A14B92]/30 bg-[#F8EFF6] p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-title text-xl font-semibold text-[#513D49]">
+                          Cuestionario Previo de Sensibilidad
+                        </h3>
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                            q ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {q ? '✓ Completado por paciente' : 'Omitido'}
+                        </span>
+                      </div>
+                      {q ? (
+                        <div className="space-y-2 text-xs text-[#513D49]">
+                          <p>
+                            <strong>Motivo de consulta:</strong> {q.reason}
+                          </p>
+                          <p>
+                            <strong>Nivel de ansiedad / temor:</strong> {q.feeling}
+                          </p>
+                          <p>
+                            <strong>Experiencias anteriores:</strong>{' '}
+                            {q.previousExperience}
+                          </p>
+                          <p>
+                            <strong>Sensibilidad reportada:</strong>{' '}
+                            {q.painSensitivity}
+                          </p>
+                          <p>
+                            <strong>Estilo de comunicación preferido:</strong>{' '}
+                            {q.communicationPreference}
+                          </p>
+                          <p className="text-[11px] font-semibold text-emerald-800 pt-1">
+                            ✓ Consentimiento Ley N° 19.628 / 20.584 aceptado
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-[#766C75]">
+                          El paciente optó por omitir el cuestionario previo (Atención con protocolo estándar).
+                        </p>
+                      )}
                     </div>
-                  ) : (
-                    <p className="text-xs text-[#766C75]">
-                      El paciente optó por omitir el cuestionario previo (Atención con protocolo estándar).
-                    </p>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* BOTONES DE ACCIÓN */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">

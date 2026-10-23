@@ -6,7 +6,7 @@ import crypto from 'crypto';
 export async function GET() {
   const { data, error } = await supabase
     .from('orientaciones_citas')
-    .select('*')
+    .select('*, cuestionarios_perfilamiento (*)')
     .order('created_at', { ascending: false });
 
   return NextResponse.json({
