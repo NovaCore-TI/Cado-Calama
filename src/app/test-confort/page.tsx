@@ -85,6 +85,23 @@ export default function TestConfortPage() {
           <p className="mt-5 max-w-2xl leading-8 text-[#665D66]">
             Personaliza el ambiente de tu futura atención en CADO: música o silencio, pausas periódicas y asistencia con acompañante. Tus elecciones se guardan y quedan vinculadas a tu reserva para que el Dr. Javier Beiza las vea en su bandeja privada.
           </p>
+          <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-[#A14B92]/30 bg-white p-4 text-xs text-[#513D49] shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#A14B92] text-xs font-bold text-white">
+                ✨
+              </span>
+              <span>
+                <strong>Test integrado en el agendamiento:</strong> Ahora este test de confort y el cuestionario sensible están integrados de extremo a extremo al reservar hora en <strong>Agendar</strong>.
+              </span>
+            </div>
+            <Link
+              href="/agendar"
+              className="btn-cado-primary inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold"
+            >
+              <span>Ir a Agendamiento Unificado</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -250,10 +267,11 @@ export default function TestConfortPage() {
               <div className="mt-4 rounded-2xl bg-[#F8EFF6] p-4 text-xs leading-5 text-[#513D49]">
                 <strong>Sincronizado:</strong> El doctor podrá ver estas preferencias en su bandeja de orientaciones.
                 <Link
-                  href="/agendar"
-                  className="mt-2 flex items-center gap-1 font-bold text-[#A14B92] hover:underline"
+                  href="/agendar?step=3"
+                  className="btn-cado-primary mt-3 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white shadow-sm"
                 >
-                  Continuar a Reserva Telemática <ArrowRight className="h-3.5 w-3.5" />
+                  <span>Continuar a Selección de Horario</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
             )}

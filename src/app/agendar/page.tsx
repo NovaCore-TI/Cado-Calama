@@ -1,19 +1,28 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
+  AlertCircle,
+  ArrowLeft,
   ArrowRight,
   CalendarDays,
   CheckCircle2,
   Clock3,
-  Database,
+  Hand,
   HeartHandshake,
-  Info,
+  MessageCircle,
+  PauseCircle,
+  ShieldAlert,
   ShieldCheck,
+  Sparkles,
+  Users,
   Video,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
-import { useCado, type Appointment } from '@/context/CadoContext';
+import { useCado, type Appointment, type ComfortProfile } from '@/context/CadoContext';
 import { ConfortLiveCard } from '@/components/ConfortLiveCard';
 
 function endTime(time: string) {
@@ -22,25 +31,88 @@ function endTime(time: string) {
   return `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`;
 }
 
-export default function OrientacionPage() {
+const quickReasons = [
+  'Quiero volver al dentista pero siento miedo / ansiedad',
+  'Dolor o molestia dental aguda',
+  'Chequeo preventivo y evaluación general',
+  'Bruxismo, tensión o dolor en la mandíbula',
+  'Dudas sobre una posible extracción (exodoncia)',
+  'Otro motivo',
+];
+
+const anxietyOptions = [
+  { id: 'fobia', label: 'Miedo intenso o fobia previa', desc: 'Me cuesta mucho pedir hora y requiero avanzar muy despacio.' },
+  { id: 'nervioso', label: 'Algo nervioso o inseguro', desc: 'Tengo inquietudes y me ayuda conversar antes de abrir la boca.' },
+  { id: 'tranquilo', label: 'Tranquilo / Sin mayor temor', desc: 'Vengo principalmente por consulta técnica o chequeo.' },
+  { id: 'no_responde', label: 'Prefiero no responder', desc: 'Prefiero comentarlo directamente en la videollamada.' },
+] as const;
+
+const pastExperienceOptions = [
+  'Mala experiencia con dolor en el pasado',
+  'Me sentí juzgado o regañado en otra clínica',
+  'Experiencias normales sin mayores traumas',
+  'Primera vez que consulto como adulto',
+  'Prefiero no responder',
+];
+
+const soundOptions = [
+  { id: 'musica_suave', label: 'Música suave relajante', desc: 'Música ambiental tranquila en el box durante la atención.', icon: Volume2 },
+  { id: 'silencio', label: 'Silencio y calma total', desc: 'Sin música de fondo, ambiente silencioso y despejado.', icon: VolumeX },
+] as const;
+
+function BookingWizard() {
+  const searchParams = useSearchParams();
+  const stepParam = searchParams.get('step');
+  const initialStep: 1 | 2 | 3 | 4 = stepParam === '2' ? 2 : stepParam === '3' ? 3 : 1;
+
   const {
     availableSlots,
     blockedDates,
     addAppointment,
     activeComfortProfile,
+    saveComfortPreferences,
     activeQuestionnaire,
+    submitQuestionnaire,
     patientDraftInfo,
     setPatientDraftInfo,
   } = useCado();
 
+  // Paso del flujo unificado:
+  // 1 = Cuestionario previo de sensibilidad
+  // 2 = Test de confort ambiental
+  // 3 = Selección de bloque horario y datos del paciente
+  // 4 = Confirmación final con enlace
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(initialStep);
+
+  // Estados del Paso 1: Cuestionario
+  const [reason, setReason] = useState(activeQuestionnaire?.reason || '');
+  const [feeling, setFeeling] = useState<string>(activeQuestionnaire?.feeling || 'nervioso');
+  const [previousExp, setPreviousExp] = useState(activeQuestionnaire?.previousExperience || 'Prefiero no responder');
+  const [sensitivity, setSensitivity] = useState(activeQuestionnaire?.painSensitivity || 'Alta sensibilidad; avisar antes de cada paso');
+  const [communication, setCommunication] = useState(activeQuestionnaire?.communicationPreference || 'Explicación paso a paso con lenguaje sencillo');
+  const [questionnaireConsent, setQuestionnaireConsent] = useState(true);
+  const [isSkippingQuestionnaire, setIsSkippingQuestionnaire] = useState(false);
+
+  // Estados del Paso 2: Confort
+  const [sound, setSound] = useState<'musica_suave' | 'silencio'>(
+    activeComfortProfile.soundPreference === 'silencio' ? 'silencio' : 'musica_suave'
+  );
+  const [breaks, setBreaks] = useState(activeComfortProfile.jawBreaks ?? true);
+  const [companion, setCompanion] = useState(activeComfortProfile.companionAllowed ?? false);
+  const [stopSignal, setStopSignal] = useState(activeComfortProfile.handSignalPledge ?? true);
+  const [explanation, setExplanation] = useState(true);
+  const [comfortNotes, setComfortNotes] = useState(activeComfortProfile.notes || '');
+
+  // Estados del Paso 3: Agendamiento de Fecha y Hora
   const today = useMemo(
     () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' }),
     []
   );
   const [date, setDate] = useState(today);
   const [slot, setSlot] = useState('');
-  const [consent, setConsent] = useState(false);
-  const [stage, setStage] = useState<'seleccion' | 'resumen' | 'final'>('seleccion');
+  const [finalConsent, setFinalConsent] = useState(true);
+
+  // Estados de proceso
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
@@ -52,36 +124,113 @@ export default function OrientacionPage() {
     .filter((value) => /^\d{2}:\d{2}$/.test(value))
     .sort();
 
+  // Validación de Paso 1
+  const canAdvanceQuestionnaire = reason.trim().length >= 3 && questionnaireConsent;
+
+  // Validación de Paso 3
   const canConfirmBooking =
     patientDraftInfo.name.trim().length >= 3 &&
     patientDraftInfo.email.includes('@') &&
     patientDraftInfo.phone.trim().length >= 8 &&
-    consent;
+    slot.length > 0 &&
+    finalConsent;
 
-  async function handleConfirmBooking() {
+  // Manejo de paso 1 -> paso 2
+  async function handleCompleteQuestionnaire(skip = false) {
+    setErrorMsg('');
+    if (skip) {
+      setIsSkippingQuestionnaire(true);
+      setCurrentStep(2);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (!canAdvanceQuestionnaire) {
+      setErrorMsg('Por favor escribe o selecciona el motivo de tu consulta para continuar.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await submitQuestionnaire({
+        reason: reason.trim(),
+        feeling,
+        previousExperience: previousExp,
+        painSensitivity: sensitivity,
+        communicationPreference: communication,
+        consent: questionnaireConsent,
+      });
+      setIsSkippingQuestionnaire(false);
+      setCurrentStep(2);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      // Fallback local en CadoContext
+      setCurrentStep(2);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // Manejo de paso 2 -> paso 3
+  async function handleCompleteComfort() {
+    setErrorMsg('');
+    const profile: ComfortProfile = {
+      anxietyLevel: (feeling as ComfortProfile['anxietyLevel']) || 'nervioso',
+      soundPreference: sound,
+      jawBreaks: breaks,
+      companionAllowed: companion,
+      handSignalPledge: stopSignal,
+      notes: comfortNotes.trim(),
+    };
+
+    setIsSubmitting(true);
+    try {
+      await saveComfortPreferences(profile);
+      setCurrentStep(3);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      setCurrentStep(3);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // Manejo de confirmación final
+  async function handleFinalBooking() {
     if (!canConfirmBooking) return;
     setErrorMsg('');
     setIsSubmitting(true);
+
+    const comfortPayload: ComfortProfile = {
+      anxietyLevel: isSkippingQuestionnaire ? 'tranquilo' : ((feeling as ComfortProfile['anxietyLevel']) || 'nervioso'),
+      soundPreference: sound,
+      jawBreaks: breaks,
+      companionAllowed: companion,
+      handSignalPledge: stopSignal,
+      notes: comfortNotes.trim(),
+    };
 
     try {
       const res = await fetch('/api/orientaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          patientName: patientDraftInfo.name,
-          email: patientDraftInfo.email,
-          phone: patientDraftInfo.phone,
+          patientName: patientDraftInfo.name.trim(),
+          email: patientDraftInfo.email.trim(),
+          phone: patientDraftInfo.phone.trim(),
           date,
           time: slot,
-          consent,
-          cuestionarioId: activeQuestionnaire?.id || null,
-          comfortProfile: activeComfortProfile,
+          consent: finalConsent,
+          cuestionarioId: isSkippingQuestionnaire ? null : (activeQuestionnaire?.id || null),
+          comfortProfile: comfortPayload,
         }),
       });
-      const json = await res.json();
 
+      const json = await res.json();
       if (!res.ok || !json.ok) {
-        setErrorMsg(json.error || 'No se pudo procesar la reserva.');
+        setErrorMsg(json.error || 'No se pudo registrar la reserva. Revisa tus datos.');
         setIsSubmitting(false);
         return;
       }
@@ -92,14 +241,15 @@ export default function OrientacionPage() {
         phone: patientDraftInfo.phone.trim(),
         date,
         time: slot,
-        comfortProfile: activeComfortProfile,
-        questionnaire: activeQuestionnaire || undefined,
+        comfortProfile: comfortPayload,
+        questionnaire: isSkippingQuestionnaire ? undefined : (activeQuestionnaire || undefined),
         meetLink: json.data?.meet_link || '',
         derivationStatus: 'Sin derivación',
       });
 
       setCreatedAppointment(app);
-      setStage('final');
+      setCurrentStep(4);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       const app = addAppointment({
         patientName: patientDraftInfo.name.trim(),
@@ -107,338 +257,705 @@ export default function OrientacionPage() {
         phone: patientDraftInfo.phone.trim(),
         date,
         time: slot,
-        comfortProfile: activeComfortProfile,
-        questionnaire: activeQuestionnaire || undefined,
+        comfortProfile: comfortPayload,
+        questionnaire: isSkippingQuestionnaire ? undefined : (activeQuestionnaire || undefined),
         meetLink: '',
         derivationStatus: 'Sin derivación',
       });
+
       setCreatedAppointment(app);
-      setStage('final');
+      setCurrentStep(4);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <main className="min-h-[70vh] bg-[#F6F8F8] px-6 py-14 text-[#513D49] sm:py-20">
-      <div className="mx-auto max-w-6xl">
-        <div className="grid items-start gap-9 lg:grid-cols-[1fr_320px]">
-          <div>
-            <p className="section-eyebrow">Orientación Virtual de 15 Minutos</p>
-            <h1 className="mt-3 font-title text-5xl font-semibold leading-tight sm:text-6xl">
-              Una conversación antes de la consulta.
-            </h1>
-            <p className="mt-5 max-w-2xl leading-8 text-[#665D66]">
-              La orientación virtual dura 15 minutos y vincula automáticamente tu Cuestionario de Perfilamiento y tu Test de Confort para que el Dr. Javier Beiza te reciba preparado.
-            </p>
-
-            <div className="mt-8 rounded-[2rem] border border-white bg-white p-6 shadow-[0_18px_45px_rgba(81,61,73,.07)] sm:p-9">
-              <div className="mb-7 flex flex-wrap gap-3 text-xs font-semibold">
-                {['1 · Horario', '2 · Datos y Consentimiento', '3 · Confirmación'].map(
-                  (label, index) => (
-                    <span
-                      key={label}
-                      className={`rounded-full px-4 py-2 ${
-                        index === ['seleccion', 'resumen', 'final'].indexOf(stage)
-                          ? 'bg-[#A14B92] text-white'
-                          : 'bg-[#E6EBEB] text-[#513D49]'
-                      }`}
-                    >
-                      {label}
-                    </span>
-                  )
-                )}
-              </div>
-
-              {stage === 'seleccion' && (
-                <>
-                  <h2 className="font-title text-3xl font-semibold">
-                    Elige una fecha y un bloque virtual
-                  </h2>
-                  <p className="mt-2 text-sm leading-7 text-[#665D66]">
-                    Bloques vespertinos de 15 minutos en hora de Chile (America/Santiago).
-                  </p>
-                  <label className="mt-7 block text-sm font-semibold">
-                    Fecha de orientación
-                    <input
-                      type="date"
-                      value={date}
-                      min={today}
-                      onChange={(event) => {
-                        setDate(event.target.value);
-                        setSlot('');
-                      }}
-                      className="mt-2 block w-full max-w-sm rounded-xl border border-[#B3BFBF] bg-white px-4 py-3"
-                    />
-                  </label>
-                  {date && !validDate && (
-                    <p role="status" className="mt-3 text-sm text-[#8A3D7D]">
-                      {blockedDates.includes(date)
-                        ? 'El doctor bloqueó esta fecha por feriado o agenda.'
-                        : 'Selecciona una fecha futura.'}
-                    </p>
-                  )}
-
-                  <div className="mt-7">
-                    <p className="text-sm font-semibold">Bloques disponibles de 15 minutos</p>
-                    <p className="mt-1 text-xs text-[#766C75]">
-                      {date ? `Disponibilidad para ${date}` : 'Selecciona primero una fecha'}
-                    </p>
-                    {slots.length === 0 ? (
-                      <div className="mt-3 rounded-2xl border border-dashed border-[#B3BFBF] bg-[#F6F8F8] p-5 text-sm leading-7 text-[#665D66]">
-                        No hay bloques disponibles para esta fecha. Prueba seleccionando mañana o habilita nuevos bloques desde la Intranet del Doctor (/admin).
-                      </div>
-                    ) : (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {slots.map((time) => (
-                          <button
-                            key={time}
-                            type="button"
-                            disabled={!validDate}
-                            onClick={() => setSlot(time)}
-                            aria-pressed={slot === time}
-                            className={`rounded-xl border px-4 py-3 text-sm font-semibold transition disabled:opacity-40 ${
-                              slot === time
-                                ? 'border-[#A14B92] bg-[#A14B92] text-white'
-                                : 'border-[#B3BFBF] bg-white hover:border-[#A14B92]'
-                            }`}
-                          >
-                            {time}–{endTime(time)}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled={!validDate || !slot}
-                    onClick={() => setStage('resumen')}
-                    className="btn-cado-primary mt-8 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Continuar con mis datos <ArrowRight className="h-4 w-4" />
-                  </button>
-                </>
-              )}
-
-              {stage === 'resumen' && (
-                <>
-                  <h2 className="font-title text-3xl font-semibold">
-                    Datos de contacto y vinculación
-                  </h2>
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-[#F6F8F8] p-4">
-                      <CalendarDays className="h-5 w-5 text-[#A14B92]" />
-                      <p className="mt-2 text-sm font-semibold">{date}</p>
-                      <p className="text-xs text-[#665D66]">Fecha seleccionada</p>
-                    </div>
-                    <div className="rounded-2xl bg-[#F6F8F8] p-4">
-                      <Clock3 className="h-5 w-5 text-[#A14B92]" />
-                      <p className="mt-2 text-sm font-semibold">
-                        {slot}–{endTime(slot)} · Hora de Chile
-                      </p>
-                      <p className="text-xs text-[#665D66]">Duración: 15 minutos</p>
-                    </div>
-                  </div>
-
-                  {errorMsg && (
-                    <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-xs text-red-700">
-                      {errorMsg}
-                    </p>
-                  )}
-
-                  <div className="mt-6 space-y-4">
-                    <label className="block text-sm font-semibold">
-                      Nombre completo <span className="text-[#A14B92]">*</span>
-                      <input
-                        type="text"
-                        required
-                        value={patientDraftInfo.name}
-                        onChange={(e) =>
-                          setPatientDraftInfo((prev) => ({ ...prev, name: e.target.value }))
-                        }
-                        placeholder="Ej: Javiera Morales"
-                        className="mt-1.5 w-full rounded-xl border border-[#B3BFBF] px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
-                      />
-                    </label>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="block text-sm font-semibold">
-                        Correo electrónico <span className="text-[#A14B92]">*</span>
-                        <input
-                          type="email"
-                          required
-                          value={patientDraftInfo.email}
-                          onChange={(e) =>
-                            setPatientDraftInfo((prev) => ({ ...prev, email: e.target.value }))
-                          }
-                          placeholder="javiera@correo.cl"
-                          className="mt-1.5 w-full rounded-xl border border-[#B3BFBF] px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
-                        />
-                      </label>
-                      <label className="block text-sm font-semibold">
-                        Teléfono / WhatsApp <span className="text-[#A14B92]">*</span>
-                        <input
-                          type="tel"
-                          required
-                          value={patientDraftInfo.phone}
-                          onChange={(e) =>
-                            setPatientDraftInfo((prev) => ({ ...prev, phone: e.target.value }))
-                          }
-                          placeholder="+56 9 8765 4321"
-                          className="mt-1.5 w-full rounded-xl border border-[#B3BFBF] px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
-                        />
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 space-y-3">
-                    <ConfortLiveCard
-                      compact
-                      soundPreference={activeComfortProfile.soundPreference}
-                      jawBreaks={activeComfortProfile.jawBreaks}
-                      companionAllowed={activeComfortProfile.companionAllowed}
-                      handSignalPledge={activeComfortProfile.handSignalPledge}
-                    />
-                  <div className="rounded-2xl border border-[#E2E7E7] bg-[#F8EFF6]/50 p-4 text-xs leading-6 text-[#513D49]">
-                    <strong>Preferencias de Confort vinculadas:</strong> Ambiente:{' '}
-                    {activeComfortProfile.soundPreference === 'silencio'
-                      ? 'Silencio'
-                      : 'Música suave'}{' '}
-                    · Pausas: {activeComfortProfile.jawBreaks ? 'Sí' : 'No'} · Acompañante:{' '}
-                    {activeComfortProfile.companionAllowed ? 'Sí' : 'No'}
-                    {activeQuestionnaire && (
-                      <span className="block text-[#8A3D7D]">
-                        ✓ Cuestionario Previo #{activeQuestionnaire.id} vinculado a esta solicitud.
-                      </span>
-                    )}
-                  </div>
-
-                  </div>
-
-                  <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-[#E2E7E7] bg-[#F6F8F8] p-4 text-xs sm:text-sm leading-6">
-                    <input
-                      type="checkbox"
-                      checked={consent}
-                      onChange={(e) => setConsent(e.target.checked)}
-                      className="mt-1 accent-[#A14B92]"
-                    />
-                    <span>
-                      Acepto el tratamiento confidencial de mis datos personales (Ley N° 19.628) y autorizo vincular mis respuestas de confort a esta reserva telemática.{' '}
-                      <strong className="text-[#A14B92]">Obligatorio *</strong>
-                    </span>
-                  </label>
-
-                  <div className="mt-7 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setStage('seleccion')}
-                      className="btn-cado-secondary rounded-xl px-5 py-3 text-sm font-semibold"
-                    >
-                      Cambiar horario
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!canConfirmBooking || isSubmitting}
-                      onClick={handleConfirmBooking}
-                      className="btn-cado-primary inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      <Database className="h-4 w-4" />
-                      <span>
-                        {isSubmitting ? 'Registrando reserva...' : 'Confirmar Reserva Telemática'}
-                      </span>
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {stage === 'final' && createdAppointment && (
-                <div role="status" className="py-5">
-                  <CheckCircle2 className="h-12 w-12 text-[#A14B92]" />
-                  <span className="mt-3 inline-flex rounded-full bg-[#F8EFF6] px-3.5 py-1 text-xs font-bold text-[#8A3D7D]">
-                    Código de Reserva: {createdAppointment.id} · Estado: {createdAppointment.status}
-                  </span>
-                  <h2 className="mt-3 font-title text-3xl font-semibold">
-                    ¡Orientación Telemática Programada!
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-[#665D66]">
-                    Hola <strong>{createdAppointment.patientName}</strong>, tu orientación quedó registrada para el{' '}
-                    <strong>{createdAppointment.date}</strong> de{' '}
-                    <strong>
-                      {createdAppointment.time} a {endTime(createdAppointment.time)}
-                    </strong>{' '}
-                    (hora de Chile). Ya puedes visualizarla en la Bandeja del Doctor en{' '}
-                    <Link href="/admin" className="font-bold text-[#A14B92] underline">
-                      /admin
-                    </Link>
-                    .
-                  </p>
-                  <div className="mt-5 rounded-2xl bg-[#F6F8F8] p-5 text-sm leading-7">
-                    <p className="font-semibold">Enlace Meet y Autogestión</p>
-                    <p className="text-xs text-[#665D66]">
-                      Sala asignada: <span className="font-mono">{createdAppointment.meetLink}</span>
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-4">
-                      <Link
-                        href="/gestionar"
-                        className="inline-flex items-center gap-2 font-semibold text-[#8A3D7D] hover:underline"
-                      >
-                        Autogestionar / Cancelar cita <ArrowRight className="h-4 w-4" />
-                      </Link>
-                      <Link
-                        href="/admin"
-                        className="inline-flex items-center gap-2 font-semibold text-[#A14B92] hover:underline"
-                      >
-                        Ver en Bandeja del Doctor <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setStage('seleccion');
-                      setSlot('');
-                      setConsent(false);
-                    }}
-                    className="btn-cado-secondary mt-6 rounded-xl px-5 py-3 text-sm font-semibold"
-                  >
-                    Agendar otra orientación
-                  </button>
-                </div>
-              )}
-            </div>
+    <main className="min-h-screen bg-white pb-24 text-[#513D49]">
+      {/* CABECERA Y STEPPER DE PROGRESO */}
+      <section className="border-b border-[#E2E7E7] bg-[#F6F8F8] px-6 py-12 sm:py-16">
+        <div className="mx-auto max-w-5xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#B3BFBF] bg-white px-3.5 py-1 text-xs font-semibold text-[#513D49]">
+            <Clock3 className="h-3.5 w-3.5 text-[#A14B92]" aria-hidden="true" />
+            <span>Orientación Virtual de 15 Minutos · Calama</span>
           </div>
 
-          <aside className="space-y-5">
-            <div className="glass-panel rounded-3xl p-6">
-              <Video className="h-7 w-7 text-[#A14B92]" />
-              <h2 className="mt-4 font-title text-2xl font-semibold">Antes de la llamada</h2>
-              <p className="mt-2 text-sm leading-7 text-[#665D66]">
-                El cuestionario previo y el test de confort se asocian automáticamente a tu reserva al confirmar tu consentimiento informado.
-              </p>
-              <div className="mt-5 space-y-3 text-sm font-semibold">
-                <Link href="/cuestionario" className="block text-[#8A3D7D] hover:underline">
-                  Completar cuestionario previo →
-                </Link>
-                <Link href="/test-confort" className="block text-[#8A3D7D] hover:underline">
-                  Personalizar test de confort →
-                </Link>
+          <h1 className="mt-4 font-title text-4xl font-semibold leading-tight text-[#513D49] sm:text-5xl">
+            {currentStep === 1 && 'Paso 1: Tu historia y nivel de confort'}
+            {currentStep === 2 && 'Paso 2: Personalización del box clínico'}
+            {currentStep === 3 && 'Paso 3: Reserva tu horario y datos'}
+            {currentStep === 4 && '¡Orientación virtual confirmada!'}
+          </h1>
+
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#513D49] sm:text-base">
+            {currentStep === 1 &&
+              'Para que el Dr. Javier Beiza pueda ofrecerte una atención humana y respetuosa, personalizamos cada detalle antes de la videollamada.'}
+            {currentStep === 2 &&
+              'Elige las condiciones en que te gustaría que esté el box clínico en Edificio Espacio Parque: ambiente sonoro, pausas y señal de parada.'}
+            {currentStep === 3 &&
+              'Selecciona el día y bloque horario vespertino que mejor se acomode a tus turnos o jornada laboral.'}
+            {currentStep === 4 &&
+              'Tu cita ha quedado registrada y vinculada a tus respuestas de confort.'}
+          </p>
+
+          {/* Stepper visual con accesibilidad */}
+          {currentStep < 4 && (
+            <nav aria-label="Progreso del agendamiento" className="mt-8">
+              <ol className="grid grid-cols-3 gap-2 sm:gap-4">
+                {[
+                  { step: 1, title: '1. Cuestionario', sub: 'Tu sensibilidad' },
+                  { step: 2, title: '2. Confort', sub: 'Ambiente y pausas' },
+                  { step: 3, title: '3. Horario', sub: 'Reserva final' },
+                ].map((item) => {
+                  const isCurrent = currentStep === item.step;
+                  const isCompleted = currentStep > item.step;
+                  return (
+                    <li
+                      key={item.step}
+                      aria-current={isCurrent ? 'step' : undefined}
+                      className={`flex flex-col border-t-4 pt-2.5 transition-colors ${
+                        isCurrent
+                          ? 'border-[#A14B92] text-[#A14B92]'
+                          : isCompleted
+                          ? 'border-[#10B981] text-[#10B981]'
+                          : 'border-[#E2E7E7] text-[#766C75]'
+                      }`}
+                    >
+                      <span className="text-xs font-bold sm:text-sm">
+                        {isCompleted ? `✓ ${item.title}` : item.title}
+                      </span>
+                      <span className="hidden text-[11px] text-[#513D49] sm:inline">
+                        {item.sub}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
+            </nav>
+          )}
+        </div>
+      </section>
+
+      {/* CONTENIDO DEL FLUJO SEGÚN EL PASO ACTIVO */}
+      <div className="mx-auto max-w-5xl px-6 pt-10">
+        {errorMsg && (
+          <div
+            role="alert"
+            className="mb-8 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          >
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden="true" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* PASO 1: CUESTIONARIO PREVIO DE SENSIBILIDAD & EXPLICACIÓN        */}
+        {/* ================================================================= */}
+        {currentStep === 1 && (
+          <div className="space-y-8">
+            {/* Banner de explicación y advertencia de personalización */}
+            <div className="rounded-3xl border border-[#A14B92]/30 bg-[#F8EFF6] p-6 sm:p-8">
+              <div className="flex items-start gap-4">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#A14B92] text-white shadow-sm">
+                  <ShieldCheck className="h-6 w-6" aria-hidden="true" />
+                </span>
+                <div className="space-y-2">
+                  <h2 className="font-title text-2xl font-semibold text-[#513D49]">
+                    ¿Por qué solicitamos este cuestionario antes de agendar?
+                  </h2>
+                  <p className="text-sm leading-relaxed text-[#513D49]">
+                    El Dr. Javier Beiza lee personalmente tus respuestas antes de la videollamada para comprender tu nivel de sensibilidad, tus temores y adaptar el ritmo de la conversación.
+                  </p>
+                  <div className="rounded-2xl border border-[#B3BFBF]/40 bg-white/80 p-3.5 text-xs leading-relaxed text-[#513D49]">
+                    <strong className="text-[#A14B92]">Importante para tu experiencia:</strong> Si decides omitir este cuestionario, podrás agendar de todos modos, pero la orientación se realizará con el <em>protocolo clínico estándar sin personalización de pausas ni adaptación a tus sensibilidades</em>.
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="clay-card rounded-3xl p-6">
-              <HeartHandshake className="h-6 w-6 text-[#A14B92]" />
-              <h2 className="mt-4 font-title text-2xl font-semibold">Privacidad garantizada</h2>
-              <p className="mt-2 text-sm leading-7 text-[#665D66]">
-                Cumplimos con la minimización de datos: solicitamos únicamente nombre, correo, teléfono y tu consentimiento explícito, sin pedir RUT.
+            {/* Formulario de preguntas ágiles */}
+            <div className="clay-card rounded-[2rem] p-6 sm:p-9 space-y-7">
+              {/* Pregunta 1: Motivo de consulta */}
+              <div className="space-y-3">
+                <label className="block font-title text-2xl font-semibold text-[#513D49]">
+                  1. ¿Cuál es el principal motivo que te hace consultar hoy?
+                </label>
+                <p className="text-xs text-[#513D49]">
+                  Puedes seleccionar una opción rápida o escribir con tus propias palabras:
+                </p>
+
+                {/* Chips de selección rápida */}
+                <div className="flex flex-wrap gap-2">
+                  {quickReasons.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setReason(item)}
+                      className={`rounded-xl border px-3.5 py-2 text-xs font-medium transition-all ${
+                        reason === item
+                          ? 'border-[#A14B92] bg-[#A14B92] text-white shadow-sm'
+                          : 'border-[#B3BFBF] bg-white text-[#513D49] hover:bg-[#F6F8F8]'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  rows={2}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Escribe aquí los detalles que quieras que el doctor conozca..."
+                  className="mt-2 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3.5 text-sm outline-none focus:border-[#A14B92]"
+                />
+              </div>
+
+              {/* Pregunta 2: Nivel de ansiedad frente al dentista */}
+              <div className="space-y-3 border-t border-[#E2E7E7] pt-6">
+                <label className="block font-title text-2xl font-semibold text-[#513D49]">
+                  2. ¿Cómo te sientes respecto a la atención odontológica?
+                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {anxietyOptions.map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={`flex cursor-pointer flex-col rounded-2xl border p-4 transition-all ${
+                        feeling === opt.id
+                          ? 'border-[#A14B92] bg-[#F8EFF6] shadow-sm'
+                          : 'border-[#E2E7E7] bg-white hover:bg-[#F6F8F8]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="radio"
+                          name="anxiety_level"
+                          value={opt.id}
+                          checked={feeling === opt.id}
+                          onChange={() => setFeeling(opt.id)}
+                          className="accent-[#A14B92]"
+                        />
+                        <strong className="text-sm font-semibold text-[#513D49]">{opt.label}</strong>
+                      </div>
+                      <span className="mt-1 pl-6 text-xs text-[#513D49]">{opt.desc}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pregunta 3: Experiencias anteriores */}
+              <div className="space-y-3 border-t border-[#E2E7E7] pt-6">
+                <label className="block font-title text-2xl font-semibold text-[#513D49]">
+                  3. ¿Has tenido experiencias anteriores difíciles?
+                </label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {pastExperienceOptions.map((exp) => (
+                    <label
+                      key={exp}
+                      className={`flex cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-xs transition ${
+                        previousExp === exp
+                          ? 'border-[#A14B92] bg-[#F8EFF6] font-semibold text-[#513D49]'
+                          : 'border-[#E2E7E7] bg-white text-[#513D49] hover:bg-[#F6F8F8]'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="past_experience"
+                        value={exp}
+                        checked={previousExp === exp}
+                        onChange={() => setPreviousExp(exp)}
+                        className="accent-[#A14B92]"
+                      />
+                      <span>{exp}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Consentimiento Ley 19.628 */}
+              <div className="rounded-2xl border border-[#E2E7E7] bg-[#F6F8F8] p-4">
+                <label className="flex cursor-pointer items-start gap-3 text-xs leading-relaxed text-[#513D49]">
+                  <input
+                    type="checkbox"
+                    checked={questionnaireConsent}
+                    onChange={(e) => setQuestionnaireConsent(e.target.checked)}
+                    className="mt-0.5 accent-[#A14B92]"
+                  />
+                  <span>
+                    Autorizo el tratamiento confidencial de mis respuestas para que el Dr. Javier Beiza las revise con fines de orientación médica previa (Ley N° 19.628 y N° 20.584).
+                  </span>
+                </label>
+              </div>
+
+              {/* Botones de acción del paso 1 */}
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+                <button
+                  type="button"
+                  onClick={() => handleCompleteQuestionnaire(false)}
+                  disabled={!canAdvanceQuestionnaire || isSubmitting}
+                  className="btn-cado-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-7 py-3 text-sm font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span>
+                    {isSubmitting ? 'Guardando respuestas...' : 'Guardar y avanzar a Test de Confort'}
+                  </span>
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleCompleteQuestionnaire(true)}
+                  className="inline-flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-[#766C75] hover:text-[#513D49] hover:underline"
+                >
+                  <ShieldAlert className="h-4 w-4" aria-hidden="true" />
+                  <span>Omitir cuestionario (Continuar con atención estándar)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* PASO 2: TEST DE CONFORT AMBIENTAL (BOX CLÍNICO)                  */}
+        {/* ================================================================= */}
+        {currentStep === 2 && (
+          <div className="grid gap-8 lg:grid-cols-[1.3fr_1fr]">
+            <div className="space-y-6">
+              {isSkippingQuestionnaire && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+                  ⚠️ Has elegido omitir el cuestionario previo. Aún puedes configurar tus preferencias de confort ambiental para el box si lo deseas.
+                </div>
+              )}
+
+              {/* Preferencia de sonido */}
+              <fieldset className="clay-card rounded-[2rem] p-6 sm:p-7">
+                <legend className="font-title text-2xl font-semibold text-[#513D49]">
+                  1. Ambiente sonoro del box
+                </legend>
+                <p className="mt-1 text-xs text-[#513D49]">
+                  ¿Cómo te gustaría que esté el espacio clínico antes de tu ingreso?
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {soundOptions.map((opt) => {
+                    const Icon = opt.icon;
+                    return (
+                      <label
+                        key={opt.id}
+                        className={`flex cursor-pointer flex-col rounded-2xl border p-4 transition ${
+                          sound === opt.id
+                            ? 'border-[#A14B92] bg-[#F8EFF6] shadow-sm'
+                            : 'border-[#E2E7E7] bg-white hover:bg-[#F6F8F8]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <Icon className="h-5 w-5 text-[#A14B92]" aria-hidden="true" />
+                          <input
+                            type="radio"
+                            name="sound_opt"
+                            value={opt.id}
+                            checked={sound === opt.id}
+                            onChange={() => setSound(opt.id)}
+                            className="accent-[#A14B92]"
+                          />
+                        </div>
+                        <strong className="mt-2 text-sm font-semibold text-[#513D49]">{opt.label}</strong>
+                        <span className="mt-1 text-xs leading-relaxed text-[#513D49]">{opt.desc}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              {/* Pausas, acompañante y pacto de mano */}
+              <fieldset className="clay-card rounded-[2rem] p-6 sm:p-7 space-y-4">
+                <legend className="font-title text-2xl font-semibold text-[#513D49]">
+                  2. Control, pausas y acompañamiento
+                </legend>
+
+                <div className="space-y-3">
+                  {[
+                    {
+                      label: 'Solicitar pausas periódicas para descansar la mandíbula',
+                      desc: 'Hacemos detenciones conscientes cada 5-7 minutos.',
+                      checked: breaks,
+                      onChange: setBreaks,
+                      icon: PauseCircle,
+                    },
+                    {
+                      label: 'Acordar señal con la mano (Stop Signal) para detenernos de inmediato',
+                      desc: 'Si levantas la mano, el doctor detiene cualquier procedimiento al instante.',
+                      checked: stopSignal,
+                      onChange: setStopSignal,
+                      icon: Hand,
+                    },
+                    {
+                      label: 'Asistir con un acompañante de confianza al box',
+                      desc: 'Permitido para darte tranquilidad durante toda la sesión.',
+                      checked: companion,
+                      onChange: setCompanion,
+                      icon: Users,
+                    },
+                    {
+                      label: 'Explicación tranquila paso a paso antes de cada acción',
+                      desc: 'Te contamos qué se siente antes de aplicar cualquier instrumento.',
+                      checked: explanation,
+                      onChange: setExplanation,
+                      icon: HeartHandshake,
+                    },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <label
+                        key={item.label}
+                        className="flex cursor-pointer items-start gap-3.5 rounded-2xl border border-[#E2E7E7] bg-white p-4 transition hover:bg-[#F6F8F8]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.checked}
+                          onChange={(e) => item.onChange(e.target.checked)}
+                          className="mt-1 accent-[#A14B92]"
+                        />
+                        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#A14B92]" aria-hidden="true" />
+                        <div>
+                          <strong className="block text-sm font-semibold text-[#513D49]">
+                            {item.label}
+                          </strong>
+                          <span className="text-xs text-[#513D49]">{item.desc}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-2">
+                  <label className="block text-xs font-semibold text-[#513D49]">
+                    Comentario adicional o necesidad específica (opcional)
+                    <input
+                      type="text"
+                      value={comfortNotes}
+                      onChange={(e) => setComfortNotes(e.target.value)}
+                      placeholder="Ej: Tengo dolor en el cuello si el sillón baja demasiado..."
+                      className="mt-1.5 w-full rounded-xl border border-[#B3BFBF] bg-white px-3.5 py-2.5 text-xs outline-none focus:border-[#A14B92]"
+                    />
+                  </label>
+                </div>
+              </fieldset>
+
+              {/* Botones de navegación del paso 2 */}
+              <div className="flex flex-wrap gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="btn-cado-secondary inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  <span>Volver al cuestionario</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCompleteComfort}
+                  disabled={isSubmitting}
+                  className="btn-cado-primary inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold shadow-md"
+                >
+                  <span>Elegir horario y confirmar cita</span>
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            {/* Tarjeta interactiva en vivo a la derecha */}
+            <aside className="lg:sticky lg:top-32 lg:self-start space-y-4">
+              <ConfortLiveCard
+                soundPreference={sound}
+                jawBreaks={breaks}
+                companionAllowed={companion}
+                handSignalPledge={stopSignal}
+              />
+              <p className="text-center text-xs text-[#766C75]">
+                Esta configuración se enviará a la bandeja clínica del Dr. Javier Beiza.
+              </p>
+            </aside>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* PASO 3: SELECCIÓN DE HORARIO Y DATOS DE CONTACTO                 */}
+        {/* ================================================================= */}
+        {currentStep === 3 && (
+          <div className="clay-card rounded-[2rem] p-6 sm:p-9 space-y-8">
+            <div>
+              <h2 className="font-title text-2xl font-semibold text-[#513D49]">
+                Selecciona tu fecha y bloque de orientación virtual
+              </h2>
+              <p className="mt-1 text-xs text-[#513D49]">
+                Horarios vespertinos adaptados a jornadas laborales y turnos de Calama.
+              </p>
+
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                {/* Selector de Fecha */}
+                <label className="block text-xs font-semibold text-[#513D49]">
+                  Fecha de la sesión
+                  <input
+                    type="date"
+                    min={today}
+                    value={date}
+                    onChange={(e) => {
+                      setDate(e.target.value);
+                      setSlot('');
+                    }}
+                    className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
+                  />
+                </label>
+
+                {/* Resumen de fecha seleccionada */}
+                <div className="flex items-center gap-3 rounded-2xl bg-[#F6F8F8] p-4 text-xs">
+                  <CalendarDays className="h-5 w-5 text-[#A14B92]" aria-hidden="true" />
+                  <div>
+                    <strong className="block font-semibold text-[#513D49]">Fecha: {date}</strong>
+                    <span>{validDate ? 'Bloques disponibles abajo' : 'Día no disponible'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones de bloques horarios disponibles */}
+              <div className="mt-5 space-y-2">
+                <span className="block text-xs font-semibold text-[#513D49]">
+                  Bloques horarios disponibles (15 minutos):
+                </span>
+                {slots.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[#B3BFBF] p-4 text-center text-xs text-[#766C75]">
+                    No hay bloques disponibles para esta fecha. Selecciona otro día en el calendario.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                    {slots.map((time) => (
+                      <button
+                        key={time}
+                        type="button"
+                        onClick={() => setSlot(time)}
+                        className={`rounded-xl border px-3.5 py-3 text-xs font-semibold transition ${
+                          slot === time
+                            ? 'border-[#A14B92] bg-[#A14B92] text-white shadow-sm'
+                            : 'border-[#B3BFBF] bg-white text-[#513D49] hover:border-[#A14B92]'
+                        }`}
+                      >
+                        {time}–{endTime(time)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Datos de contacto del paciente */}
+            <div className="border-t border-[#E2E7E7] pt-6 space-y-4">
+              <h2 className="font-title text-2xl font-semibold text-[#513D49]">
+                Tus datos de contacto
+              </h2>
+
+              <label className="block text-xs font-semibold text-[#513D49]">
+                Nombre completo <span className="text-[#A14B92]">*</span>
+                <input
+                  type="text"
+                  required
+                  autoComplete="name"
+                  value={patientDraftInfo.name}
+                  onChange={(e) =>
+                    setPatientDraftInfo((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  placeholder="Ej: Javiera Morales"
+                  className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
+                />
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-xs font-semibold text-[#513D49]">
+                  Correo electrónico (para enviarte el Meet) <span className="text-[#A14B92]">*</span>
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    spellCheck={false}
+                    value={patientDraftInfo.email}
+                    onChange={(e) =>
+                      setPatientDraftInfo((prev) => ({ ...prev, email: e.target.value }))
+                    }
+                    placeholder="javiera@correo.cl"
+                    className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
+                  />
+                </label>
+
+                <label className="block text-xs font-semibold text-[#513D49]">
+                  Teléfono / WhatsApp <span className="text-[#A14B92]">*</span>
+                  <input
+                    type="tel"
+                    required
+                    autoComplete="tel"
+                    value={patientDraftInfo.phone}
+                    onChange={(e) =>
+                      setPatientDraftInfo((prev) => ({ ...prev, phone: e.target.value }))
+                    }
+                    placeholder="+56 9 8765 4321"
+                    className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Sello de resumen integrado: Cuestionario + Confort */}
+            <div className="rounded-2xl border border-[#E2E7E7] bg-[#F8EFF6] p-4 text-xs space-y-2">
+              <strong className="block text-[#513D49]">
+                Resumen de vinculación clínica personalizada:
+              </strong>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[#513D49]">
+                <span>
+                  {isSkippingQuestionnaire
+                    ? '• Cuestionario previo: Omitido (Protocolo estándar)'
+                    : '• Cuestionario previo: Respuestas vinculadas'}
+                </span>
+                <span>• Ambiente sonoro: {sound === 'silencio' ? 'Silencio' : 'Música suave'}</span>
+                <span>• Pausas mandibulares: {breaks ? 'Activadas' : 'A demanda'}</span>
+                <span>• Señal de mano (Stop): {stopSignal ? 'Acordada' : 'No'}</span>
+              </div>
+            </div>
+
+            {/* Checkbox de consentimiento de agendamiento */}
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#E2E7E7] bg-[#F6F8F8] p-4 text-xs leading-relaxed text-[#513D49]">
+              <input
+                type="checkbox"
+                checked={finalConsent}
+                onChange={(e) => setFinalConsent(e.target.checked)}
+                className="mt-0.5 accent-[#A14B92]"
+              />
+              <span>
+                Acepto el tratamiento confidencial de mis datos personales (Ley N° 19.628) y entiendo que esta orientación telemática informativa no reemplaza una evaluación odontológica presencial.
+              </span>
+            </label>
+
+            {/* Botones de acción del paso 3 */}
+            <div className="flex flex-wrap gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setCurrentStep(2)}
+                className="btn-cado-secondary inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                <span>Volver a confort</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={!canConfirmBooking || isSubmitting}
+                onClick={handleFinalBooking}
+                className="btn-cado-primary inline-flex items-center gap-2 rounded-2xl px-7 py-3 text-sm font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                <span>
+                  {isSubmitting ? 'Registrando cita en Supabase...' : 'Confirmar Reserva de Orientación'}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================================================================= */}
+        {/* PASO 4: CONFIRMACIÓN FINAL CON ENLACE DE GOOGLE MEET              */}
+        {/* ================================================================= */}
+        {currentStep === 4 && createdAppointment && (
+          <div className="clay-card rounded-[2rem] p-7 sm:p-10 space-y-6 text-center max-w-2xl mx-auto">
+            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#10B981]/15 text-[#10B981] shadow-inner">
+              <CheckCircle2 className="h-9 w-9" aria-hidden="true" />
+            </span>
+
+            <div className="space-y-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#A14B92]">
+                Código de Cita: {createdAppointment.id}
+              </span>
+              <h2 className="font-title text-4xl font-semibold text-[#513D49]">
+                ¡Tu orientación virtual está confirmada!
+              </h2>
+              <p className="text-sm text-[#513D49] max-w-md mx-auto">
+                Hemos enviado un correo con los detalles a{' '}
+                <strong className="text-[#A14B92]">{createdAppointment.email}</strong>.
               </p>
             </div>
-            <p className="flex items-start gap-2 text-xs leading-6 text-[#665D66]">
-              <ShieldCheck className="mt-1 h-4 w-4 shrink-0 text-[#A14B92]" />
-              Conectado a Supabase y servicio de orientaciones.
-            </p>
-          </aside>
-        </div>
+
+            {/* Tarjeta de horario y enlace Meet */}
+            <div className="rounded-2xl border border-[#E2E7E7] bg-[#F8EFF6] p-5 text-left space-y-3">
+              <div className="flex items-center justify-between text-xs border-b border-[#E2E7E7] pb-2">
+                <span className="font-semibold text-[#513D49]">Fecha y hora:</span>
+                <span className="font-bold text-[#A14B92]">
+                  {createdAppointment.date} a las {createdAppointment.time} hrs
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs border-b border-[#E2E7E7] pb-2">
+                <span className="font-semibold text-[#513D49]">Paciente:</span>
+                <span>{createdAppointment.patientName}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-[#513D49]">Pacto de confort:</span>
+                <span className="text-[#10B981] font-semibold">
+                  ✓ {createdAppointment.comfortProfile.soundPreference === 'silencio' ? 'Silencio' : 'Música'} · Señal de mano pactada
+                </span>
+              </div>
+            </div>
+
+            {/* Botón directo a Google Meet */}
+            {createdAppointment.meetLink && (
+              <a
+                href={createdAppointment.meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-cado-primary flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold shadow-md"
+              >
+                <Video className="h-4 w-4" aria-hidden="true" />
+                <span>Abrir enlace de videollamada en Google Meet</span>
+              </a>
+            )}
+
+            {/* Botón de contacto directo con WhatsApp */}
+            <div className="pt-2">
+              <a
+                href={`https://wa.me/56944657815?text=${encodeURIComponent(
+                  `Hola Dr. Javier Beiza, acabo de agendar la orientación telemática ${createdAppointment.id} para el día ${createdAppointment.date} a las ${createdAppointment.time} hrs.`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-xs font-semibold text-[#8A3D7D] hover:underline"
+              >
+                <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                <span>Avisar al doctor por WhatsApp sobre esta reserva</span>
+              </a>
+            </div>
+
+            <div className="pt-4 border-t border-[#E2E7E7]">
+              <Link
+                href="/"
+                className="btn-cado-secondary inline-flex rounded-xl px-5 py-2.5 text-xs font-semibold"
+              >
+                Volver a la página principal
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </main>
+  );
+}
+
+export default function UnifiedBookingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-white p-12 text-[#513D49]">
+          <div className="flex items-center gap-3 text-sm font-semibold">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#A14B92] border-t-transparent" />
+            <span>Cargando flujo de reserva personalizada...</span>
+          </div>
+        </div>
+      }
+    >
+      <BookingWizard />
+    </Suspense>
   );
 }
