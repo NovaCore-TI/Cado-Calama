@@ -128,6 +128,8 @@ export default function AdminPage() {
     addBlogPost,
     updateBlogPost,
     deleteBlogPost,
+    realtimeConnected,
+    lastRealtimeEvent,
     isDoctorLoggedIn,
     doctorUser,
     authMethod,
@@ -634,7 +636,7 @@ export default function AdminPage() {
               }`}
             />
             <span className="truncate">
-              {supabaseStatus.connected ? `Supabase (${supabaseStatus.latencyMs}ms)` : 'Modo local'}
+              {realtimeConnected ? 'Realtime en vivo' : supabaseStatus.connected ? 'Supabase conectado' : 'Modo local'}
             </span>
           </div>
 
@@ -666,6 +668,28 @@ export default function AdminPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* INDICADOR DE REALTIME WEBSOCKETS */}
+            <div
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold ${
+                realtimeConnected
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'
+              }`}
+              title={realtimeConnected ? 'Conectado a Supabase Realtime por WebSockets (sincronización instantánea)' : 'Conectando con Supabase Realtime...'}
+            >
+              <span className="relative flex h-2 w-2">
+                {realtimeConnected && (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                )}
+                <span
+                  className={`relative inline-flex h-2 w-2 rounded-full ${
+                    realtimeConnected ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                />
+              </span>
+              <span>{realtimeConnected ? 'En vivo' : 'Conectando…'}</span>
+            </div>
+
             <button
               type="button"
               onClick={handleRefreshBackend}
@@ -692,6 +716,27 @@ export default function AdminPage() {
 
         {/* CUERPO PRINCIPAL SEGÚN SECCIÓN */}
         <main className="mx-auto max-w-7xl space-y-8 px-6 py-8 sm:px-9 sm:py-10">
+          {/* BANNER DE NOTIFICACIÓN DE SINCRONIZACIÓN EN TIEMPO REAL */}
+          {lastRealtimeEvent && (
+            <aside
+              aria-label="Sincronización en tiempo real"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-xs font-medium text-emerald-900 shadow-sm"
+            >
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                </span>
+                <span>
+                  <strong>Sincronización en vivo:</strong> {lastRealtimeEvent}
+                </span>
+              </div>
+              <span className="rounded-full bg-emerald-200/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                Auto-sync
+              </span>
+            </aside>
+          )}
+
           <div>
             <span className="section-eyebrow">{title.eyebrow}</span>
             <h1 className="mt-2 font-title text-3xl font-semibold text-[#513D49] sm:text-4xl">
