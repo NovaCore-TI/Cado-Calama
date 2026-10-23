@@ -1,38 +1,103 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
+// Horarios vespertinos estándar de CADO en huso horario Chile Continental (RF-10)
+const HORARIOS_VESPERTINOS = ['19:00', '19:15', '19:30', '19:45'];
+
+function getFutureDatesChile(daysCount = 14): string[] {
+  const dates: string[] = [];
+  const now = new Date();
+  
+  // Usar hora oficial de Chile Continental
+  const chileNowStr = now.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+  const [year, month, day] = chileNowStr.split('-').map(Number);
+  const baseDate = new Date(Date.UTC(year, month - 1, day));
+
+  for (let i = 0; i < daysCount; i++) {
+    const d = new Date(baseDate.getTime() + i * 24 * 60 * 60 * 1000);
+    const dayOfWeek = d.getUTCDay();
+    // Excluir domingos (0) para atenciones telemáticas de CADO
+    if (dayOfWeek !== 0) {
+      dates.push(d.toISOString().slice(0, 10));
+    }
+  }
+  return dates;
+}
+
 // RF-10: Visualización y entrega de bloques virtuales vespertinos en hora de Chile Continental
 // RF-11: Control transaccional de disponibilidad y prevención de colisiones
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const dateFilter = searchParams.get('fecha');
+    const requestedDate = searchParams.get('fecha');
 
-    // Consultar bloques registrados en Supabase
-    let query = supabase
+    const futureDates = requestedDate ? [requestedDate] : getFutureDatesChile(14);
+    const minDate = futureDates[0];
+    const maxDate = futureDates[futureDates.length - 1];
+
+    // Consultar citas ya programadas en Supabase para excluir bloques ocupados (RF-11)
+    const { data: citasOcupadas, error: errorCitas } = await supabase
+      .from('orientaciones_citas')
+      .select('fecha, hora')
+      .eq('estado_atencion', 'Programada')
+      .gte('fecha', minDate)
+      .lte('fecha', maxDate);
+
+    // Consultar bloques expresamente bloqueados por el doctor (vacaciones, feriados)
+    const { data: bloquesBloqueados } = await supabase
       .from('bloques_disponibilidad')
-      .select('*')
-      .order('fecha', { ascending: true })
-      .order('hora_inicio', { ascending: true });
+      .select('fecha, hora_inicio, estado')
+      .gte('fecha', minDate)
+      .lte('fecha', maxDate)
+      .neq('estado', 'Disponible');
 
-    if (dateFilter) {
-      query = query.eq('fecha', dateFilter);
+    const occupiedSet = new Set<string>();
+
+    if (!errorCitas && citasOcupadas) {
+      citasOcupadas.forEach((c) => {
+        const formattedHour = String(c.hora).slice(0, 5);
+        occupiedSet.add(`${c.fecha}|${formattedHour}`);
+      });
     }
 
-    const { data: dbSlots, error } = await query;
+    if (bloquesBloqueados) {
+      bloquesBloqueados.forEach((b) => {
+        const formattedHour = String(b.hora_inicio).slice(0, 5);
+        occupiedSet.add(`${b.fecha}|${formattedHour}`);
+      });
+    }
 
-    // Horarios vespertinos estándar (18:00 a 19:45 hrs, bloques de 15 minutos)
-    const standardVespertinoTimes = ['18:00', '18:20', '18:40', '19:00', '19:20', '19:40'];
+    // Generar lista de bloques habilitados disponibles
+    const availableSlots: { fecha: string; hora: string; hora_fin: string; slotKey: string }[] = [];
+
+    futureDates.forEach((fecha) => {
+      HORARIOS_VESPERTINOS.forEach((hora) => {
+        const slotKey = `${fecha}|${hora}`;
+        if (!occupiedSet.has(slotKey)) {
+          const [h, m] = hora.split(':').map(Number);
+          const endM = m + 15;
+          const horaFin = `${String(Math.floor(h + endM / 60)).padStart(2, '0')}:${String(endM % 60).padStart(2, '0')}`;
+          availableSlots.push({
+            fecha,
+            hora,
+            hora_fin: horaFin,
+            slotKey,
+          });
+        }
+      });
+    });
 
     return NextResponse.json({
       ok: true,
       timezone: 'America/Santiago (Chile Continental UTC-3/UTC-4)',
-      standardVespertinoTimes,
-      source: !error && dbSlots ? 'supabase' : 'local_default',
-      data: dbSlots && dbSlots.length > 0 ? dbSlots : null,
-      message: error
-        ? `Aviso: Base de datos en modo fallback (${error.message}). Usando configuración horaria local.`
-        : 'Bloques de disponibilidad obtenidos correctamente.',
+      duracionMinutos: 15,
+      standardVespertinoTimes: HORARIOS_VESPERTINOS,
+      totalDisponibles: availableSlots.length,
+      diasHabilitados: futureDates,
+      slots: availableSlots,
+      data: availableSlots,
     });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
@@ -98,10 +163,7 @@ export async function POST(request: NextRequest) {
         : 'Bloque registrado exitosamente en la base de datos.',
     });
   } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
-    return NextResponse.json(
-      { ok: false, error: 'Error procesando solicitud de bloques.', details: errorMessage },
-      { status: 500 }
-    );
+    const errorMessage = err instanceof Error ? err.message : 'Error procesando solicitud';
+    return NextResponse.json({ ok: false, error: errorMessage }, { status: 500 });
   }
 }

@@ -209,15 +209,27 @@ export default function RecursosPage() {
   }, [selectedGuide]);
 
   const handleDownloadPdf = (guide: ClinicalGuide) => {
-    const blob = generateValidPdfBlob(guide);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = guide.fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      // Descarga directa del PDF oficial vectorial desde el endpoint seguro (RF-04)
+      const downloadUrl = `/api/recursos/download?id=${guide.id}`;
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = guide.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      // Fallback local en caso de desconexión
+      const blob = generateValidPdfBlob(guide);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = guide.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
 
     setDownloadedId(guide.id);
     setTimeout(() => setDownloadedId(null), 3500);

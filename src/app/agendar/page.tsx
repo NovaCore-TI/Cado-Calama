@@ -117,6 +117,7 @@ function BookingWizard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
+  const [googleCalendarUrl, setGoogleCalendarUrl] = useState<string>('');
 
   const validDate = date >= today && !blockedDates.includes(date);
   const slots = availableSlots
@@ -237,6 +238,10 @@ function BookingWizard() {
         return;
       }
 
+      if (json.googleCalendarUrl) {
+        setGoogleCalendarUrl(json.googleCalendarUrl);
+      }
+
       const app = addAppointment({
         id: json.data?.codigo || undefined,
         patientName: patientDraftInfo.name.trim(),
@@ -255,6 +260,7 @@ function BookingWizard() {
       setCurrentStep(4);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
+
       const app = addAppointment({
         patientName: patientDraftInfo.name.trim(),
         email: patientDraftInfo.email.trim(),
@@ -902,6 +908,40 @@ function BookingWizard() {
                   ✓ {createdAppointment.comfortProfile.soundPreference === 'silencio' ? 'Silencio' : 'Música'} · Señal de mano pactada
                 </span>
               </div>
+            </div>
+
+            {/* Botones de Calendario: Google Calendar y Descarga .ics (RF-13 & RF-16) */}
+            <div className="grid gap-2.5 sm:grid-cols-2 pt-2">
+              {googleCalendarUrl && (
+                <a
+                  href={googleCalendarUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-xs font-semibold text-[#513D49] hover:border-[#A14B92] hover:bg-[#F6F8F8] transition shadow-sm"
+                >
+                  <CalendarDays className="h-4 w-4 text-[#A14B92]" aria-hidden="true" />
+                  <span>Añadir a Google Calendar</span>
+                </a>
+              )}
+              <a
+                href={`/api/orientaciones/calendar?codigo=${createdAppointment.id}`}
+                download={`CADO_Orientacion_${createdAppointment.id}.ics`}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-xs font-semibold text-[#513D49] hover:border-[#A14B92] hover:bg-[#F6F8F8] transition shadow-sm"
+              >
+                <Clock3 className="h-4 w-4 text-[#A14B92]" aria-hidden="true" />
+                <span>Descargar archivo .ics</span>
+              </a>
+            </div>
+
+            {/* Acceso a autogestión */}
+            <div className="pt-2 text-xs text-[#766C75]">
+              ¿Necesitas reprogramar o anular más adelante?{' '}
+              <Link
+                href={`/gestionar?codigo=${createdAppointment.id}`}
+                className="font-semibold text-[#A14B92] hover:underline"
+              >
+                Gestionar o reprogramar mi orientación aquí
+              </Link>
             </div>
 
             {/* Botón directo a Google Meet */}

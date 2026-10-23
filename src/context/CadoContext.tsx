@@ -44,6 +44,13 @@ export interface Appointment {
   syncedToSupabase?: boolean;
 }
 
+export interface DoctorUser {
+  id?: string;
+  email?: string;
+  nombre?: string;
+  rol?: string;
+}
+
 export interface BlogPost {
   id: string;
   title: string;
@@ -106,7 +113,7 @@ export interface CadoContextType {
 
   // Auth for Doctor (RF-17 & RF-18 con Supabase Auth)
   isDoctorLoggedIn: boolean;
-  doctorUser: { id?: string; email?: string } | null;
+  doctorUser: DoctorUser | null;
   authMethod: 'supabase' | 'demo' | null;
   loginDoctor: (email: string, pass: string) => Promise<{ ok: boolean; error?: string; locked?: boolean }>;
   logoutDoctor: () => Promise<void>;
@@ -234,8 +241,81 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Doctor Auth state (RF-17 & RF-18)
   const [isDoctorLoggedIn, setIsDoctorLoggedIn] = useState(false);
-  const [doctorUser, setDoctorUser] = useState<{ id?: string; email?: string } | null>(null);
+  const [doctorUser, setDoctorUser] = useState<DoctorUser | null>(null);
   const [authMethod, setAuthMethod] = useState<'supabase' | 'demo' | null>(null);
+
+  // Vinculación dinámica y persistente con la tabla SQL public.doctores
+  const fetchDoctorProfile = useCallback(async (user: { id: string; email?: string; user_metadata?: Record<string, unknown> }): Promise<DoctorUser> => {
+    const userEmail = user.email?.trim().toLowerCase() || '';
+    if (!userEmail) return { id: user.id, email: '', nombre: 'Dr. Javier Beiza Ayala', rol: 'Cirujano Dentista · Director Clínico CADO' };
+
+    // 1. Buscar si el usuario ya existe en la tabla SQL public.doctores
+    try {
+      const { data: dbDoctor, error: errFetch } = await supabase
+        .from('doctores')
+        .select('id, nombre, email, rol')
+        .eq('email', userEmail)
+        .maybeSingle();
+
+      if (!errFetch && dbDoctor?.nombre) {
+        return {
+          id: dbDoctor.id || user.id,
+          email: userEmail,
+          nombre: dbDoctor.nombre,
+          rol: dbDoctor.rol || 'Cirujano Dentista · Director Clínico CADO',
+        };
+      }
+    } catch (err) {
+      console.warn('[CadoContext] Error consultando doctores en DB:', err);
+    }
+
+    // 2. Determinar nombre a partir de user_metadata o correo
+    const metaNombre = (user.user_metadata?.nombre || user.user_metadata?.full_name || user.user_metadata?.name) as string | undefined;
+    const metaRol = (user.user_metadata?.rol || user.user_metadata?.role) as string | undefined;
+
+    const baseName = userEmail.split('@')[0].replace(/[._-]/g, ' ');
+    const formattedName = baseName
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+    const nombreFinal = metaNombre || (formattedName ? `Dr. ${formattedName}` : 'Dr. Javier Beiza Ayala');
+    const rolFinal = metaRol || 'Cirujano Dentista · Director Clínico CADO';
+
+    // 3. ¡VINCULAR EN SQL! Si no existía en public.doctores, creamos el registro automáticamente en la base de datos
+    try {
+      const { data: insertedDoctor, error: errInsert } = await supabase
+        .from('doctores')
+        .upsert(
+          {
+            nombre: nombreFinal,
+            email: userEmail,
+            rol: rolFinal,
+          },
+          { onConflict: 'email' }
+        )
+        .select('id, nombre, email, rol')
+        .maybeSingle();
+
+      if (!errInsert && insertedDoctor?.nombre) {
+        return {
+          id: insertedDoctor.id || user.id,
+          email: userEmail,
+          nombre: insertedDoctor.nombre,
+          rol: insertedDoctor.rol || rolFinal,
+        };
+      }
+    } catch (err) {
+      console.warn('[CadoContext] Auto-vinculación en SQL completada con fallback local:', err);
+    }
+
+    return {
+      id: user.id,
+      email: userEmail,
+      nombre: nombreFinal,
+      rol: rolFinal,
+    };
+  }, []);
 
   const refreshSupabaseData = useCallback(async () => {
     const status = await checkSupabaseConnection();
@@ -400,12 +480,13 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ignore storage errors
     }
 
-    async function checkSupabaseSession() {
+async function checkSupabaseSession() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          const profile = await fetchDoctorProfile(session.user);
           setIsDoctorLoggedIn(true);
-          setDoctorUser({ id: session.user.id, email: session.user.email });
+          setDoctorUser(profile);
           setAuthMethod('supabase');
         }
       } catch {}
@@ -904,8 +985,9 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (!error && data?.session?.user) {
+        const profile = await fetchDoctorProfile(data.session.user);
         setIsDoctorLoggedIn(true);
-        setDoctorUser({ id: data.session.user.id, email: data.session.user.email });
+        setDoctorUser(profile);
         setAuthMethod('supabase');
         try {
           localStorage.removeItem('cado_auth_lockout');
@@ -917,18 +999,7 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Continuar al fallback de prueba si falla la conexión de red
     }
 
-    // 3. Acceso clínico de prueba / demostración autorizado
-    if (cleanEmail === 'demo@cado.local' && pass === 'DEMO') {
-      setIsDoctorLoggedIn(true);
-      setDoctorUser({ id: 'demo-doctor', email: 'demo@cado.local' });
-      setAuthMethod('demo');
-      try {
-        localStorage.removeItem('cado_auth_lockout');
-        sessionStorage.setItem('cado_demo_session_v2', 'true');
-        sessionStorage.setItem('cado_auth_method', 'demo');
-      } catch {}
-      return { ok: true };
-    }
+    // 3. Fallo de autenticación en Supabase
 
     // 4. Registro de intento fallido (5 intentos -> bloqueo de 15 min)
     let currentAttempts = 1;
@@ -939,7 +1010,8 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsed = JSON.parse(savedLock);
         currentAttempts = (parsed.attempts || 0) + 1;
       }
-      if (currentAttempts >= 5) {
+      const failedAttempts = currentAttempts;
+    if (failedAttempts >= 5) {
         lockUntil = Date.now() + 15 * 60 * 1000; // 15 minutos
       }
       localStorage.setItem(
@@ -948,7 +1020,8 @@ export const CadoProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
     } catch {}
 
-    if (currentAttempts >= 5) {
+    const failedAttempts = currentAttempts;
+    if (failedAttempts >= 5) {
       return {
         ok: false,
         locked: true,
