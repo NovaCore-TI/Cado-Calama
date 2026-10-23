@@ -14,6 +14,7 @@ import {
   Video,
 } from 'lucide-react';
 import { useCado, type Appointment } from '@/context/CadoContext';
+import { ConfortLiveCard } from '@/components/ConfortLiveCard';
 
 function endTime(time: string) {
   const [hour, minute] = time.split(':').map(Number);
@@ -290,7 +291,15 @@ export default function OrientacionPage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-[#E2E7E7] bg-[#F8EFF6]/50 p-4 text-xs leading-6 text-[#513D49]">
+                  <div className="mt-6 space-y-3">
+                    <ConfortLiveCard
+                      compact
+                      soundPreference={activeComfortProfile.soundPreference}
+                      jawBreaks={activeComfortProfile.jawBreaks}
+                      companionAllowed={activeComfortProfile.companionAllowed}
+                      handSignalPledge={activeComfortProfile.handSignalPledge}
+                    />
+                  <div className="rounded-2xl border border-[#E2E7E7] bg-[#F8EFF6]/50 p-4 text-xs leading-6 text-[#513D49]">
                     <strong>Preferencias de Confort vinculadas:</strong> Ambiente:{' '}
                     {activeComfortProfile.soundPreference === 'silencio'
                       ? 'Silencio'
@@ -302,6 +311,8 @@ export default function OrientacionPage() {
                         ✓ Cuestionario Previo #{activeQuestionnaire.id} vinculado a esta solicitud.
                       </span>
                     )}
+                  </div>
+
                   </div>
 
                   <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-[#E2E7E7] bg-[#F6F8F8] p-4 text-xs sm:text-sm leading-6">

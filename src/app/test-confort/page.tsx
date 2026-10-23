@@ -14,6 +14,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import { useCado, type ComfortProfile } from '@/context/CadoContext';
+import { ConfortLiveCard } from '@/components/ConfortLiveCard';
 
 const soundOptions = [
   { id: 'musica_suave', label: 'Música suave', detail: 'Prefiero escuchar música tranquila durante la atención.', icon: Volume2 },
@@ -194,7 +195,13 @@ export default function TestConfortPage() {
           </fieldset>
         </div>
 
-        <aside className="lg:sticky lg:top-32 lg:self-start">
+        <aside className="space-y-6 lg:sticky lg:top-32 lg:self-start">
+          <ConfortLiveCard
+            soundPreference={sound}
+            jawBreaks={breaks}
+            companionAllowed={companion}
+            handSignalPledge={stopSignal}
+          />
           <div className="glass-panel rounded-3xl p-6 sm:p-8">
             <h2 className="font-title text-3xl font-semibold">Resumen de tu perfil</h2>
             <p className="mt-2 text-sm leading-7 text-[#665D66]">
