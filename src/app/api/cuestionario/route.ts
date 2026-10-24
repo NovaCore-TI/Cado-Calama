@@ -1,109 +1,86 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-
-const NIVELES_VALIDOS = [
-  'Me siento tranquilo/a',
-  'Tengo algunas inquietudes',
-  'Me cuesta dar este paso',
-  'Prefiero no responder',
+import { readDoctorRecords } from "@/lib/doctor-records";
+import { NextRequest } from "next/server";
+import { getServerDatabase } from "@/lib/server-db";
+import {
+  accessFailure,
+  AccessError,
+  checkSameOrigin,
+  privateJson,
+  requireDoctor,
+} from "@/lib/doctor-auth";
+import { DRAFT_COOKIE, newSecret } from "@/lib/patient-access";
+const feelings = [
+  "tranquilo",
+  "nervioso",
+  "fobia",
+  "no_responde",
+  "Me siento tranquilo/a",
+  "Tengo algunas inquietudes",
+  "Me cuesta dar este paso",
+  "Prefiero no responder",
 ];
-
-// Backend de cuestionario de perfilamiento, validación de campos sensibles ("Prefiero no responder") y consentimiento obligatorio Ley 19.628
-export async function GET() {
-  const { data, error } = await supabase
-    .from('cuestionarios_perfilamiento')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  return NextResponse.json({
-    ok: true,
-    source: !error && data ? 'supabase' : 'empty_or_pending_schema',
-    supabaseStatus: error?.message || 'OK',
-    data: data || [],
-  });
+export async function GET(request: NextRequest) {
+  try {
+    const { doctor } = await requireDoctor(request);
+    const data = await readDoctorRecords(doctor.id, "cuestionarios");
+    return privateJson({ ok: true, data });
+  } catch (error) {
+    return accessFailure(error);
+  }
 }
-
 export async function POST(request: NextRequest) {
   try {
+    checkSameOrigin(request);
     const body = await request.json();
-    const {
-      reason,
-      feeling,
-      previousExperience = 'Prefiero no responder',
-      painSensitivity = 'Prefiero no responder',
-      communicationPreference = 'Explicación paso a paso con lenguaje sencillo',
-      consent,
-    } = body;
-
-    // Validación estricta de campos obligatorios sin bloquear "Prefiero no responder" en preguntas sensibles
-    if (!reason || typeof reason !== 'string' || reason.trim().length < 3) {
-      return NextResponse.json(
-        {
-          ok: false,
-          field: 'reason',
-          error: 'El motivo general de consulta es obligatorio (mínimo 3 caracteres).',
-        },
-        { status: 400 }
+    if (body.consent !== true)
+      throw new AccessError(
+        400,
+        "Debes aceptar el consentimiento de privacidad.",
       );
+    if (
+      typeof body.reason !== "string" ||
+      body.reason.trim().length < 3 ||
+      body.reason.length > 500 ||
+      !feelings.includes(body.feeling)
+    )
+      throw new AccessError(400, "Revisa el motivo y la opción de percepción.");
+    const extras: Record<string, string> = {};
+    for (const key of [
+      "previousExperience",
+      "painSensitivity",
+      "communicationPreference",
+    ]) {
+      if (body[key] !== undefined && typeof body[key] !== "string")
+        throw new AccessError(400, "Respuesta inválida.");
+      extras[key] = (body[key] || "Prefiero no responder").slice(0, 500);
     }
-
-    if (!feeling || !NIVELES_VALIDOS.includes(feeling)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          field: 'feeling',
-          error: 'Debes seleccionar una opción válida o «Prefiero no responder».',
-        },
-        { status: 400 }
-      );
-    }
-
-    // Exigir aceptación explícita de consentimiento informado de privacidad (Ley 19.628 y 20.584)
-    if (consent !== true) {
-      return NextResponse.json(
-        {
-          ok: false,
-          field: 'consent',
-          error: 'Debes aceptar explícitamente el consentimiento informado de privacidad para almacenar tus respuestas.',
-        },
-        { status: 400 }
-      );
-    }
-
-    const payload = {
-      motivo_consulta: reason.trim().slice(0, 255),
-      nivel_temor: feeling,
-      respuestas_adicionales: {
-        previousExperience: previousExperience || 'Prefiero no responder',
-        painSensitivity: painSensitivity || 'Prefiero no responder',
-        communicationPreference: communicationPreference || 'Prefiero no responder',
-        alcanceAviso: 'Este cuestionario es orientativo y no constituye un diagnóstico médico ni presupuesto clínico.',
-      },
-      consentimiento_privacidad: true,
-    };
-
-    const { data, error } = await supabase
-      .from('cuestionarios_perfilamiento')
-      .insert(payload)
-      .select()
+    const secret = newSecret();
+    const { data, error } = await getServerDatabase()
+      .from("cuestionarios_perfilamiento")
+      .insert({
+        motivo_consulta: body.reason.trim(),
+        nivel_temor: body.feeling,
+        respuestas_adicionales: extras,
+        consentimiento_privacidad: true,
+        draft_access_token: secret,
+      })
+      .select("id,created_at")
       .single();
-
-    return NextResponse.json(
-      {
-        ok: true,
-        syncedToSupabase: !error,
-        supabaseError: error?.message || null,
-        disclaimer: 'El cuestionario no entrega diagnósticos ni presupuestos clínicos.',
-        data: data || {
-          id: `Q-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-          ...payload,
-          created_at: new Date().toISOString(),
-        },
-      },
-      { status: 201 }
+    if (error || !data)
+      throw new AccessError(503, "No se pudo guardar el cuestionario.");
+    const response = privateJson(
+      { ok: true, syncedToSupabase: true, data },
+      201,
     );
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Formato JSON inválido.' }, { status: 400 });
+    response.cookies.set(DRAFT_COOKIE, data.id + ":" + secret, {
+      httpOnly: true,
+      secure: new URL(request.url).protocol === "https:",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 86400,
+    });
+    return response;
+  } catch (error) {
+    return accessFailure(error);
   }
 }

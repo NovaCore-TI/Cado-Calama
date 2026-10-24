@@ -1,36 +1,91 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import test from "node:test";
+import assert from "node:assert/strict";
+import { NextRequest, NextResponse } from "next/server.js";
+import { loadTs, database } from "./helpers/load-ts.mjs";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT = path.join(__dirname, '..');
-
-test('RF-12: Minimización estricta de datos (prohibición de solicitar/almacenar RUT)', () => {
-  const orientacionesPath = path.join(ROOT, 'src', 'app', 'api', 'orientaciones', 'route.ts');
-  const content = fs.readFileSync(orientacionesPath, 'utf8');
-
-  assert.ok(content.includes("'rut' in body || 'RUT' in body"), 'Debe detectar si se envía campo rut o RUT');
-  assert.ok(content.includes('status: 400'), 'Debe retornar error 400 ante presencia de RUT');
-  assert.ok(content.includes('minimización de datos'), 'Debe citar política de minimización de datos');
+const payload = {
+  patientName: "Ficticio",
+  email: "a@example.invalid",
+  phone: "12345678",
+  date: "2099-01-01",
+  time: "19:00",
+  consent: true,
+};
+const request = (body) =>
+  new NextRequest("https://cado.example/api/orientaciones", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+test("RF-12: RUT and missing consent are rejected before persistence", async () => {
+  const api = loadTs("src/app/api/orientaciones/route.ts");
+  for (const body of [
+    { ...payload, rut: "fake" },
+    { ...payload, consent: false },
+  ])
+    assert.equal((await api.POST(request(body))).status, 400);
 });
-
-test('RF-12: Estado inicial obligatorio de la cita es "Programada"', () => {
-  const orientacionesPath = path.join(ROOT, 'src', 'app', 'api', 'orientaciones', 'route.ts');
-  const content = fs.readFileSync(orientacionesPath, 'utf8');
-
-  assert.ok(content.includes("estado_atencion: 'Programada'"), 'Debe asignar estado_atencion = Programada');
+test("RF-11/12: database collision yields 409 and creates no Google event", async () => {
+  let syncs = 0;
+  const api = loadTs("src/app/api/orientaciones/route.ts", {
+    "@/lib/server-db": {
+      getServerDatabase: () => ({
+        rpc: async () => ({ data: null, error: { code: "23505" } }),
+      }),
+    },
+    "@/lib/calendar-sync": {
+      synchronizeAppointment: async () => {
+        syncs++;
+      },
+    },
+  });
+  assert.equal((await api.POST(request(payload))).status, 409);
+  assert.equal(syncs, 0);
 });
-
-test('RF-12: Interfaz /agendar implementa flujo de etapas con confirmación y sin RUT', () => {
-  const agendarPath = path.join(ROOT, 'src', 'app', 'agendar', 'page.tsx');
-  const content = fs.readFileSync(agendarPath, 'utf8');
-
-  assert.ok(content.includes('currentStep === 1'), 'Debe contener etapa 1');
-  assert.ok(content.includes('currentStep === 2'), 'Debe contener etapa 2');
-  assert.ok(content.includes('currentStep === 3'), 'Debe contener etapa 3');
-  assert.ok(content.includes('currentStep === 4'), 'Debe contener etapa de confirmación');
-  assert.ok(!content.includes('placeholder="RUT"'), 'No debe tener campos de solicitud de RUT');
+test("RF-12: unavailable database never confirms a booking", async () => {
+  const api = loadTs("src/app/api/orientaciones/route.ts", {
+    "@/lib/server-db": {
+      getServerDatabase: () => ({
+        rpc: async () => ({ data: null, error: { code: "08006" } }),
+      }),
+    },
+  });
+  const response = await api.POST(request(payload));
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).ok, false);
+});
+test("RF-16: confirmation is returned before any external calendar work", async () => {
+  const jobs = [];
+  let calendarCalls = 0;
+  const api = loadTs("src/app/api/orientaciones/route.ts", {
+    "next/server": { NextResponse, after: (job) => jobs.push(job) },
+    "@/lib/server-db": {
+      getServerDatabase: () => ({
+        rpc: async () => ({
+          data: {
+            id: "fixture",
+            codigo: "fixture",
+            estado_atencion: "Programada",
+            estado_sync: "Pendiente_Reintento",
+          },
+          error: null,
+        }),
+      }),
+    },
+    "@/lib/calendar-sync": {
+      synchronizeAppointment: async () => {
+        calendarCalls++;
+        throw Error("fixture Google outage");
+      },
+    },
+  });
+  const response = await api.POST(request(payload));
+  assert.equal(response.status, 201);
+  assert.equal(calendarCalls, 0);
+  assert.equal(jobs.length, 1);
+  await jobs[0]();
+  assert.equal(calendarCalls, 1);
+  const result = await response.json();
+  assert.equal(result.data.estado_sync, "Pendiente_Reintento");
+  assert.equal(result.syncedToSupabase, true);
 });

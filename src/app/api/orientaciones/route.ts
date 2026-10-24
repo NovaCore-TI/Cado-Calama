@@ -1,398 +1,200 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import crypto from 'crypto';
+import { randomUUID } from "node:crypto";
+import { NextRequest, after } from "next/server";
+import { getServerDatabase } from "@/lib/server-db";
 import {
-  createGoogleAppointmentEvent,
-  generateDirectGoogleCalendarUrl,
-  cancelGoogleAppointmentEvent,
-  rescheduleGoogleAppointmentEvent,
-} from '@/lib/google-calendar';
-
-// RF-10 a RF-16: Endpoints y lógica de negocio telemática
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const codigo = searchParams.get('codigo')?.trim().toUpperCase();
-  const token = searchParams.get('token')?.trim();
-
-  // Búsqueda específica por código o token para autogestión de pacientes (RF-14 & RF-15)
-  if (codigo || token) {
-    let query = supabase
-      .from('orientaciones_citas')
-      .select('*, cuestionarios_perfilamiento (*)');
-    if (codigo) query = query.eq('codigo', codigo);
-    if (token) query = query.eq('token_gestion', token);
-
-    const { data: cita, error } = await query.maybeSingle();
-
-    if (!cita) {
-      return NextResponse.json(
-        { ok: false, error: 'No encontramos ninguna orientación registrada con el código proporcionado.' },
-        { status: 404 }
-      );
-    }
-
-    const directCalendarUrl = generateDirectGoogleCalendarUrl({
-      codigo: cita.codigo,
-      fecha: cita.fecha,
-      hora: cita.hora,
-      patientName: cita.nombre_paciente,
-      meetLink: cita.meet_link || '',
+  accessFailure,
+  AccessError,
+  checkSameOrigin,
+  privateJson,
+  requireDoctor,
+} from "@/lib/doctor-auth";
+import {
+  DRAFT_COOKIE,
+  managementToken,
+  newSecret,
+  publicAppointment,
+  verifyQuestionnaireDraft,
+} from "@/lib/patient-access";
+import { futureChileSlot, validContact } from "@/lib/booking-validation";
+import { synchronizeAppointment } from "@/lib/calendar-sync";
+import { readDoctorRecords } from "@/lib/doctor-records";
+function scheduleSync(id: string) {
+  // Pending work is durable in PostgreSQL even if the immediate attempt cannot run.
+  try {
+    after(async () => {
+      await synchronizeAppointment(id).catch(() => {});
     });
-
-    return NextResponse.json({
-      ok: true,
-      data: {
-        ...cita,
-        googleCalendarUrl: directCalendarUrl,
-        icsUrl: `/api/orientaciones/calendar?codigo=${cita.codigo}`,
-      },
-    });
+  } catch {
+    console.warn("Calendar sync remains pending for the retry processor.");
   }
-
-  const { data, error } = await supabase
-    .from('orientaciones_citas')
-    .select('*, cuestionarios_perfilamiento (*)')
-    .order('created_at', { ascending: false });
-
-  return NextResponse.json({
-    ok: true,
-    source: !error && data ? 'supabase' : 'local_fallback',
-    supabaseStatus: error?.message || 'OK',
-    data: data || [],
-  });
 }
-
-// RF-11 (Colisiones), RF-12 (Sin RUT y estado Programada), RF-13 (Google Meet), RF-16 (Resiliencia)
+function databaseFailure(error: { code?: string } | null): never {
+  if (error?.code === "23505" || error?.code === "P0001")
+    throw new AccessError(
+      409,
+      "El bloque ya no está disponible. Tu reserva anterior se conserva.",
+    );
+  if (error?.code === "P0002")
+    throw new AccessError(
+      404,
+      "No se encontró la orientación con el enlace proporcionado.",
+    );
+  if (error?.code === "22023")
+    throw new AccessError(400, "Los datos no son válidos.");
+  throw new AccessError(
+    503,
+    "No se pudo guardar. No se ha confirmado ningún cambio.",
+  );
+}
+export async function GET(request: NextRequest) {
+  try {
+    const code = request.nextUrl.searchParams.get("codigo");
+    if (request.headers.has("x-management-token")) {
+      const token = managementToken(request);
+      let query = getServerDatabase()
+        .from("orientaciones_citas")
+        .select("*")
+        .eq("token_gestion", token);
+      if (code) query = query.eq("codigo", code);
+      const { data, error } = await query.maybeSingle();
+      if (error) databaseFailure(error);
+      if (!data) throw new AccessError(404, "Enlace inválido o caducado.");
+      return privateJson({ ok: true, data: publicAppointment(data) });
+    }
+    // A short code is a display reference, never an authorization credential.
+    const { doctor } = await requireDoctor(request);
+    const data = await readDoctorRecords(doctor.id, "orientaciones", code);
+    return privateJson({ ok: true, data });
+  } catch (error) {
+    return accessFailure(error);
+  }
+}
 export async function POST(request: NextRequest) {
   try {
+    checkSameOrigin(request);
     const body = await request.json();
-    const {
-      patientName,
-      email,
-      phone,
-      date,
-      time,
-      consent,
-      cuestionarioId = null,
-      comfortProfile = {},
-    } = body;
-
-    // RF-12: Rechazar estrictamente si se intenta enviar RUT por política de minimización de datos
-    if ('rut' in body || 'RUT' in body) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'Por política de minimización de datos (RF-12), no se solicita ni almacena el RUT en reservas telemáticas.',
-        },
-        { status: 400 }
+    if (
+      !body ||
+      typeof body !== "object" ||
+      Array.isArray(body) ||
+      "rut" in body ||
+      "RUT" in body
+    )
+      throw new AccessError(400, "La reserva no solicita RUT.");
+    if (body.consent !== true)
+      throw new AccessError(
+        400,
+        "Debes aceptar el consentimiento de privacidad.",
       );
-    }
-
-    if (!patientName?.trim() || !email?.trim() || !phone?.trim() || !date || !time) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'Nombre completo, correo electrónico, teléfono, fecha y bloque horario son obligatorios.',
-        },
-        { status: 400 }
+    if (
+      !validContact(body.patientName, body.email, body.phone) ||
+      !futureChileSlot(body.date, body.time)
+    )
+      throw new AccessError(
+        400,
+        "Revisa tus datos y selecciona un bloque virtual futuro.",
       );
-    }
-
-    if (consent !== true) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'Debe aceptar el consentimiento informado de privacidad para vincular sus respuestas a la reserva.',
-        },
-        { status: 400 }
-      );
-    }
-
-    // RF-11: Control transaccional de colisiones previas
-    const { data: colision } = await supabase
-      .from('orientaciones_citas')
-      .select('id, codigo, estado_atencion')
-      .eq('fecha', date)
-      .eq('hora', time)
-      .eq('estado_atencion', 'Programada')
-      .maybeSingle();
-
-    if (colision) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `El bloque horario seleccionado acaba de ser reservado por otro paciente. Por favor selecciona otro horario disponible.`,
-          colision: true,
-        },
-        { status: 409 }
-      );
-    }
-
-    const codigo = `CADO-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
-    const tokenGestion = crypto.randomBytes(16).toString('hex');
-
-    // RF-13 & RF-16: Sincronización automatizada con Google Calendar & Meet
-    const googleSync = await createGoogleAppointmentEvent({
-      codigo,
-      fecha: date,
-      hora: time,
-      patientName: patientName.trim(),
-      patientEmail: email.trim(),
-      patientPhone: phone.trim(),
-      comfortProfile,
-    });
-
-    const meetLink = googleSync.meetLink;
-    const calendarEventId = googleSync.eventId;
-    const directCalendarUrl = generateDirectGoogleCalendarUrl({
-      codigo,
-      fecha: date,
-      hora: time,
-      patientName: patientName.trim(),
-      meetLink,
-    });
-
-    // Intentar inserción de paciente
-    const { data: paciente } = await supabase
-      .from('pacientes')
-      .insert({
-        nombre_completo: patientName.trim(),
-        email: email.trim(),
-        telefono: phone.trim(),
-      })
-      .select('id')
-      .single();
-
-    // RF-13 & RF-16: Inserción de cita con enlace seguro y estado de resiliencia
-    const { data: cita, error } = await supabase
-      .from('orientaciones_citas')
-      .insert({
-        codigo,
-        paciente_id: paciente?.id || null,
-        cuestionario_id: cuestionarioId,
-        nombre_paciente: patientName.trim(),
-        email_paciente: email.trim(),
-        telefono_paciente: phone.trim(),
-        fecha: date,
-        hora: time,
-        preferencias_confort: comfortProfile,
-        estado_atencion: 'Programada',
-        estado_derivacion: 'Sin derivación',
-        meet_link: meetLink,
-        token_gestion: tokenGestion,
-        calendar_event_id: calendarEventId,
-        estado_sync: googleSync.status || 'Sincronizado',
-        intentos_sync: 0,
-      })
-      .select()
-      .single();
-
-    return NextResponse.json(
+    const questionnaire = await verifyQuestionnaireDraft(
+      request,
+      body.cuestionarioId,
+    );
+    const rawComfort = body.comfortProfile || {};
+    if (
+      typeof rawComfort !== "object" ||
+      Array.isArray(rawComfort) ||
+      JSON.stringify(rawComfort).length > 3000
+    )
+      throw new AccessError(400, "Preferencias inválidas.");
+    const comfort = {
+      anxietyLevel: ["tranquilo", "nervioso", "fobia", "no_responde"].includes(
+        rawComfort.anxietyLevel,
+      )
+        ? rawComfort.anxietyLevel
+        : "no_responde",
+      soundPreference:
+        rawComfort.soundPreference === "silencio" ? "silencio" : "musica_suave",
+      jawBreaks: rawComfort.jawBreaks === true,
+      companionAllowed: rawComfort.companionAllowed === true,
+      handSignalPledge: rawComfort.handSignalPledge === true,
+      explanationStepByStep: rawComfort.explanationStepByStep === true,
+      notes:
+        typeof rawComfort.notes === "string"
+          ? rawComfort.notes.slice(0, 500)
+          : "",
+    };
+    const token = newSecret();
+    const code = "CADO-" + randomUUID();
+    const { data, error } = await getServerDatabase().rpc(
+      "reserve_orientation",
+      {
+        p_date: body.date,
+        p_time: body.time,
+        p_name: body.patientName,
+        p_email: body.email,
+        p_phone: body.phone,
+        p_code: code,
+        p_token: token,
+        p_questionnaire: questionnaire,
+        p_comfort: comfort,
+      },
+    );
+    if (error || !data) databaseFailure(error);
+    // External availability cannot delay or turn a committed reservation into an error.
+    scheduleSync(data.id);
+    const response = privateJson(
       {
         ok: true,
-        syncedToSupabase: !error,
-        supabaseError: error?.message || null,
-        googleCalendarUrl: directCalendarUrl,
-        calendarEventId: calendarEventId,
-        data: cita || {
-          codigo,
-          nombre_paciente: patientName.trim(),
-          email_paciente: email.trim(),
-          telefono_paciente: phone.trim(),
-          fecha: date,
-          hora: time,
-          preferencias_confort: comfortProfile,
-          estado_atencion: 'Programada',
-          meet_link: meetLink,
-          token_gestion: tokenGestion,
-        },
+        syncedToSupabase: true,
+        data: { ...publicAppointment(data), token_gestion: token },
       },
-      { status: 201 }
+      201,
     );
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Solicitud inválida';
-    return NextResponse.json({ ok: false, error: errorMessage }, { status: 400 });
+    response.cookies.set(DRAFT_COOKIE, "", {
+      httpOnly: true,
+      path: "/",
+      maxAge: 0,
+    });
+    return response;
+  } catch (error) {
+    return accessFailure(error);
   }
 }
-
-// RF-14 (Cancelación) y RF-15 (Reprogramación Atómica)
 export async function PATCH(request: NextRequest) {
   try {
+    checkSameOrigin(request);
     const body = await request.json();
-    const {
-      id,
-      codigo,
-      tokenGestion,
-      nuevoEstado,
-      nuevaFecha,
-      nuevaHora,
-      notas,
-      action,
-      motivo = '',
-    } = body;
-
-    const targetCodigo = codigo || id;
-    if (!targetCodigo && !tokenGestion) {
-      return NextResponse.json(
-        { ok: false, error: 'Se requiere id, código de cita o token de gestión para modificar la orientación.' },
-        { status: 400 }
-      );
-    }
-
-    const cleanCodigo = targetCodigo ? String(targetCodigo).trim().toUpperCase() : null;
-
-    // Obtener la cita actual
-    let fetchQuery = supabase.from('orientaciones_citas').select('*');
-    if (cleanCodigo) fetchQuery = fetchQuery.eq('codigo', cleanCodigo);
-    else if (tokenGestion) fetchQuery = fetchQuery.eq('token_gestion', tokenGestion);
-
-    const { data: citaActual, error: errorFetch } = await fetchQuery.maybeSingle();
-
-    if (errorFetch || !citaActual) {
-      return NextResponse.json(
-        { ok: false, error: `No se encontró ninguna cita registrada con los datos proporcionados.` },
-        { status: 404 }
-      );
-    }
-
-    // ACCIÓN: CANCELAR (RF-14)
-    if (action === 'cancelar' || nuevoEstado === 'Cancelada') {
-      if (citaActual.estado_atencion === 'Cancelada') {
-        return NextResponse.json(
-          { ok: false, error: 'Esta cita ya se encuentra cancelada.' },
-          { status: 400 }
-        );
-      }
-
-      const { data: updatedCita, error: errorUpdate } = await supabase
-        .from('orientaciones_citas')
-        .update({
-          estado_atencion: 'Cancelada',
-          notas_derivacion: motivo || notas || 'Cancelada por paciente',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', citaActual.id)
-        .select()
-        .single();
-
-      if (errorUpdate) {
-        return NextResponse.json({ ok: false, error: errorUpdate.message }, { status: 500 });
-      }
-
-      // RF-13 & RF-16: Cancelar evento en Google Calendar si existe
-      if (citaActual.calendar_event_id) {
-        cancelGoogleAppointmentEvent({
-          eventId: citaActual.calendar_event_id,
-          doctorId: citaActual.doctor_id,
-          reason: motivo || notas,
-        }).catch((err) => console.warn('[orientaciones/cancelar] Error en Google Calendar:', err));
-      }
-
-      // Registro de auditoría
-      supabase
-        .from('logs_auditoria')
-        .insert({
-          accion: 'CANCELACION_CITA_AUTOGESTION',
-          entidad: 'orientaciones_citas',
-          entidad_id: citaActual.codigo,
-          detalle: `Cancelación por autogestión de paciente. Motivo: ${motivo || notas || 'No especificado'}`,
-          ip_origen: request.headers.get('x-forwarded-for') || '127.0.0.1',
-        })
-        .then(() => {}, () => {});
-
-      return NextResponse.json({
-        ok: true,
-        message: 'Tu orientación ha sido cancelada exitosamente y el cupo ha sido liberado.',
-        data: updatedCita,
-      });
-    }
-
-    // ACCIÓN: REPROGRAMAR ATÓMICAMENTE (RF-15)
-    if (action === 'reprogramar' || (nuevaFecha && nuevaHora)) {
-      if (!nuevaFecha || !nuevaHora) {
-        return NextResponse.json(
-          { ok: false, error: 'Debes proporcionar la nueva fecha y hora para reprogramar.' },
-          { status: 400 }
-        );
-      }
-
-      if (citaActual.estado_atencion === 'Cancelada') {
-        return NextResponse.json(
-          { ok: false, error: 'No es posible reprogramar una cita que ya fue cancelada.' },
-          { status: 400 }
-        );
-      }
-
-      const formattedNewHour = String(nuevaHora).slice(0, 5);
-
-      // Verificación de colisión en el nuevo bloque (RF-15: sin perder la cita vigente si colisiona)
-      const { data: conflicto } = await supabase
-        .from('orientaciones_citas')
-        .select('id, codigo')
-        .eq('fecha', nuevaFecha)
-        .eq('hora', formattedNewHour)
-        .eq('estado_atencion', 'Programada')
-        .neq('id', citaActual.id)
-        .maybeSingle();
-
-      if (conflicto) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: `El bloque del ${nuevaFecha} a las ${formattedNewHour} ya fue tomado. Tu cita original del ${citaActual.fecha} a las ${citaActual.hora} se mantiene 100% activa.`,
-          },
-          { status: 409 }
-        );
-      }
-
-      const { data: reprogramada, error: errorReprog } = await supabase
-        .from('orientaciones_citas')
-        .update({
-          fecha: nuevaFecha,
-          hora: formattedNewHour,
-          estado_atencion: 'Programada',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', citaActual.id)
-        .select()
-        .single();
-
-      if (errorReprog) {
-        return NextResponse.json({ ok: false, error: errorReprog.message }, { status: 500 });
-      }
-
-      // RF-13 & RF-16: Sincronizar nueva fecha y hora en Google Calendar si existe evento
-      if (citaActual.calendar_event_id) {
-        rescheduleGoogleAppointmentEvent({
-          eventId: citaActual.calendar_event_id,
-          doctorId: citaActual.doctor_id,
-          nuevaFecha,
-          nuevaHora: formattedNewHour,
-        }).catch((err) => console.warn('[orientaciones/reprogramar] Error en Google Calendar:', err));
-      }
-
-      // Registro de auditoría
-      supabase
-        .from('logs_auditoria')
-        .insert({
-          accion: 'REPROGRAMACION_CITA_AUTOGESTION',
-          entidad: 'orientaciones_citas',
-          entidad_id: citaActual.codigo,
-          detalle: `Reprogramada de ${citaActual.fecha} ${citaActual.hora} a ${nuevaFecha} ${formattedNewHour}`,
-          ip_origen: request.headers.get('x-forwarded-for') || '127.0.0.1',
-        })
-        .then(() => {}, () => {});
-
-      return NextResponse.json({
-        ok: true,
-        message: 'Tu orientación ha sido reprogramada exitosamente.',
-        data: reprogramada,
-      });
-    }
-
-    return NextResponse.json({ ok: false, error: 'Acción no soportada. Usa cancelar o reprogramar.' }, { status: 400 });
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Error procesando modificación';
-    return NextResponse.json({ ok: false, error: errorMessage }, { status: 500 });
+    let token: string | null = null;
+    let doctorId: string | null = null;
+    if (body.tokenGestion || request.headers.has("x-management-token"))
+      token = managementToken(request, body.tokenGestion);
+    else doctorId = (await requireDoctor(request)).doctor.id;
+    if (typeof body.codigo !== "string" || body.codigo.length > 80)
+      throw new AccessError(400, "Referencia inválida.");
+    if (
+      body.action === "reprogramar" &&
+      !futureChileSlot(body.nuevaFecha, body.nuevaHora)
+    )
+      throw new AccessError(400, "Selecciona un bloque virtual futuro.");
+    if (!doctorId && !["cancelar", "reprogramar"].includes(body.action))
+      throw new AccessError(403, "Acción no autorizada.");
+    const { data, error } = await getServerDatabase().rpc(
+      "manage_orientation",
+      {
+        p_code: body.codigo,
+        p_token: token,
+        p_doctor: doctorId,
+        p_action: body.action,
+        p_date: body.nuevaFecha || null,
+        p_time: body.nuevaHora || null,
+        p_state: body.nuevoEstado || null,
+        p_note:
+          typeof body.motivo === "string" ? body.motivo.slice(0, 500) : "",
+      },
+    );
+    if (error || !data) databaseFailure(error);
+    scheduleSync(data.id);
+    return privateJson({ ok: true, data: publicAppointment(data) });
+  } catch (error) {
+    return accessFailure(error);
   }
 }

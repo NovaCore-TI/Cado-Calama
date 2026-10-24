@@ -1,31 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDoctorGoogleAuthUrl } from '@/lib/google-calendar';
-
-export const dynamic = 'force-dynamic';
-
+import { NextRequest, NextResponse } from "next/server";
+import { getDoctorGoogleAuthUrl } from "@/lib/google-calendar";
+import { accessFailure, requireDoctor } from "@/lib/doctor-auth";
+import { newSecret } from "@/lib/patient-access";
+export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const doctorId = searchParams.get('doctorId') || 'default';
-
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
-  const proto = request.headers.get('x-forwarded-proto') || (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
-  const origin = host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
-  const redirectUri = `${origin}/api/auth/google/callback`;
-
-  const authUrl = getDoctorGoogleAuthUrl(doctorId, redirectUri);
-
-  if (!authUrl) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          'Las credenciales GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET no están configuradas en las variables de entorno.',
-        instrucciones:
-          'Crea un proyecto en Google Cloud Console, habilita Google Calendar API, genera credenciales OAuth Web y colócalas en tu archivo .env.local.',
-      },
-      { status: 503 }
+  try {
+    await requireDoctor(request);
+    const state = newSecret();
+    const origin = new URL(process.env.NEXT_PUBLIC_APP_URL || request.url)
+      .origin;
+    const url = getDoctorGoogleAuthUrl(
+      state,
+      origin + "/api/auth/google/callback",
     );
+    if (!url)
+      return NextResponse.json(
+        { ok: false, error: "La integración con Google no está configurada." },
+        { status: 503 },
+      );
+    const response = NextResponse.redirect(url);
+    response.cookies.set("cado_google_state", state, {
+      httpOnly: true,
+      secure: origin.startsWith("https:"),
+      sameSite: "lax",
+      maxAge: 600,
+      path: "/api/auth/google/callback",
+    });
+    return response;
+  } catch (error) {
+    return accessFailure(error);
   }
-
-  return NextResponse.redirect(authUrl);
 }
