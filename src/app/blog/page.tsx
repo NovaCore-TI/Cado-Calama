@@ -1,38 +1,22 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useCado, BlogPost } from '@/context/CadoContext';
+import { useCado } from '@/context/CadoContext';
 import { 
   BookOpen, 
   Search, 
   Clock, 
   User, 
   ArrowRight, 
-  X, 
   HeartHandshake, 
-  Sparkles,
-  Share2,
-  Check
+  Sparkles
 } from 'lucide-react';
 
 export default function BlogPage() {
   const { blogPosts } = useCado();
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activePost, setActivePost] = useState<BlogPost | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setActivePost(null);
-    }
-    if (activePost) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [activePost]);
-
   const categories = ['Todos', 'Miedo Dental', 'Cuidados', 'Bruxismo', 'Urgencias'];
 
   const filteredPosts = useMemo(() => {
@@ -47,12 +31,6 @@ export default function BlogPage() {
       return matchCat && matchQuery && post.published;
     });
   }, [blogPosts, selectedCategory, searchQuery]);
-
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
 
   return (
     <div className="bg-white text-gray-800 space-y-10 sm:space-y-14 pb-24 max-w-5xl mx-auto px-6 pt-10 sm:pt-14">
@@ -79,11 +57,12 @@ export default function BlogPage() {
 
         {/* BUSCADOR DE ARTÍCULOS */}
         <div className="relative w-full md:w-72 font-sans">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3" />
+          <Search className="w-4 h-4 text-gray-600 absolute left-3.5 top-3" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Buscar artículos"
             placeholder="Buscar artículos..."
             className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#B3BFBF] text-xs text-[#513D49] focus:outline-none focus:ring-2 focus:ring-[#A14B92]/30 bg-white"
           />
@@ -134,7 +113,7 @@ export default function BlogPage() {
                   <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-[#A14B92] font-bold uppercase tracking-wider border border-purple-200">
                     {post.category}
                   </span>
-                  <span className="text-gray-400 flex items-center gap-1">
+                  <span className="text-gray-600 flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     <span>{post.readTime}</span>
                   </span>
@@ -150,7 +129,7 @@ export default function BlogPage() {
               </div>
 
               <div className="pt-3 border-t border-[#E2E7E7] flex items-center justify-between font-sans">
-                <span className="text-[11px] text-gray-400">{post.date}</span>
+                <span className="text-[11px] text-gray-600">{post.date}</span>
                 <Link
                   href={`/blog/${post.slug}`}
                   className="text-xs font-bold text-[#A14B92] hover:underline flex items-center gap-1"
@@ -163,87 +142,6 @@ export default function BlogPage() {
           ))
         )}
       </div>
-
-      {/* 4. MODAL DE LECTURA COMPLETA */}
-      {activePost && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setActivePost(null);
-          }}
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
-        >
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-10 space-y-6 max-h-[90vh] overflow-y-auto shadow-2xl border border-[#E2E7E7] animate-in zoom-in-95 duration-200">
-            <div className="flex items-start justify-between gap-4 border-b border-[#E2E7E7] pb-4">
-              <div className="space-y-1">
-                <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-[#A14B92] font-bold text-[10px] uppercase tracking-wider border border-purple-200 font-sans">
-                  {activePost.category}
-                </span>
-                <h3 className="font-title font-bold text-2xl text-[#513D49]">
-                  {activePost.title}
-                </h3>
-                <div className="flex items-center gap-3 text-xs text-gray-500 pt-1 font-sans">
-                  <span>Por <strong>{activePost.author}</strong></span>
-                  <span>•</span>
-                  <span>{activePost.date}</span>
-                  <span>•</span>
-                  <span>{activePost.readTime}</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setActivePost(null)}
-                aria-label="Cerrar lectura"
-                className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-700 shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* CONTENIDO EDITORIAL */}
-            <div className="text-xs sm:text-sm text-gray-700 leading-relaxed space-y-4 whitespace-pre-line font-sans">
-              {activePost.content}
-            </div>
-
-            {/* CTA IN-ARTICLE */}
-            <div className="p-5 rounded-2xl bg-[#F6F8F8] border border-[#E2E7E7] flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="space-y-0.5 text-center sm:text-left font-sans">
-                <strong className="text-xs text-[#513D49] block">¿Deseas conversar sobre este tema con el doctor?</strong>
-                <span className="text-[11px] text-gray-500">Puedes agendar una orientación virtual de 15 min sin compromiso.</span>
-              </div>
-              <Link
-                href="/agendar"
-                onClick={() => setActivePost(null)}
-                className="px-4 py-2.5 rounded-xl bg-[#A14B92] hover:bg-[#8C3C7E] text-white text-xs font-bold shadow-xs hover:shadow-sm whitespace-nowrap font-sans"
-              >
-                Orientación virtual
-              </Link>
-            </div>
-
-            {/* FOOTER DEL MODAL */}
-            <div className="pt-2 border-t border-[#E2E7E7] flex justify-between items-center font-sans">
-              <button
-                type="button"
-                onClick={handleShare}
-                className="text-xs text-gray-500 hover:text-[#513D49] flex items-center gap-1.5"
-              >
-                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}
-                <span>{copiedLink ? '¡Enlace copiado!' : 'Compartir artículo'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActivePost(null)}
-                className="px-5 py-2 rounded-xl border border-[#B3BFBF] text-xs font-semibold hover:bg-gray-50 text-[#513D49]"
-              >
-                Cerrar Lectura
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

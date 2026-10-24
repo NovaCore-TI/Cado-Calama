@@ -1,4 +1,5 @@
 'use client';
+import { Modal } from "@/components/Modal";
 
 import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
 import Image from 'next/image';
@@ -128,7 +129,7 @@ function DoctorDashboard() {
     blockedDates,
     addBlockedDate,
     removeBlockedDate,
-    blogPosts,
+    doctorBlogPosts: blogPosts,
     addBlogPost,
     updateBlogPost,
     deleteBlogPost,
@@ -166,20 +167,6 @@ function DoctorDashboard() {
   const [postContent, setPostContent] = useState('');
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
-
-  // Modal ESC handler
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        if (openAppointmentId) setOpenAppointmentId(null);
-        if (previewPost) setPreviewPost(null);
-      }
-    }
-    if (openAppointmentId || previewPost) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [openAppointmentId, previewPost]);
 
   // Desduplicación estricta de citas para evitar duplicados en memoria o estado local
   const uniqueAppointments = useMemo(() => {
@@ -847,6 +834,7 @@ function DoctorDashboard() {
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    aria-label="Buscar orientaciones por nombre, código o correo"
                     placeholder="Buscar por nombre, código de cita o correo..."
                     className="w-full rounded-2xl border border-[#B3BFBF] bg-white py-3 pl-11 pr-4 text-xs sm:text-sm outline-none focus:border-[#A14B92]"
                   />
@@ -1817,15 +1805,7 @@ function DoctorDashboard() {
         (() => {
           const app = appointments.find((item) => item.id === openAppointmentId)!;
           return (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="modal-patient-name"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setOpenAppointmentId(null);
-              }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-200"
-            >
+            <Modal labelledBy="modal-patient-name" onClose={() => setOpenAppointmentId(null)}>
               <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl sm:p-9 space-y-6">
                 <div className="flex items-start justify-between gap-4 border-b border-[#E2E7E7] pb-4">
                   <div>
@@ -1996,7 +1976,7 @@ function DoctorDashboard() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           );
         })()}
 
@@ -2004,27 +1984,21 @@ function DoctorDashboard() {
       {/* MODAL: VISTA PREVIA DEL ARTÍCULO                                  */}
       {/* =================================================================== */}
       {previewPost && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setPreviewPost(null);
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
-        >
+        <Modal labelledBy="post-preview-title" onClose={() => setPreviewPost(null)}>
           <article className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl sm:p-9 space-y-4">
             <div className="flex items-start justify-between gap-4 border-b border-[#E2E7E7] pb-3">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-[#A14B92]">
                   {previewPost.category} · {previewPost.published ? 'Publicado' : 'Borrador'}
                 </span>
-                <h2 className="mt-1 font-title text-3xl font-semibold text-[#513D49]">
+                <h2 id="post-preview-title" className="mt-1 font-title text-3xl font-semibold text-[#513D49]">
                   {previewPost.title}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setPreviewPost(null)}
+                aria-label="Cerrar vista previa"
                 className="rounded-xl border border-[#B3BFBF] p-2 hover:bg-[#F6F8F8]"
               >
                 <X className="h-4 w-4" />
@@ -2046,7 +2020,7 @@ function DoctorDashboard() {
               </button>
             </div>
           </article>
-        </div>
+        </Modal>
       )}
     </div>
   );

@@ -60,7 +60,7 @@ test("Changing professional discards late private responses and public bookings 
         actor = new Headers(init.headers).get("authorization").slice(-1);
       return response({ doctor: doctor(actor) });
     }
-    if (url.startsWith("/api/blog")) return response({ data: [] });
+    if (url.startsWith("/api/blog")) return response({ data: url.includes("admin=1") ? [{ id: "draft-" + actor, titulo: "Own draft", publicado: false }] : [{ id: "public", titulo: "Published", publicado: true }] });
     if (url.startsWith("/api/bloques"))
       return response({ slots: [], blockedDates: [] });
     if (url === "/api/orientaciones") {
@@ -106,6 +106,8 @@ test("Changing professional discards late private responses and public bookings 
   );
   context = render();
   assert.equal(context.appointments[0].id, "own-a");
+  assert.equal(context.blogPosts[0].id, "public");
+  assert.equal(context.doctorBlogPosts[0].id, "draft-a");
   pauseA = true;
   const oldRefresh = context.refreshSupabaseData();
   await pending;
@@ -117,6 +119,8 @@ test("Changing professional discards late private responses and public bookings 
   await oldRefresh;
   context = render();
   assert.equal(context.doctorUser.nombre, "Doctor b");
+  assert.equal(context.blogPosts[0].id, "public");
+  assert.equal(context.doctorBlogPosts[0].id, "draft-b");
   assert.deepEqual(
     Array.from(context.appointments, (a) => a.id),
     ["own-b"],

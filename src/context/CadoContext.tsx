@@ -140,6 +140,7 @@ export interface CadoContextType {
 
   // Blog Posts
   blogPosts: BlogPost[];
+  doctorBlogPosts: BlogPost[];
   addBlogPost: (post: Omit<BlogPost, "id" | "date">) => Promise<boolean>;
   updateBlogPost: (id: string, post: Partial<BlogPost>) => Promise<boolean>;
   deleteBlogPost: (id: string) => Promise<boolean>;
@@ -217,6 +218,7 @@ async function api(url: string, init?: RequestInit) {
 export function CadoProvider({ children }: { children: React.ReactNode }) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [doctorBlogPosts, setDoctorBlogPosts] = useState<BlogPost[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
   const [questionnaires, setQuestionnaires] = useState<
@@ -252,7 +254,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     activeAuthUser.current = null;
     authorized.current = false;
     setAppointments([]);
-    setBlogPosts([]);
+    setDoctorBlogPosts([]);
     setAvailableSlots([]);
     setBlockedDates([]);
     setQuestionnaires([]);
@@ -386,7 +388,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     // Drafts are visible only to the verified professional.
     const posts = (await api("/api/blog?admin=1")).data;
     if (current() && authorized.current && posts)
-      setBlogPosts(
+      setDoctorBlogPosts(
         posts.map((r: ArticleRow) => ({
           id: r.id,
           title: r.titulo,
@@ -708,7 +710,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     });
   const updateBlogPost: CadoContextType["updateBlogPost"] = (id, partial) =>
     mutate(async () => {
-      const post = { ...blogPosts.find((p) => p.id === id), ...partial };
+      const post = { ...doctorBlogPosts.find((p) => p.id === id), ...partial };
       await api("/api/blog", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -756,6 +758,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         addBlockedDate,
         removeBlockedDate,
         blogPosts,
+        doctorBlogPosts,
         addBlogPost,
         updateBlogPost,
         deleteBlogPost,

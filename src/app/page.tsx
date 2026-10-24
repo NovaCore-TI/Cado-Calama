@@ -372,7 +372,7 @@ export default function HomePage() {
                 href="https://wa.me/56944657815"
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Contactar a CADO Odontología por WhatsApp (abre en una nueva ventana)"
+                aria-label="WhatsApp prioritario: contactar a CADO Odontología (abre en una nueva ventana)"
                 className="inline-flex items-center gap-2 rounded-2xl border border-white/40 bg-white/10 px-5 py-3.5 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />

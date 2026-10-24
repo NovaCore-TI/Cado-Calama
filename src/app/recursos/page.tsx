@@ -1,5 +1,6 @@
 'use client';
 
+import { Modal } from "@/components/Modal";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
@@ -315,21 +316,14 @@ export default function RecursosPage() {
         </div>
 
         {selectedGuide && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setSelectedGuide(null);
-            }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
-          >
+          <Modal labelledBy="guide-preview-title" onClose={() => setSelectedGuide(null)}>
             <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-9">
               <div className="flex items-start justify-between gap-4 border-b border-[#E2E7E7] pb-4">
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wider text-[#A14B92]">
                     {selectedGuide.category} · Vista Previa
                   </span>
-                  <h2 className="mt-1 font-title text-3xl font-semibold">{selectedGuide.title}</h2>
+                  <h2 id="guide-preview-title" className="mt-1 font-title text-3xl font-semibold">{selectedGuide.title}</h2>
                 </div>
                 <button
                   type="button"
@@ -371,7 +365,7 @@ export default function RecursosPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
 
         <div className="glass-panel mt-12 flex flex-col items-start justify-between gap-5 rounded-3xl p-7 sm:flex-row sm:items-center">
