@@ -1,3 +1,4 @@
+import { ArticleBody } from "@/components/ArticleBody";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -86,9 +87,7 @@ export default async function ArticlePage({ params }: Props) {
           {article.autor_nombre} · {article.tiempo_lectura}
         </p>
       </header>
-      <div className="whitespace-pre-wrap py-10 leading-8">
-        {article.cuerpo}
-      </div>
+      <div className="py-10 leading-8"><ArticleBody content={article.cuerpo} /></div>
       <Link
         href="/agendar"
         className="btn-cado-primary inline-block rounded-xl p-4"

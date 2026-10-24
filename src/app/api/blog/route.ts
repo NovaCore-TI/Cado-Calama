@@ -1,3 +1,4 @@
+import { normalizeArticleContent, articlePlainText } from "@/lib/article-content";
 import { NextRequest } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getServerDatabase } from "@/lib/server-db";
@@ -19,6 +20,10 @@ function article(body: Record<string, unknown>) {
     content.length > 100000
   )
     throw new AccessError(400, "Revisa el título y contenido.");
+  let safeContent: string;
+  try { safeContent = normalizeArticleContent(content); if (!articlePlainText(safeContent).trim()) throw Error(); }
+  catch { throw new AccessError(400, "Revisa el formato del contenido y sus enlaces."); }
+  if (!["Miedo Dental", "Cuidados", "Bruxismo", "Urgencias"].includes(String(body.categoria))) throw new AccessError(400, "Categoría inválida.");
   const slug =
     typeof body.slug === "string"
       ? body.slug
@@ -33,11 +38,12 @@ function article(body: Record<string, unknown>) {
   return {
     titulo: title.trim(),
     slug,
-    cuerpo: content.trim(),
+    cuerpo: safeContent,
+    tiempo_lectura: Math.max(1, Math.ceil(articlePlainText(safeContent).split(/\s+/).length / 180)) + " min de lectura",
     resumen:
       typeof body.resumen === "string"
         ? body.resumen.slice(0, 500)
-        : content.slice(0, 140),
+        : articlePlainText(safeContent).slice(0, 140),
     categoria: typeof body.categoria === "string" ? body.categoria : "Cuidados",
     publicado: body.publicado === true,
     estado_publicacion: body.publicado === true ? "Publicado" : "Borrador",
@@ -57,6 +63,7 @@ export async function GET(request: NextRequest) {
     const slug = request.nextUrl.searchParams.get("slug");
     if (slug) query = query.eq("slug", slug);
     const { data, error } = await query;
+    if (error?.code === "23505") throw new AccessError(409, "La URL del artículo ya está en uso. Elige otra.");
     if (error) throw error;
     return privateJson({
       ok: true,
@@ -76,6 +83,7 @@ export async function POST(request: NextRequest) {
       .insert({ ...payload, autor_id: doctor.id, autor_nombre: doctor.nombre })
       .select()
       .single();
+    if (error?.code === "23505") throw new AccessError(409, "La URL del artículo ya está en uso. Elige otra.");
     if (error) throw error;
     return privateJson({ ok: true, data, syncedToSupabase: true }, 201);
   } catch (error) {
@@ -95,6 +103,7 @@ export async function PATCH(request: NextRequest) {
       .eq("autor_id", doctor.id)
       .select()
       .maybeSingle();
+    if (error?.code === "23505") throw new AccessError(409, "La URL del artículo ya está en uso. Elige otra.");
     if (error) throw error;
     if (!data) throw new AccessError(404, "Artículo no disponible.");
     return privateJson({ ok: true, data });
@@ -115,6 +124,7 @@ export async function DELETE(request: NextRequest) {
       .eq("autor_id", doctor.id)
       .select("id")
       .maybeSingle();
+    if (error?.code === "23505") throw new AccessError(409, "La URL del artículo ya está en uso. Elige otra.");
     if (error) throw error;
     if (!data) throw new AccessError(404, "Artículo no disponible.");
     return privateJson({ ok: true });
