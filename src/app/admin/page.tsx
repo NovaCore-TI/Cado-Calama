@@ -1,4 +1,5 @@
 'use client';
+import { GuideLibrary } from "@/components/GuideLibrary";
 import { Modal } from "@/components/Modal";
 
 import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
@@ -39,7 +40,7 @@ import {
 } from 'lucide-react';
 import { useCado, type Appointment, type BlogPost, type QuestionnaireSubmission } from '@/context/CadoContext';
 
-type Section = 'resumen' | 'orientaciones' | 'disponibilidad' | 'derivaciones' | 'contenidos' | 'integraciones';
+type Section = 'resumen' | 'orientaciones' | 'disponibilidad' | 'derivaciones' | 'contenidos' | 'recursos' | 'integraciones';
 
 const navigation = [
   { id: 'resumen', label: 'Resumen', icon: LayoutDashboard },
@@ -47,6 +48,7 @@ const navigation = [
   { id: 'disponibilidad', label: 'Disponibilidad', icon: CalendarDays },
   { id: 'derivaciones', label: 'Derivaciones', icon: ArrowRight },
   { id: 'contenidos', label: 'Contenidos Blog', icon: FileText },
+  { id: 'recursos', label: 'Guías para pacientes', icon: FileText },
   { id: 'integraciones', label: 'Integraciones', icon: Video },
 ] as const;
 
@@ -76,6 +78,7 @@ const sectionTitles: Record<Section, { eyebrow: string; title: string; descripti
     title: 'Gestor de Contenidos del Blog',
     description: 'Redacta, edita y publica artículos orientados a resolver dudas sobre fobia dental, bruxismo y postoperatorio.',
   },
+  recursos: { eyebrow: 'Biblioteca', title: 'Guías para pacientes', description: 'Revisa el documento completo antes de publicarlo. Puedes retirar una guía de la biblioteca pública en cualquier momento.' },
   integraciones: {
     eyebrow: 'Infraestructura',
     title: 'Estado de Integraciones Backend',
@@ -1487,6 +1490,7 @@ function DoctorDashboard() {
           {/* =============================================================== */}
           {/* SECCIÓN 5: GESTOR DE CONTENIDOS DEL BLOG                        */}
           {/* =============================================================== */}
+          {section === 'recursos' && <section className="clay-card rounded-3xl p-6 sm:p-8"><GuideLibrary admin /></section>}
           {section === 'contenidos' && (
             <div className="grid gap-8 xl:grid-cols-[1.3fr_1fr]">
               {/* FORMULARIO EDITAR / CREAR */}
