@@ -145,3 +145,5 @@ html { scroll-behavior: smooth; }
 ::-webkit-scrollbar-thumb:hover {
   background: #A14B92;
 }
+
+.cado-modal::backdrop { background: transparent; }
