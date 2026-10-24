@@ -105,6 +105,9 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
+        <link rel="preload" href="/fonts/montserrat-normal-100-900.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/cormorant-garamond-normal-300-700.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/caveat-normal-400-700.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icon.png" />
