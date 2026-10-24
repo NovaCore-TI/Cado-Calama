@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
+import { SITE_URL } from '@/lib/site';
 import './globals.css';
 import { SiteShell } from '@/components/SiteShell';
 import { CadoProvider } from '@/context/CadoContext';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.cadoodontologia.cl'),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: 'CADO Odontología Calama | Dr. Javier Beiza — Atención cercana',
     template: '%s | CADO Odontología Calama',

@@ -1,139 +1,100 @@
-'use client';
-
-import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import {
-  ArrowLeft,
-  ArrowRight,
-  BookOpen,
-  Calendar,
-  Clock,
-  HeartHandshake,
-  Share2,
-  Sparkles,
-  User,
-} from 'lucide-react';
-import { useCado } from '@/context/CadoContext';
-
-export default function ArticlePage() {
-  const { slug } = useParams<{ slug: string }>();
-  const { blogPosts } = useCado();
-  const post = blogPosts.find((item) => item.slug === slug && item.published);
-
-  if (!post) {
-    return (
-      <main className="bg-[#F6F8F8] px-6 py-20 text-[#513D49]">
-        <div className="mx-auto max-w-3xl rounded-[2rem] bg-white p-8 shadow-sm sm:p-12">
-          <p className="section-eyebrow">Contenido no disponible</p>
-          <h1 className="mt-3 font-title text-4xl font-semibold">
-            Este artículo no se encuentra publicado.
-          </h1>
-          <p className="mt-4 text-sm leading-7 text-[#665D66]">
-            Puede haber sido retirado o el enlace puede no ser correcto. Puedes explorar los otros artículos de salud bucal disponibles.
-          </p>
-          <div className="mt-7 flex flex-wrap gap-4">
-            <Link href="/blog" className="btn-cado-primary rounded-xl px-5 py-3 text-sm font-semibold">
-              Volver al blog
-            </Link>
-            <Link href="/" className="btn-cado-secondary rounded-xl px-5 py-3 text-sm font-semibold">
-              Ir al inicio
-            </Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { getPublishedArticle } from "@/lib/articles";
+import { SITE_URL, serializeStructuredData } from "@/lib/site";
+type Props = { params: Promise<{ slug: string }> };
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const article = await getPublishedArticle(slug);
+  if (!article)
+    return {
+      title: "Artículo no encontrado",
+      robots: { index: false, follow: false },
+    };
+  return {
+    title: article.titulo,
+    description: article.resumen,
+    alternates: { canonical: SITE_URL + "/blog/" + article.slug },
+    robots: { index: true, follow: true },
+    openGraph: {
+      type: "article",
+      title: article.titulo,
+      description: article.resumen,
+      url: SITE_URL + "/blog/" + article.slug,
+      publishedTime: article.published_at,
+      authors: [article.autor_nombre],
+    },
+  };
+}
+export default async function ArticlePage({ params }: Props) {
+  const { slug } = await params;
+  const article = await getPublishedArticle(slug);
+  if (!article) notFound();
+  const crumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Inicio", item: SITE_URL },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Blog",
+        item: SITE_URL + "/blog",
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: article.titulo,
+        item: SITE_URL + "/blog/" + article.slug,
+      },
+    ],
+  };
+  const medical = {
+    "@context": "https://schema.org",
+    "@type": "MedicalWebPage",
+    name: article.titulo,
+    description: article.resumen,
+    url: SITE_URL + "/blog/" + article.slug,
+    datePublished: article.published_at,
+  };
   return (
-    <main className="bg-white px-6 py-14 text-[#513D49] sm:py-20">
-      <article className="mx-auto max-w-3xl">
-        {/* BREADCRUMB */}
-        <nav aria-label="Ruta de navegación" className="text-xs text-[#766C75]">
-          <Link href="/" className="hover:text-[#A14B92]">
-            Inicio
-          </Link>{' '}
-          <span className="mx-1">/</span>{' '}
-          <Link href="/blog" className="hover:text-[#A14B92]">
-            Blog
-          </Link>{' '}
-          <span className="mx-1">/</span>{' '}
-          <span aria-current="page" className="font-semibold text-[#513D49]">
-            {post.title}
-          </span>
-        </nav>
-
-        {/* CABECERA DEL ARTÍCULO */}
-        <header className="mt-8 border-b border-[#E2E7E7] pb-8">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-[#F6F8F8] px-3.5 py-1 text-xs font-semibold text-[#A14B92]">
-            <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>{post.category}</span>
-          </div>
-
-          <h1 className="mt-4 font-title text-4xl font-semibold leading-tight text-[#513D49] sm:text-5xl text-balance">
-            {post.title}
-          </h1>
-
-          <p className="mt-5 text-base leading-relaxed text-[#665D66] sm:text-lg">
-            {post.excerpt}
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-[#766C75]">
-            <span className="flex items-center gap-1.5 font-semibold text-[#513D49]">
-              <User className="h-3.5 w-3.5 text-[#A14B92]" aria-hidden="true" />
-              {post.author}
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
-              {post.date}
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-              {post.readTime}
-            </span>
-          </div>
-        </header>
-
-        {/* CUERPO DEL ARTÍCULO */}
-        <div className="whitespace-pre-wrap py-10 text-base leading-8 text-[#513D49]">
-          {post.content}
-        </div>
-
-        {/* CARD CTA DE ORIENTACIÓN VIRTUAL */}
-        <div className="clay-card rounded-[2rem] p-7 sm:p-9 space-y-4">
-          <div className="flex items-start gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#A14B92]/10 text-[#A14B92]">
-              <HeartHandshake className="h-6 w-6" aria-hidden="true" />
-            </span>
-            <div className="space-y-1.5">
-              <h2 className="font-title text-2xl font-semibold text-[#513D49]">
-                ¿Te gustaría resolver tus dudas con el Dr. Javier Beiza?
-              </h2>
-              <p className="text-sm leading-relaxed text-[#665D66]">
-                El contenido educativo es orientativo y no reemplaza una evaluación odontológica. En una sesión telemática de 15 minutos puedes conversar con tranquilidad desde tu casa.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Link
-              href="/agendar"
-              className="btn-cado-primary inline-flex items-center gap-2 rounded-xl px-5 py-3 text-xs font-bold text-white shadow-md active:scale-98"
-            >
-              <span>Agendar orientación virtual de 15 min</span>
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-            <Link
-              href="/blog"
-              className="btn-cado-secondary inline-flex items-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>Ver más artículos del blog</span>
-            </Link>
-          </div>
-        </div>
-      </article>
-    </main>
+    <article className="mx-auto max-w-3xl px-6 py-16 text-[#513D49]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeStructuredData(crumbs) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeStructuredData(medical) }}
+      />
+      <nav aria-label="Ruta de navegación" className="text-sm">
+        <Link href="/" className="underline">
+          Inicio
+        </Link>{" "}
+        /{" "}
+        <Link href="/blog" className="underline">
+          Blog
+        </Link>{" "}
+        / <span aria-current="page">{article.titulo}</span>
+      </nav>
+      <header className="mt-8 space-y-4 border-b pb-8">
+        <p className="section-eyebrow">{article.categoria}</p>
+        <h1 className="font-title text-4xl sm:text-5xl">{article.titulo}</h1>
+        <p>{article.resumen}</p>
+        <p className="text-sm">
+          {article.autor_nombre} · {article.tiempo_lectura}
+        </p>
+      </header>
+      <div className="whitespace-pre-wrap py-10 leading-8">
+        {article.cuerpo}
+      </div>
+      <Link
+        href="/agendar"
+        className="btn-cado-primary inline-block rounded-xl p-4"
+      >
+        Agendar una orientación
+      </Link>
+    </article>
   );
 }

@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/admin', '/admin/*'], // Doctor portal hidden and barred from search crawlers
+        disallow: ['/admin', '/admin/*', '/gestionar', '/api/'], // Doctor portal hidden and barred from search crawlers
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,
