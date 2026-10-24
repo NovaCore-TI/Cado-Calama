@@ -9,7 +9,8 @@ import {
 } from "./google-calendar";
 
 // Durable pending state + lease: a failed/terminated request can be retried safely.
-export async function synchronizeAppointment(id: string) {
+export type SyncOutcome = { status: "synced" | "pending" | "skipped" };
+export async function synchronizeAppointment(id: string): Promise<SyncOutcome> {
   const db = getServerDatabase();
   const lease = randomUUID();
   const now = new Date();
@@ -25,7 +26,7 @@ export async function synchronizeAppointment(id: string) {
     .select("*")
     .maybeSingle();
   if (error) throw error;
-  if (!row) return;
+  if (!row) return { status: "skipped" };
   try {
     let result: {
       ok?: boolean;
@@ -60,7 +61,7 @@ export async function synchronizeAppointment(id: string) {
       });
     const success =
       result.ok && (!("status" in result) || result.status === "Sincronizado");
-    const { error: updateError } = await db
+    const { data: updated, error: updateError } = await db
       .from("orientaciones_citas")
       .update({
         estado_sync: success ? "Sincronizado" : "Pendiente_Reintento",
@@ -72,8 +73,12 @@ export async function synchronizeAppointment(id: string) {
       .eq("sync_lease_id", lease)
       .eq("fecha", row.fecha)
       .eq("hora", row.hora)
-      .eq("estado_atencion", row.estado_atencion);
+      .eq("estado_atencion", row.estado_atencion)
+      .select("id")
+      .maybeSingle();
     if (updateError) throw updateError;
+    if (!updated) return { status: "skipped" };
+    return { status: success ? "synced" : "pending" };
   } finally {
     await db
       .from("orientaciones_citas")
