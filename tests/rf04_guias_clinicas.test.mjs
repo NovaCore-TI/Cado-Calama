@@ -1,76 +1,77 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { NextRequest } from "next/server.js";
+import { PDFDocument, PDFName } from "pdf-lib";
+import { PGlite } from "@electric-sql/pglite";
+import { loadTs, database } from "./helpers/load-ts.mjs";
+const seed = JSON.parse(fs.readFileSync("content/guides.json"));
+const guide = { ...seed[0], id: "11111111-1111-4111-8111-111111111111", activo: true, revisado_en: "2026-10-24T00:00:00Z" };
+const request = (query = "") => new NextRequest("https://cado.example/api/recursos" + query);
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT = path.join(__dirname, '..');
-
-const EXPECTED_GUIDES = [
-  {
-    id: 'guia-post-exodoncia',
-    fileName: 'CADO_Guia_Cuidados_Post_Exodoncia.pdf',
-    category: 'Postoperatorio',
-  },
-  {
-    id: 'guia-primeros-auxilios-urgencias',
-    fileName: 'CADO_Guia_Primeros_Auxilios_Urgencias.pdf',
-    category: 'Urgencias y Dolor',
-  },
-  {
-    id: 'guia-preparacion-ansiedad-bruxismo',
-    fileName: 'CADO_Guia_Preparacion_y_Confort_Dental.pdf',
-    category: 'Bienestar y Confort',
-  },
-];
-
-test('RF-04: Verificación física de archivos PDF generados', () => {
-  for (const guide of EXPECTED_GUIDES) {
-    const filePath = path.join(ROOT, 'public', 'guias', guide.fileName);
-    assert.ok(fs.existsSync(filePath), `El archivo ${guide.fileName} debe existir en public/guias/`);
-
-    const stats = fs.statSync(filePath);
-    assert.ok(stats.size > 2000, `El archivo ${guide.fileName} debe tener tamaño > 2KB (tiene ${stats.size} bytes)`);
-
-    const buffer = fs.readFileSync(filePath);
-    const header = buffer.subarray(0, 5).toString('ascii');
-    assert.equal(header, '%PDF-', `El archivo ${guide.fileName} debe tener cabecera PDF válida (%PDF-)`);
-
-    const tail = buffer.subarray(buffer.length - 15).toString('ascii');
-    assert.ok(tail.includes('%%EOF'), `El archivo ${guide.fileName} debe finalizar con EOF válido`);
+test("Resource catalogue distinguishes a valid empty list from a database outage", async () => {
+  for (const error of [null, { message: "offline" }]) {
+    const db = database(() => ({ data: [], error }));
+    const api = loadTs("src/app/api/recursos/route.ts", { "@/lib/server-db": { getServerDatabase: () => db }, "./server-db": { getServerDatabase: () => db } });
+    const response = await api.GET(request());
+    assert.equal(response.status, error ? 503 : 200);
+    if (!error) assert.deepEqual((await response.json()).data, []);
   }
 });
-
-test('RF-04: Catálogo y rutas de API backend en código', async () => {
-  const routePath = path.join(ROOT, 'src', 'app', 'api', 'recursos', 'route.ts');
-  assert.ok(fs.existsSync(routePath), 'El endpoint /api/recursos/route.ts debe existir');
-
-  const content = fs.readFileSync(routePath, 'utf8');
-  assert.ok(content.includes('CADO_Guia_Cuidados_Post_Exodoncia.pdf'), 'Debe incluir guía post-exodoncia');
-  assert.ok(content.includes('CADO_Guia_Primeros_Auxilios_Urgencias.pdf'), 'Debe incluir guía primeros auxilios');
-  assert.ok(content.includes('CADO_Guia_Preparacion_y_Confort_Dental.pdf'), 'Debe incluir guía preparación y confort');
-  assert.ok(content.includes('DESCARGA_GUIA_PDF'), 'Debe registrar logs de auditoría');
+test("Resource download rejects inherited object keys and traversal without touching the database", async () => {
+  const db = database(() => { throw Error("Must not query invalid slugs"); });
+  const api = loadTs("src/app/api/recursos/download/route.ts", { "@/lib/server-db": { getServerDatabase: () => db }, "./server-db": { getServerDatabase: () => db } });
+  for (const id of ["__proto__", "../../.env.local", ""]) {
+    assert.equal((await api.GET(request("/download?id=" + encodeURIComponent(id)))).status, 404);
+  }
+  assert.equal(db.calls.length, 0);
+  const healthy = database(() => ({ data: [], error: null }));
+  const controlled = loadTs("src/app/api/recursos/download/route.ts", { "@/lib/server-db": { getServerDatabase: () => healthy }, "./server-db": { getServerDatabase: () => healthy } });
+  assert.equal((await controlled.GET(request("/download?id=constructor"))).status, 404);
 });
-
-test('RF-04: Endpoint de descarga forzada con mitigación de Path Traversal', async () => {
-  const downloadRoutePath = path.join(ROOT, 'src', 'app', 'api', 'recursos', 'download', 'route.ts');
-  assert.ok(fs.existsSync(downloadRoutePath), 'El endpoint /api/recursos/download/route.ts debe existir');
-
-  const content = fs.readFileSync(downloadRoutePath, 'utf8');
-  assert.ok(content.includes('ALLOWED_FILES'), 'Debe implementar allowlist estricto de archivos');
-  assert.ok(content.includes('Content-Disposition'), 'Debe configurar cabeceras de descarga attachment');
-  assert.ok(content.includes('application/pdf'), 'Debe configurar cabecera de tipo de contenido application/pdf');
+test("Withdrawn guides are not downloadable, and admin preview requires a verified doctor", async () => {
+  const db = database(() => ({ data: [], error: null }));
+  const api = loadTs("src/app/api/recursos/download/route.ts", { "@/lib/server-db": { getServerDatabase: () => db }, "./server-db": { getServerDatabase: () => db } });
+  assert.equal((await api.GET(request("/download?id=" + guide.slug))).status, 404);
+  assert.ok(db.calls[0].filters.some(f => f[0] === "eq" && f[1] === "activo" && f[2] === true));
+  assert.equal((await api.GET(request("/download?id=" + guide.slug + "&admin=1"))).status, 401);
 });
-
-test('RF-04: Esquema Supabase incluye tabla y seed de guías clínicas', () => {
-  const schemaPath = path.join(ROOT, 'supabase', 'schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-
-  assert.ok(schema.includes('CREATE TABLE IF NOT EXISTS public.guias_clinicas'), 'Tabla guias_clinicas debe estar definida');
-  assert.ok(schema.includes('INSERT INTO public.guias_clinicas'), 'Debe existir seed inicial para guías clínicas');
-  assert.ok(schema.includes('/guias/CADO_Guia_Cuidados_Post_Exodoncia.pdf'), 'Seed debe incluir URL de exodoncia');
-  assert.ok(schema.includes('/guias/CADO_Guia_Primeros_Auxilios_Urgencias.pdf'), 'Seed debe incluir URL de primeros auxilios');
-  assert.ok(schema.includes('/guias/CADO_Guia_Preparacion_y_Confort_Dental.pdf'), 'Seed debe incluir URL de confort');
+test("PDF metadata and download describe the generated file, with Spanish language and tagged structure", async () => {
+  const db = database(({ table }) => ({ data: table === "guias_clinicas" ? [guide] : null, error: null }));
+  const mocks = { "@/lib/server-db": { getServerDatabase: () => db }, "./server-db": { getServerDatabase: () => db } };
+  const download = loadTs("src/app/api/recursos/download/route.ts", mocks);
+  const response = await download.GET(request("/download?id=" + guide.slug));
+  assert.equal(response.status, 200);
+  const bytes = await response.arrayBuffer();
+  assert.equal(Number(response.headers.get("content-length")), bytes.byteLength);
+  assert.match(response.headers.get("cache-control"), /no-store/);
+  const pdf = await PDFDocument.load(bytes);
+  assert.equal(pdf.getPageCount(), 1);
+  assert.equal(pdf.catalog.lookup(PDFName.of("Lang")).decodeText(), "es-CL");
+  assert.ok(pdf.catalog.has(PDFName.of("StructTreeRoot")));
+  assert.equal(db.calls.filter(call => call.table === "logs_auditoria").length, 1);
+  const catalogue = loadTs("src/app/api/recursos/route.ts", mocks);
+  const metadata = (await (await catalogue.GET(request())).json()).data[0];
+  assert.equal(metadata.bytes, bytes.byteLength);
+  assert.equal(metadata.pages, pdf.getPageCount());
+});
+test("Resource migration keeps drafts private, permits withdrawal and deduplicates delivery events", async () => {
+  const db = new PGlite();
+  try {
+    await db.exec("CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS; CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY); CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT null::uuid $$;");
+    await db.exec(fs.readFileSync("supabase/migrations/20261024174342_harden_patient_access.sql", "utf8"));
+    const migration = fs.readdirSync("supabase/migrations").find(name => name.endsWith("_unify_resource_catalog.sql"));
+    await db.exec(fs.readFileSync("supabase/migrations/" + migration, "utf8"));
+    await db.exec("SET ROLE anon");
+    assert.equal((await db.query("SELECT count(*)::int n FROM guias_clinicas")).rows[0].n, 0);
+    await assert.rejects(db.query("UPDATE guias_clinicas SET activo=true"));
+    await db.exec("RESET ROLE; UPDATE guias_clinicas SET activo=true,revisado_en=now(); SET ROLE anon");
+    assert.equal((await db.query("SELECT count(*)::int n FROM guias_clinicas")).rows[0].n, 3);
+    await db.exec("RESET ROLE; UPDATE guias_clinicas SET activo=false; SET ROLE anon");
+    assert.equal((await db.query("SELECT count(*)::int n FROM guias_clinicas")).rows[0].n, 0);
+    await assert.rejects(db.query("INSERT INTO logs_auditoria(accion,entidad) VALUES('x','x')"));
+    await db.exec("RESET ROLE");
+    for (let i=0;i<2;i++) await db.exec("INSERT INTO logs_auditoria(accion,entidad,event_key) VALUES('PDF_PREPARADO','guias_clinicas','fixture-delivery') ON CONFLICT(event_key) DO NOTHING");
+    assert.equal((await db.query("SELECT count(*)::int n FROM logs_auditoria")).rows[0].n, 1);
+  } finally { await db.close(); }
 });

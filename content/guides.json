@@ -1,0 +1,86 @@
+[
+  {
+    "slug": "guia-post-exodoncia",
+    "titulo": "Cuidados Posteriores a una Extracción Dental (Exodoncia)",
+    "categoria": "Postoperatorio",
+    "descripcion": "Indicaciones paso a paso para las primeras 48 horas: control del sangrado, alimentación recomendada, higiene suave y señales de alerta.",
+    "contenido": [
+      {
+        "heading": "1. Primeras 2 horas después de la atención",
+        "points": [
+          "Mantener la gasa estéril mordiendo con presión suave y constante durante 30 a 45 minutos.",
+          "No escupir, no enjuagar con fuerza ni succionar la herida para proteger el coágulo sanguíneo.",
+          "Descansar y evitar esfuerzos físicos o exposición al calor."
+        ]
+      },
+      {
+        "heading": "2. Alimentación e hidratación (Primeras 48 horas)",
+        "points": [
+          "Preferir alimentos blandos, fríos o tibios (yogur, helado suave, purés tibios, sopas coladas tibias).",
+          "No utilizar bombillas (pajitas), ya que la succión puede desprender el coágulo.",
+          "Evitar bebidas calientes, alcohol, tabaco y alimentos con semillas pequeñas."
+        ]
+      },
+      {
+        "heading": "3. Higiene oral y cuándo contactar a CADO",
+        "points": [
+          "Cepillar los demás dientes normalmente con cepillo suave, evitando rozar directamente la zona intervenida el primer día.",
+          "Si el sangrado no disminuye tras presionar con una gasa limpia por 30 minutos o aparece fiebre, contactar al +56 9 4465 7815."
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "guia-primeros-auxilios-urgencias",
+    "titulo": "Primeros Auxilios ante Urgencias Dentales y Dolor Agudo",
+    "categoria": "Urgencias y Dolor",
+    "descripcion": "Qué hacer de inmediato en casa ante fracturas dentales, golpes (traumatismos), dolor nocturno o inflamación antes de llegar a la consulta.",
+    "contenido": [
+      {
+        "heading": "1. Dolor dental agudo o inflamación",
+        "points": [
+          "Realizar enjuagues suaves con agua tibia para limpiar restos de alimentos en la zona.",
+          "Aplicar compresas frías por fuera de la mejilla (10 minutos con paño protector) si existe hinchazón.",
+          "Nunca colocar ácido acetilsalicílico (aspirina) ni alcohol directamente sobre la encía o el diente."
+        ]
+      },
+      {
+        "heading": "2. Fractura o desalojo de un diente por golpe",
+        "points": [
+          "Si un diente definitivo sale por completo, tomarlo solo por la corona (parte blanca), nunca por la raíz.",
+          "Transportarlo en un recipiente con leche fría o suero fisiológico y acudir de inmediato a evaluación odontológica."
+        ]
+      },
+      {
+        "heading": "3. Canales de contacto prioritario CADO Calama",
+        "points": [
+          "Teléfono y WhatsApp directo: +56 9 4465 7815 (Vivar #1580, oficina 203, Edificio Espacio Parque).",
+          "Ante dificultad para respirar o tragar por inflamación severa, acudir de inmediato a un servicio de urgencia hospitalaria."
+        ]
+      }
+    ]
+  },
+  {
+    "slug": "guia-preparacion-ansiedad-bruxismo",
+    "titulo": "Guía de Preparación sin Ansiedad y Alivio Mandibular (TTM)",
+    "categoria": "Bienestar y Confort",
+    "descripcion": "Ejercicios de respiración, autocuidado para el bruxismo y cómo aprovechar tu orientación virtual y preferencias de confort en CADO.",
+    "contenido": [
+      {
+        "heading": "1. Antes de tu orientación virtual o consulta",
+        "points": [
+          "Anota tus dudas principales; ninguna pregunta es pequeña ni será juzgada.",
+          "Completa el Test de Confort para elegir música suave, silencio, pausas frecuentes o asistir con acompañante.",
+          "Recuerda que en el sillón dental siempre tendrás una señal acordada con tu mano para detener el procedimiento."
+        ]
+      },
+      {
+        "heading": "2. Autocuidado básico para tensión mandibular (Bruxismo / TTM)",
+        "points": [
+          "Postura de descanso mandibular: mantener labios juntos y dientes ligeramente separados durante el día.",
+          "Aplicar calor húmedo tibio en las mejillas durante 10 minutos antes de dormir si sientes rigidez."
+        ]
+      }
+    ]
+  }
+]
