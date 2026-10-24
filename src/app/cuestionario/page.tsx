@@ -55,26 +55,6 @@ export default function CuestionarioPage() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/cuestionario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reason,
-          feeling,
-          previousExperience,
-          painSensitivity,
-          communicationPreference,
-          consent,
-        }),
-      });
-      const json = await response.json();
-
-      if (!response.ok || !json.ok) {
-        setErrorMessage(json.error || 'Verifica los campos obligatorios antes de continuar.');
-        setIsSubmitting(false);
-        return;
-      }
-
       const saved = await submitQuestionnaire({
         reason,
         feeling,
@@ -84,25 +64,17 @@ export default function CuestionarioPage() {
         consent,
       });
 
-      setSavedRecordId(json.data?.id || saved.id);
-      setSyncedToCloud(Boolean(json.syncedToSupabase));
-    } catch {
-      const saved = await submitQuestionnaire({
-        reason,
-        feeling,
-        previousExperience,
-        painSensitivity,
-        communicationPreference,
-        consent,
-      });
       setSavedRecordId(saved.id);
+      setSyncedToCloud(Boolean(saved.syncedToSupabase));
+    } catch {
+      setErrorMessage('No se pudo guardar el cuestionario. Intenta nuevamente.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <main className="bg-[#F6F8F8] px-6 py-14 text-[#513D49] sm:py-20">
+    <section className="bg-[#F6F8F8] px-6 py-14 text-[#513D49] sm:py-20">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-3xl">
           <p className="section-eyebrow">Cuestionario Previo de Perfilamiento</p>
@@ -487,6 +459,6 @@ export default function CuestionarioPage() {
           </aside>
         </div>
       </div>
-    </main>
+    </section>
   );
 }
