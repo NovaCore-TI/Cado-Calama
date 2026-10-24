@@ -1,6 +1,10 @@
 'use client';
 import { GuideLibrary } from "@/components/GuideLibrary";
 import { Modal } from "@/components/Modal";
+import dynamic from "next/dynamic";
+import { ArticleBody } from "@/components/ArticleBody";
+import { articlePlainText } from "@/lib/article-content";
+const RichTextEditor = dynamic(() => import("@/components/RichTextEditor"), { ssr: false });
 
 import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
 import Image from 'next/image';
@@ -165,11 +169,39 @@ function DoctorDashboard() {
 
   // Blog CMS
   const [postTitle, setPostTitle] = useState('');
+  const [postSlug, setPostSlug] = useState('');
+  const [postDirty, setPostDirty] = useState(false);
+  const [postBusy, setPostBusy] = useState(false);
+  const postSaving = useRef(false);
+  const [postMessage, setPostMessage] = useState('');
   const [postCategory, setPostCategory] = useState<BlogPost['category']>('Cuidados');
   const [postExcerpt, setPostExcerpt] = useState('');
   const [postContent, setPostContent] = useState('');
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
+
+  useEffect(() => {
+    if (!postDirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    const leave = (event: MouseEvent) => {
+      const link = event.target instanceof Element ? event.target.closest('a') : null;
+      if (!link || link.target === '_blank' || event.ctrlKey || event.metaKey || event.button !== 0 || link.href === window.location.href) return;
+      if (!window.confirm('Hay cambios sin guardar. ¿Quieres salir y descartarlos?')) { event.preventDefault(); event.stopImmediatePropagation(); }
+    };
+    window.addEventListener('beforeunload', warn);
+    document.addEventListener('click', leave, true);
+    return () => { window.removeEventListener('beforeunload', warn); document.removeEventListener('click', leave, true); };
+  }, [postDirty]);
+  function discardPost() {
+    if (postSaving.current) return false;
+    if (postDirty && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return false;
+    setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage('');
+    return true;
+  }
+  function navigateSection(next: Section) {
+    if (section === 'contenidos' && next !== section && !discardPost()) return;
+    setSection(next);
+  }
 
   // Desduplicación estricta de citas para evitar duplicados en memoria o estado local
   const uniqueAppointments = useMemo(() => {
@@ -279,48 +311,28 @@ function DoctorDashboard() {
 
   async function handleSavePost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!postTitle.trim() || !postContent.trim()) return;
-    const excerpt = postExcerpt.trim() || `${postContent.trim().slice(0, 140)}…`;
-    let saved = false;
-    if (editingPostId) {
-      saved = await updateBlogPost(editingPostId, {
-        title: postTitle.trim(),
-        category: postCategory,
-        excerpt,
-        content: postContent.trim(),
-      });
-    } else {
-      saved = await addBlogPost({
-        title: postTitle.trim(),
-        slug: postTitle
-          .trim()
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, ''),
-        category: postCategory,
-        excerpt,
-        content: postContent.trim(),
-        author: doctorUser?.nombre || 'Profesional CADO',
-        readTime: `${Math.max(2, Math.ceil(postContent.trim().split(/\s+/).length / 180))} min de lectura`,
-        published: false,
-      });
-    }
-    if (!saved) return;
-    setEditingPostId(null);
-    setPostTitle('');
-    setPostExcerpt('');
-    setPostContent('');
+    if (postSaving.current) return;
+    const text = articlePlainText(postContent).trim();
+    if (!postTitle.trim() || !text) { setPostMessage('Completa el título y contenido del artículo.'); return; }
+    postSaving.current = true; setPostBusy(true); setPostMessage('Guardando…');
+    try {
+      const slug = postSlug.trim() || postTitle.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const content = { title: postTitle.trim(), slug, category: postCategory, excerpt: postExcerpt.trim() || text.slice(0, 140), content: postContent };
+      const saved = editingPostId ? await updateBlogPost(editingPostId, content) : await addBlogPost({ ...content, author: doctorUser?.nombre || 'Profesional CADO', readTime: '2 min de lectura', published: false });
+      if (!saved) { setPostMessage('No se pudo guardar. Tu texto continúa en el editor.'); return; }
+      setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage('Artículo guardado.');
+    } finally { postSaving.current = false; setPostBusy(false); }
   }
-
   function editPost(post: BlogPost) {
-    setEditingPostId(post.id);
-    setPostTitle(post.title);
-    setPostCategory(post.category);
-    setPostExcerpt(post.excerpt);
-    setPostContent(post.content);
+    if (!discardPost()) return;
+    setEditingPostId(post.id); setPostTitle(post.title); setPostSlug(post.slug); setPostCategory(post.category); setPostExcerpt(post.excerpt); setPostContent(post.content); setPostDirty(false);
     window.scrollTo({ top: 300, behavior: 'smooth' });
+  }
+  async function mutatePost(action: () => Promise<boolean>) {
+    if (postSaving.current) return;
+    postSaving.current = true; setPostBusy(true);
+    try { setPostMessage(await action() ? 'Cambio guardado.' : 'No se pudo guardar el cambio.'); }
+    finally { postSaving.current = false; setPostBusy(false); }
   }
 
   function handleGenerateCalamaEveningSlots() {
@@ -529,7 +541,7 @@ function DoctorDashboard() {
               <button
                 key={id}
                 type="button"
-                onClick={() => setSection(id)}
+                onClick={() => navigateSection(id)}
                 aria-current={isCurrent ? 'page' : undefined}
                 className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-left text-xs font-semibold transition lg:w-full ${
                   isCurrent
@@ -631,7 +643,7 @@ function DoctorDashboard() {
 
             <button
               type="button"
-              onClick={logoutDoctor}
+              onClick={() => { if (discardPost()) void logoutDoctor(); }}
               className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
             >
               <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1503,27 +1515,31 @@ function DoctorDashboard() {
                     {editingPostId ? 'Editar artículo' : 'Redactar nuevo artículo'}
                   </h2>
                   <p className="text-xs text-[#766C75]">
-                    Los artículos guardados se sincronizan con la base de datos clínica (`articulos_blog`).
+                    Guarda un borrador, revisa su vista previa y publícalo cuando esté listo.
                   </p>
                 </div>
 
+                <fieldset disabled={postBusy} className="space-y-4">
                 <label className="block text-xs font-semibold text-[#513D49]">
                   Título del artículo
                   <input
                     type="text"
                     required
                     value={postTitle}
-                    onChange={(e) => setPostTitle(e.target.value)}
+                    onChange={(e) => { setPostTitle(e.target.value); setPostDirty(true); }}
                     placeholder="Ej: Cómo prepararse para una consulta sin dolor en Calama"
                     className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-sm outline-none focus:border-[#A14B92]"
                   />
                 </label>
 
+                <label className="block text-xs font-semibold text-[#513D49]">URL del artículo (slug)
+                  <input value={postSlug} onChange={(event) => { setPostSlug(event.target.value); setPostDirty(true); }} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={160} placeholder="Se genera a partir del título si lo dejas vacío" className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-sm" />
+                </label>
                 <label className="block text-xs font-semibold text-[#513D49]">
                   Categoría
                   <select
                     value={postCategory}
-                    onChange={(e) => setPostCategory(e.target.value as BlogPost['category'])}
+                    onChange={(e) => { setPostCategory(e.target.value as BlogPost['category']); setPostDirty(true); }}
                     className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-sm font-semibold text-[#513D49] outline-none"
                   >
                     <option value="Miedo Dental">Miedo Dental</option>
@@ -1538,34 +1554,24 @@ function DoctorDashboard() {
                   <textarea
                     rows={2}
                     value={postExcerpt}
-                    onChange={(e) => setPostExcerpt(e.target.value)}
+                    onChange={(e) => { setPostExcerpt(e.target.value); setPostDirty(true); }}
                     placeholder="Breve descripción que se mostrará en la tarjeta del blog..."
                     className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-xs outline-none focus:border-[#A14B92]"
                   />
                 </label>
 
-                <label className="block text-xs font-semibold text-[#513D49]">
-                  Cuerpo del artículo (Texto completo)
-                  <textarea
-                    rows={8}
-                    required
-                    value={postContent}
-                    onChange={(e) => setPostContent(e.target.value)}
-                    placeholder="Escribe aquí las indicaciones y explicaciones con lenguaje claro y respetuoso..."
-                    className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-sm leading-relaxed outline-none focus:border-[#A14B92]"
-                  />
-                </label>
-
+                <div className="space-y-2">
+                  <p id="article-content-label" className="text-xs font-semibold text-[#513D49]">Cuerpo del artículo</p>
+                  <RichTextEditor value={postContent} onChange={(value) => { setPostContent(value); setPostDirty(true); }} disabled={postBusy} />
+                </div>
+                <p role="status" aria-live="polite" className="text-sm text-[#665D66]">{postMessage}</p>
                 <div className="flex flex-wrap justify-end gap-3 pt-2">
+                  <button type="button" disabled={postBusy || !postTitle.trim()} onClick={() => setPreviewPost({ id: editingPostId || 'preview', title: postTitle, slug: postSlug, category: postCategory, excerpt: postExcerpt, content: postContent, author: doctorUser?.nombre || '', readTime: '', date: '', published: false })} className="btn-cado-secondary rounded-xl px-4 py-2.5 text-xs font-semibold disabled:opacity-60">Previsualizar cambios</button>
                   {editingPostId && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditingPostId(null);
-                        setPostTitle('');
-                        setPostExcerpt('');
-                        setPostContent('');
-                      }}
+                      onClick={() => discardPost()}
+                      disabled={postBusy}
                       className="btn-cado-secondary rounded-xl px-4 py-2.5 text-xs font-semibold"
                     >
                       Cancelar
@@ -1573,11 +1579,13 @@ function DoctorDashboard() {
                   )}
                   <button
                     type="submit"
-                    className="btn-cado-primary rounded-xl px-6 py-2.5 text-xs font-semibold shadow-md"
+                    disabled={postBusy}
+                    className="btn-cado-primary rounded-xl px-6 py-2.5 text-xs font-semibold shadow-md disabled:opacity-60"
                   >
-                    {editingPostId ? 'Guardar cambios' : 'Crear artículo borrador'}
+                    {postBusy ? 'Guardando…' : editingPostId ? 'Guardar cambios' : 'Crear artículo borrador'}
                   </button>
                 </div>
+                </fieldset>
               </form>
 
               {/* LISTA DE ARTÍCULOS */}
@@ -1617,6 +1625,7 @@ function DoctorDashboard() {
                       <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
                         <button
                           type="button"
+                          disabled={postBusy}
                           onClick={() => setPreviewPost(post)}
                           className="font-semibold text-[#8A3D7D] hover:underline"
                         >
@@ -1624,6 +1633,7 @@ function DoctorDashboard() {
                         </button>
                         <button
                           type="button"
+                          disabled={postBusy}
                           onClick={() => editPost(post)}
                           className="font-semibold text-[#513D49] hover:underline"
                         >
@@ -1631,8 +1641,9 @@ function DoctorDashboard() {
                         </button>
                         <button
                           type="button"
+                          disabled={postBusy}
                           onClick={() =>
-                            updateBlogPost(post.id, { published: !post.published })
+                            mutatePost(() => updateBlogPost(post.id, { published: !post.published }))
                           }
                           className="font-semibold text-[#A14B92] hover:underline"
                         >
@@ -1640,9 +1651,10 @@ function DoctorDashboard() {
                         </button>
                         <button
                           type="button"
+                          disabled={postBusy}
                           onClick={() => {
                             if (window.confirm(`¿Eliminar «${post.title}»?`)) {
-                              deleteBlogPost(post.id);
+                              void mutatePost(() => deleteBlogPost(post.id));
                             }
                           }}
                           className="ml-auto font-semibold text-red-600 hover:underline"
@@ -2010,9 +2022,7 @@ function DoctorDashboard() {
             </div>
 
             <p className="text-sm font-semibold text-[#513D49]">{previewPost.excerpt}</p>
-            <div className="whitespace-pre-wrap text-sm leading-relaxed text-[#665D66]">
-              {previewPost.content}
-            </div>
+            <ArticleBody content={previewPost.content} />
 
             <div className="pt-3 border-t border-[#E2E7E7] flex justify-end">
               <button
