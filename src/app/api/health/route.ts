@@ -1,22 +1,24 @@
-import { NextResponse } from 'next/server';
-import { checkSupabaseConnection } from '@/lib/supabase';
-
+import { NextResponse } from "next/server";
+import { getServerDatabase } from "@/lib/server-db";
 export async function GET() {
-  const status = await checkSupabaseConnection();
-
-  return NextResponse.json({
-    ok: true,
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://zccvmxtaxbigyqopqftd.supabase.co',
-    connection: status,
-    endpoints: [
-      { endpoint: '/api/perfil', methods: ['GET'], description: 'Perfil profesional, ubicación, servicios y canales CADO' },
-      { endpoint: '/api/blog', methods: ['GET', 'POST'], description: 'Publicación cronológica y lectura de artículos del blog en Supabase' },
-      { endpoint: '/api/faq', methods: ['GET'], description: 'Motor de filtrado y búsqueda predictiva de FAQ por palabra clave y categoría' },
-      { endpoint: '/api/recursos', methods: ['GET', 'POST'], description: 'Catálogo de guías clínicas PDF y auditoría de descargas' },
-      { endpoint: '/api/urgencias', methods: ['GET', 'POST'], description: 'Triaje de urgencias dentales y auditoría de derivación prioritaria' },
-      { endpoint: '/api/cuestionario', methods: ['GET', 'POST'], description: 'Cuestionario de perfilamiento, opción Prefiero no responder y consentimiento Ley 19.628' },
-      { endpoint: '/api/confort', methods: ['GET', 'POST'], description: 'Preferencias de confort ambiental (música, pausas, acompañante)' },
-      { endpoint: '/api/orientaciones', methods: ['GET', 'POST'], description: 'Vinculación relacional de consentimiento y perfil de confort con reserva telemática (sin RUT)' },
-    ],
-  });
+  try {
+    const { data, error } = await getServerDatabase().rpc("cado_readiness");
+    if (error || data !== true)
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "El servicio no está listo para recibir reservas.",
+        },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      );
+    return NextResponse.json(
+      { ok: true },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "Servicio no configurado o no disponible." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 }
