@@ -1,36 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { exchangeCodeAndSaveDoctorTokens } from '@/lib/google-calendar';
-
-export const dynamic = 'force-dynamic';
-
+import { timingSafeEqual } from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { exchangeCodeAndSaveDoctorTokens } from "@/lib/google-calendar";
+import { accessFailure, AccessError, requireDoctor } from "@/lib/doctor-auth";
+export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const code = searchParams.get('code');
-  const doctorId = searchParams.get('state') || '';
-  const error = searchParams.get('error');
-
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || '';
-  const proto = request.headers.get('x-forwarded-proto') || (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
-  const appUrl = host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
-  const redirectUri = `${appUrl}/api/auth/google/callback`;
-
-  if (error) {
-    return NextResponse.redirect(`${appUrl}/admin?google_error=${encodeURIComponent(error)}`);
-  }
-
-  if (!code || !doctorId) {
-    return NextResponse.redirect(`${appUrl}/admin?google_error=missing_code_or_doctor`);
-  }
-
+  const origin = new URL(process.env.NEXT_PUBLIC_APP_URL || request.url).origin;
   try {
-    const { googleEmail } = await exchangeCodeAndSaveDoctorTokens(code, doctorId, redirectUri);
-    return NextResponse.redirect(
-      `${appUrl}/admin?google_success=true&email=${encodeURIComponent(googleEmail)}`
+    const { doctor } = await requireDoctor(request);
+    const state = request.nextUrl.searchParams.get("state") || "";
+    const expected = request.cookies.get("cado_google_state")?.value || "";
+    if (
+      !expected ||
+      state.length !== expected.length ||
+      !timingSafeEqual(Buffer.from(state), Buffer.from(expected))
+    )
+      throw new AccessError(
+        403,
+        "La vinculación de Google caducó o no es válida.",
+      );
+    const code = request.nextUrl.searchParams.get("code");
+    if (!code || request.nextUrl.searchParams.has("error"))
+      throw new AccessError(400, "Google no autorizó la vinculación.");
+    await exchangeCodeAndSaveDoctorTokens(
+      code,
+      doctor.id,
+      origin + "/api/auth/google/callback",
     );
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.redirect(
-      `${appUrl}/admin?google_error=${encodeURIComponent(message)}`
+    const response = NextResponse.redirect(
+      origin + "/admin?google_success=true",
     );
+    response.cookies.set("cado_google_state", "", {
+      path: "/api/auth/google/callback",
+      maxAge: 0,
+    });
+    return response;
+  } catch (error) {
+    const response = accessFailure(error);
+    response.cookies.set("cado_google_state", "", {
+      path: "/api/auth/google/callback",
+      maxAge: 0,
+    });
+    return response;
   }
 }

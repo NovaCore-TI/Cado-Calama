@@ -1,16 +1,16 @@
-import { google } from 'googleapis';
-import { supabase } from '@/lib/supabase';
-import { OFFICIAL_CADO_DOCTORS } from '@/lib/doctors-catalog';
+import "server-only";
+import { createHash } from "node:crypto";
+import { google } from "googleapis";
+import { getServerDatabase } from "@/lib/server-db";
 import {
   getDoctorGoogleCredentials,
   saveDoctorGoogleCredentials,
-  getAllConnectedDoctorTokens,
-} from '@/lib/google-tokens-store';
+} from "@/lib/google-tokens-store";
 
 // Parámetros de conexión Google Cloud / Google Calendar API
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const REDIRECT_URI = `${APP_URL}/api/auth/google/callback`;
 
 export function getOAuth2Client(customRedirectUri?: string) {
@@ -22,17 +22,19 @@ export function getOAuth2Client(customRedirectUri?: string) {
 }
 
 // 1. Generar URL de autorización para que un doctor vincule su Google Calendar
-export function getDoctorGoogleAuthUrl(doctorId: string, redirectUri?: string): string | null {
+export function getDoctorGoogleAuthUrl(
+  doctorId: string,
+  redirectUri?: string,
+): string | null {
   const oauth2Client = getOAuth2Client(redirectUri);
   if (!oauth2Client) return null;
 
   return oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    prompt: 'consent', // Obliga a Google a devolver refresh_token
+    access_type: "offline",
+    prompt: "consent", // Obliga a Google a devolver refresh_token
     scope: [
-      'https://www.googleapis.com/auth/calendar.events',
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/userinfo.email',
+      "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/userinfo.email",
     ],
     state: doctorId,
   });
@@ -42,23 +44,31 @@ export function getDoctorGoogleAuthUrl(doctorId: string, redirectUri?: string): 
 export async function exchangeCodeAndSaveDoctorTokens(
   code: string,
   doctorId: string,
-  redirectUri?: string
+  redirectUri?: string,
 ) {
   const oauth2Client = getOAuth2Client(redirectUri);
-  if (!oauth2Client) throw new Error('Credenciales de Google OAuth no configuradas');
+  if (!oauth2Client)
+    throw new Error("Credenciales de Google OAuth no configuradas");
 
   const { tokens } = await oauth2Client.getToken(code);
   oauth2Client.setCredentials(tokens);
 
   // Obtener email de Google del doctor
-  const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+  const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
   const userInfo = await oauth2.userinfo.get();
-  const googleEmail = userInfo.data.email || '';
+  const googleEmail = userInfo.data.email || "";
 
-  const officialDoctor = OFFICIAL_CADO_DOCTORS.find((d) => d.id === doctorId);
-  const doctorName = officialDoctor?.nombre || 'Doctor CADO';
+  const { data: doctor, error: profileError } = await getServerDatabase()
+    .from("doctores")
+    .select("nombre")
+    .eq("id", doctorId)
+    .eq("activo", true)
+    .maybeSingle();
+  if (profileError || !doctor)
+    throw new Error("Perfil profesional no disponible.");
+  const doctorName = doctor.nombre;
 
-  // Guardar en el almacén de tokens (archivo local de alta resiliencia y DB Supabase)
+  // Guardar exclusivamente en la tabla privada del profesional asignado.
   await saveDoctorGoogleCredentials(doctorId, {
     email: googleEmail,
     refreshToken: tokens.refresh_token || undefined,
@@ -71,13 +81,13 @@ export async function exchangeCodeAndSaveDoctorTokens(
 // Formatear fechas ISO para Google Calendar (Chile Continental America/Santiago)
 function formatChileDateTime(fecha: string, hora: string) {
   const cleanHour = String(hora).slice(0, 5);
-  const [h, m] = cleanHour.split(':').map(Number);
+  const [h, m] = cleanHour.split(":").map(Number);
   const endMinutes = m + 15;
   const endH = h + Math.floor(endMinutes / 60);
   const endM = endMinutes % 60;
 
   const startIso = `${fecha}T${cleanHour}:00`;
-  const endIso = `${fecha}T${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}:00`;
+  const endIso = `${fecha}T${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}:00`;
 
   return { startIso, endIso, cleanHour };
 }
@@ -92,125 +102,153 @@ export async function createGoogleAppointmentEvent(params: {
   patientPhone: string;
   doctorId?: string | null;
   comfortProfile?: Record<string, unknown>;
+  managementToken?: string;
 }) {
-  const { codigo, fecha, hora, patientName, patientEmail, patientPhone, doctorId, comfortProfile } = params;
+  const {
+    codigo,
+    fecha,
+    hora,
+    patientName,
+    patientEmail,
+    patientPhone,
+    doctorId,
+    comfortProfile,
+    managementToken,
+  } = params;
   const { startIso, endIso } = formatChileDateTime(fecha, hora);
 
-  // 1. Resolver qué doctor atenderá (buscar asignado o el primero que tenga Google conectado)
-  let resolvedDoctorId = doctorId || '';
-  let credentials = resolvedDoctorId ? await getDoctorGoogleCredentials(resolvedDoctorId) : null;
+  // Never choose another doctor's calendar for an unassigned appointment.
+  const credentials = doctorId
+    ? await getDoctorGoogleCredentials(doctorId)
+    : null;
+  const doctorName = credentials?.doctorName || "Profesional CADO";
+  const doctorEmail = credentials?.email || "";
 
-  if (!credentials || !credentials.refreshToken) {
-    // Si el doctor pedido no tiene Google conectado, buscar si alguno de los doctores sí lo tiene
-    const connectedTokens = getAllConnectedDoctorTokens();
-    const connectedId = Object.keys(connectedTokens).find((id) => connectedTokens[id]?.refreshToken);
-    if (connectedId) {
-      resolvedDoctorId = connectedId;
-      credentials = connectedTokens[connectedId];
-    }
-  }
-
-  const officialDoc = OFFICIAL_CADO_DOCTORS.find((d) => d.id === resolvedDoctorId) || OFFICIAL_CADO_DOCTORS[0];
-  const doctorName = credentials?.doctorName || officialDoc.nombre;
-  const doctorEmail = credentials?.email || officialDoc.email;
-
-  const defaultMeetLink = `https://meet.google.com/cado-${codigo.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+  const defaultMeetLink = "";
 
   // 2. Si hay credenciales de Google OAuth activas con refresh_token
   if (credentials?.refreshToken && GOOGLE_CLIENT_ID) {
     try {
       const oauth2Client = getOAuth2Client();
       if (oauth2Client) {
-        oauth2Client.setCredentials({ refresh_token: credentials.refreshToken });
-        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+        oauth2Client.setCredentials({
+          refresh_token: credentials.refreshToken,
+        });
+        const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
-        const calendarResponse = await calendar.events.insert({
-          calendarId: 'primary',
-          conferenceDataVersion: 1,
-          sendUpdates: 'all', // Notifica automáticamente por email tanto al paciente como al doctor
-          requestBody: {
-            summary: `Orientación Telemática CADO · ${patientName} (${codigo})`,
-            description: [
-              `Orientación Odontológica Inicial de 15 minutos en CADO Odontología.`,
-              `Paciente: ${patientName} (${patientPhone} - ${patientEmail})`,
-              `Profesional: ${doctorName}`,
-              `Código de Reserva: ${codigo}`,
-              ``,
-              `Preferencias de Confort del Paciente:`,
-              comfortProfile?.jawBreaks ? `• Solicita pausas para descanso mandibular` : null,
-              comfortProfile?.handSignalPledge ? `• Señal manual de parada acordada` : null,
-              comfortProfile?.companionAllowed ? `• Asistirá con acompañante` : null,
-              comfortProfile?.notes ? `• Notas adicionales: ${comfortProfile.notes}` : null,
-              ``,
-              `Enlace de autogestión/cancelación: ${APP_URL}/gestionar?codigo=${codigo}`,
-              `Vivar #1580 Of. 203, Calama`,
-            ]
-              .filter(Boolean)
-              .join('\n'),
-            start: {
-              dateTime: startIso,
-              timeZone: 'America/Santiago',
-            },
-            end: {
-              dateTime: endIso,
-              timeZone: 'America/Santiago',
-            },
-            attendees: [
-              { email: patientEmail, displayName: patientName },
-              { email: doctorEmail, displayName: doctorName, responseStatus: 'accepted' },
-            ],
-            conferenceData: {
-              createRequest: {
-                requestId: `${codigo}-${Date.now()}`,
-                conferenceSolutionKey: { type: 'hangoutsMeet' },
+        const calendarResponse = await calendar.events
+          .insert({
+            calendarId: "primary",
+            conferenceDataVersion: 1,
+            sendUpdates: "all", // Notifica automáticamente por email tanto al paciente como al doctor
+            requestBody: {
+              id: googleEventId(codigo),
+              summary: `Orientación Telemática CADO · ${patientName} (${codigo})`,
+              description: [
+                `Orientación Odontológica Inicial de 15 minutos en CADO Odontología.`,
+                `Paciente: ${patientName} (${patientPhone} - ${patientEmail})`,
+                `Profesional: ${doctorName}`,
+                `Código de Reserva: ${codigo}`,
+                ``,
+                `Preferencias de Confort del Paciente:`,
+                comfortProfile?.jawBreaks
+                  ? `• Solicita pausas para descanso mandibular`
+                  : null,
+                comfortProfile?.handSignalPledge
+                  ? `• Señal manual de parada acordada`
+                  : null,
+                comfortProfile?.companionAllowed
+                  ? `• Asistirá con acompañante`
+                  : null,
+                comfortProfile?.notes
+                  ? `• Notas adicionales: ${comfortProfile.notes}`
+                  : null,
+                ``,
+                `Enlace de autogestión/cancelación: ${APP_URL}/gestionar#token=${managementToken || ""}`,
+                `Vivar #1580 Of. 203, Calama`,
+              ]
+                .filter(Boolean)
+                .join("\n"),
+              start: {
+                dateTime: startIso,
+                timeZone: "America/Santiago",
+              },
+              end: {
+                dateTime: endIso,
+                timeZone: "America/Santiago",
+              },
+              attendees: [
+                { email: patientEmail, displayName: patientName },
+                {
+                  email: doctorEmail,
+                  displayName: doctorName,
+                  responseStatus: "accepted",
+                },
+              ],
+              conferenceData: {
+                createRequest: {
+                  requestId: googleEventId(codigo),
+                  conferenceSolutionKey: { type: "hangoutsMeet" },
+                },
+              },
+              reminders: {
+                useDefault: false,
+                overrides: [
+                  { method: "popup", minutes: 15 },
+                  { method: "email", minutes: 60 },
+                ],
               },
             },
-            reminders: {
-              useDefault: false,
-              overrides: [
-                { method: 'popup', minutes: 15 },
-                { method: 'email', minutes: 60 },
-              ],
-            },
-          },
-        });
+          })
+          .catch(async (error: { code?: number }) => {
+            if (error.code !== 409) throw error;
+            return calendar.events.get({
+              calendarId: "primary",
+              eventId: googleEventId(codigo),
+            });
+          });
 
         const createdEvent = calendarResponse.data;
         const officialMeetLink =
           createdEvent.hangoutLink ||
-          createdEvent.conferenceData?.entryPoints?.find((e) => e.entryPointType === 'video')?.uri ||
+          createdEvent.conferenceData?.entryPoints?.find(
+            (e) => e.entryPointType === "video",
+          )?.uri ||
           defaultMeetLink;
 
         return {
           ok: true,
-          source: 'google_calendar_api',
+          source: "google_calendar_api",
           eventId: createdEvent.id || null,
           meetLink: officialMeetLink,
           doctorName,
-          status: 'Sincronizado',
+          status: officialMeetLink ? "Sincronizado" : "Pendiente_Reintento",
         };
       }
     } catch (apiError: unknown) {
       // RF-16: Resiliencia ante fallos externos de API - Registro en auditoría
-      const errMessage = apiError instanceof Error ? apiError.message : String(apiError);
+      const errMessage =
+        apiError instanceof Error ? apiError.message : String(apiError);
       try {
-        await supabase.from('logs_auditoria').insert({
-          accion: 'FALLO_SYNC_GOOGLE_CALENDAR',
-          entidad: 'orientaciones_citas',
-          entidad_id: codigo,
-          detalle: `Fallo al sincronizar con Google Calendar del doctor ${doctorName}: ${errMessage}. Usando fallback local.`,
-        });
+        await getServerDatabase()
+          .from("logs_auditoria")
+          .insert({
+            accion: "FALLO_SYNC_GOOGLE_CALENDAR",
+            entidad: "orientaciones_citas",
+            entidad_id: codigo,
+            detalle: `Fallo al sincronizar con Google Calendar del doctor ${doctorName}: ${errMessage}. Usando fallback local.`,
+          });
       } catch {
         // Silencioso
       }
 
       return {
         ok: true,
-        source: 'resilient_fallback_meet',
+        source: "resilient_fallback_meet",
         eventId: null,
         meetLink: defaultMeetLink,
         doctorName,
-        status: 'Pendiente_Reintento',
+        status: "Pendiente_Reintento",
         syncError: errMessage,
       };
     }
@@ -219,11 +257,11 @@ export async function createGoogleAppointmentEvent(params: {
   // Fallback seguro si ningún doctor ha vinculado aún Google Calendar
   return {
     ok: true,
-    source: 'standard_meet_room',
+    source: "not_connected",
     eventId: null,
     meetLink: defaultMeetLink,
     doctorName,
-    status: 'Sincronizado',
+    status: "Pendiente_Reintento",
   };
 }
 
@@ -236,39 +274,37 @@ export async function rescheduleGoogleAppointmentEvent(params: {
 }) {
   const { eventId, doctorId, nuevaFecha, nuevaHora } = params;
   if (!eventId || !GOOGLE_CLIENT_ID) {
-    return { ok: false, reason: 'no_event_or_creds' };
+    return { ok: false, reason: "no_event_or_creds" };
   }
 
   try {
-    let credentials = doctorId ? await getDoctorGoogleCredentials(doctorId) : null;
-    if (!credentials?.refreshToken) {
-      const connectedTokens = getAllConnectedDoctorTokens();
-      const connectedId = Object.keys(connectedTokens).find((id) => connectedTokens[id]?.refreshToken);
-      if (connectedId) credentials = connectedTokens[connectedId];
-    }
+    const credentials = doctorId
+      ? await getDoctorGoogleCredentials(doctorId)
+      : null;
 
-    if (!credentials?.refreshToken) return { ok: false, reason: 'doctor_not_connected' };
+    if (!credentials?.refreshToken)
+      return { ok: false, reason: "doctor_not_connected" };
 
     const oauth2Client = getOAuth2Client();
     if (!oauth2Client) return { ok: false };
     oauth2Client.setCredentials({ refresh_token: credentials.refreshToken });
 
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
     const { startIso, endIso } = formatChileDateTime(nuevaFecha, nuevaHora);
 
     await calendar.events.patch({
-      calendarId: 'primary',
+      calendarId: "primary",
       eventId,
-      sendUpdates: 'all',
+      sendUpdates: "all",
       requestBody: {
-        start: { dateTime: startIso, timeZone: 'America/Santiago' },
-        end: { dateTime: endIso, timeZone: 'America/Santiago' },
+        start: { dateTime: startIso, timeZone: "America/Santiago" },
+        end: { dateTime: endIso, timeZone: "America/Santiago" },
       },
     });
 
     return { ok: true };
   } catch (err) {
-    console.warn('[rescheduleGoogleAppointmentEvent] Error:', err);
+    console.warn("[rescheduleGoogleAppointmentEvent] Error:", err);
     return { ok: false, error: String(err) };
   }
 }
@@ -281,33 +317,38 @@ export async function cancelGoogleAppointmentEvent(params: {
 }) {
   const { eventId, doctorId } = params;
   if (!eventId || !GOOGLE_CLIENT_ID) {
-    return { ok: false, reason: 'no_event_or_creds' };
+    return { ok: false, reason: "no_event_or_creds" };
   }
 
   try {
-    let credentials = doctorId ? await getDoctorGoogleCredentials(doctorId) : null;
-    if (!credentials?.refreshToken) {
-      const connectedTokens = getAllConnectedDoctorTokens();
-      const connectedId = Object.keys(connectedTokens).find((id) => connectedTokens[id]?.refreshToken);
-      if (connectedId) credentials = connectedTokens[connectedId];
-    }
+    const credentials = doctorId
+      ? await getDoctorGoogleCredentials(doctorId)
+      : null;
 
-    if (!credentials?.refreshToken) return { ok: false, reason: 'doctor_not_connected' };
+    if (!credentials?.refreshToken)
+      return { ok: false, reason: "doctor_not_connected" };
 
     const oauth2Client = getOAuth2Client();
     if (!oauth2Client) return { ok: false };
     oauth2Client.setCredentials({ refresh_token: credentials.refreshToken });
 
-    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
     await calendar.events.delete({
-      calendarId: 'primary',
+      calendarId: "primary",
       eventId,
-      sendUpdates: 'all', // Notifica la cancelación a paciente y doctor
+      sendUpdates: "all", // Notifica la cancelación a paciente y doctor
     });
 
     return { ok: true };
   } catch (err) {
-    console.warn('[cancelGoogleAppointmentEvent] Error:', err);
+    if (
+      typeof err === "object" &&
+      err &&
+      "code" in err &&
+      [404, 410].includes(Number(err.code))
+    )
+      return { ok: true };
+    console.warn("[cancelGoogleAppointmentEvent] Error:", err);
     return { ok: false, error: String(err) };
   }
 }
@@ -322,26 +363,36 @@ export function generateDirectGoogleCalendarUrl(params: {
   doctorName?: string;
   comfortNotes?: string;
 }): string {
-  const { codigo, fecha, hora, patientName, meetLink, doctorName = 'Dr. Javier Beiza', comfortNotes = '' } = params;
-  const cleanHour = String(hora).slice(0, 5).replace(':', '');
-  const [h, m] = String(hora).slice(0, 5).split(':').map(Number);
+  const {
+    codigo,
+    fecha,
+    hora,
+    patientName,
+    meetLink,
+    doctorName = "Profesional CADO",
+    comfortNotes = "",
+  } = params;
+  const cleanHour = String(hora).slice(0, 5).replace(":", "");
+  const [h, m] = String(hora).slice(0, 5).split(":").map(Number);
   const endMinutes = m + 15;
   const endH = h + Math.floor(endMinutes / 60);
   const endM = endMinutes % 60;
-  const endHour = `${String(endH).padStart(2, '0')}${String(endM).padStart(2, '0')}`;
+  const endHour = `${String(endH).padStart(2, "0")}${String(endM).padStart(2, "0")}`;
 
-  const cleanDate = fecha.replace(/-/g, '');
+  const cleanDate = fecha.replace(/-/g, "");
   const datesParam = `${cleanDate}T${cleanHour}00/${cleanDate}T${endHour}00`;
 
-  const title = encodeURIComponent(`Orientación Odontológica CADO · ${patientName} (${codigo})`);
+  const title = encodeURIComponent(
+    `Orientación Odontológica CADO · ${patientName} (${codigo})`,
+  );
   const details = encodeURIComponent(
     `Orientación telemática de 15 minutos en CADO Odontología.\n` +
       `Profesional: ${doctorName}\n` +
       `Paciente: ${patientName}\n` +
       `Sala Google Meet: ${meetLink}\n` +
-      (comfortNotes ? `Preferencias de confort: ${comfortNotes}\n` : '') +
-      `Gestión de cita: ${APP_URL}/gestionar?codigo=${codigo}\n\n` +
-      `Vivar #1580 Of. 203, Calama · Tel/WhatsApp: +56 9 4465 7815`
+      (comfortNotes ? `Preferencias de confort: ${comfortNotes}\n` : "") +
+      `Gestión de cita: ${APP_URL}/gestionar\n\n` +
+      `Vivar #1580 Of. 203, Calama · Tel/WhatsApp: +56 9 4465 7815`,
   );
   const location = encodeURIComponent(meetLink);
 
@@ -357,36 +408,66 @@ export function generateIcsCalendarContent(params: {
   meetLink: string;
   doctorName?: string;
 }): string {
-  const { codigo, fecha, hora, patientName, meetLink, doctorName = 'Dr. Javier Beiza Ayala' } = params;
-  const cleanDate = fecha.replace(/-/g, '');
-  const cleanHour = String(hora).slice(0, 5).replace(':', '');
-  const [h, m] = String(hora).slice(0, 5).split(':').map(Number);
-  const endMinutes = m + 15;
-  const endH = h + Math.floor(endMinutes / 60);
-  const endM = endMinutes % 60;
-  const endHour = `${String(endH).padStart(2, '0')}${String(endM).padStart(2, '0')}`;
+  const {
+    codigo,
+    fecha,
+    hora,
+    patientName,
+    meetLink,
+    doctorName = "Profesional CADO",
+  } = params;
+  const start = new Date(fecha + "T" + String(hora).slice(0, 5) + ":00Z");
+  const end = new Date(start.getTime() + 15 * 60 * 1000);
+  const stamp = (date: Date) =>
+    date.toISOString().replace(/[-:]/g, "").slice(0, 15);
+  const startStamp = stamp(start),
+    endStamp = stamp(end);
+  const escape = (value: string) =>
+    String(value)
+      .replace(/\\/g, "\\\\")
+      .replace(/\r?\n/g, "\\n")
+      .replace(/;/g, "\\;")
+      .replace(/,/g, "\\,");
+  return (
+    [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//CADO Odontologia//Orientacion Telematica v1.0//ES",
+      "CALSCALE:GREGORIAN",
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      `UID:${escape(codigo)}@cado.cl`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
+      `DTSTART;TZID=America/Santiago:${startStamp}`,
+      `DTEND;TZID=America/Santiago:${endStamp}`,
+      `SUMMARY:${escape("Orientación Odontológica CADO - " + patientName)}`,
+      `DESCRIPTION:${escape("Orientación virtual de 15 min con " + doctorName + ". Sala Meet: " + meetLink)}`,
+      `LOCATION:${escape(meetLink)}`,
+      "STATUS:CONFIRMED",
+      "BEGIN:VALARM",
+      "TRIGGER:-PT15M",
+      "ACTION:DISPLAY",
+      "DESCRIPTION:Recordatorio orientación CADO en 15 minutos",
+      "END:VALARM",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ]
+      .map((line) => {
+        const pieces: string[] = [];
+        let part = "";
+        for (const char of line) {
+          if (Buffer.byteLength(part + char, "utf8") > 73) {
+            pieces.push(part);
+            part = " " + char;
+          } else part += char;
+        }
+        pieces.push(part);
+        return pieces.join("\r\n");
+      })
+      .join("\r\n") + "\r\n"
+  );
+}
 
-  return [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//CADO Odontologia//Orientacion Telematica v1.0//ES',
-    'CALSCALE:GREGORIAN',
-    'METHOD:REQUEST',
-    'BEGIN:VEVENT',
-    `UID:${codigo}-${cleanDate}@cado.cl`,
-    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
-    `DTSTART;TZID=America/Santiago:${cleanDate}T${cleanHour}00`,
-    `DTEND;TZID=America/Santiago:${cleanDate}T${endHour}00`,
-    `SUMMARY:Orientación Odontológica CADO - ${patientName}`,
-    `DESCRIPTION:Orientación virtual de 15 min con ${doctorName}. Sala Meet: ${meetLink}`,
-    `LOCATION:${meetLink}`,
-    'STATUS:CONFIRMED',
-    'BEGIN:VALARM',
-    'TRIGGER:-PT15M',
-    'ACTION:DISPLAY',
-    'DESCRIPTION:Recordatorio orientación CADO en 15 minutos',
-    'END:VALARM',
-    'END:VEVENT',
-    'END:VCALENDAR',
-  ].join('\r\n');
+export function googleEventId(code: string) {
+  return createHash("sha256").update(code).digest("hex");
 }

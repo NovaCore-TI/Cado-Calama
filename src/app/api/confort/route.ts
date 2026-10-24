@@ -1,77 +1,62 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-
-// Backend de recolección de preferencias de confort ambiental vinculadas a la solicitud del paciente
-export async function GET() {
-  const { data, error } = await supabase
-    .from('preferencias_confort')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  return NextResponse.json({
-    ok: true,
-    source: !error && data ? 'supabase' : 'empty_or_pending_schema',
-    supabaseStatus: error?.message || 'OK',
-    data: data || [],
-  });
+import { readDoctorRecords } from "@/lib/doctor-records";
+import { NextRequest } from "next/server";
+import { getServerDatabase } from "@/lib/server-db";
+import {
+  accessFailure,
+  AccessError,
+  checkSameOrigin,
+  privateJson,
+  requireDoctor,
+} from "@/lib/doctor-auth";
+import { verifyQuestionnaireDraft } from "@/lib/patient-access";
+export async function GET(request: NextRequest) {
+  try {
+    const { doctor } = await requireDoctor(request);
+    const data = await readDoctorRecords(doctor.id, "confort");
+    return privateJson({ ok: true, data });
+  } catch (error) {
+    return accessFailure(error);
+  }
 }
-
 export async function POST(request: NextRequest) {
   try {
+    checkSameOrigin(request);
     const body = await request.json();
-    const {
-      cuestionarioId = null,
-      soundPreference = 'musica_suave',
-      jawBreaks = true,
-      companionAllowed = false,
-      handSignalPledge = true,
-      explanationStepByStep = true,
-      notes = '',
-      consent = true,
-    } = body;
-
-    if (consent !== true) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'Se requiere consentimiento explícito para almacenar las preferencias de confort.',
-        },
-        { status: 400 }
+    if (body.consent !== true || !body.cuestionarioId)
+      throw new AccessError(
+        400,
+        "Se requiere cuestionario y consentimiento explícito.",
       );
-    }
-
+    await verifyQuestionnaireDraft(request, body.cuestionarioId);
+    const db = getServerDatabase();
+    const existing = await db
+      .from("preferencias_confort")
+      .select("id")
+      .eq("cuestionario_id", body.cuestionarioId)
+      .limit(1)
+      .maybeSingle();
+    if (existing.error) throw existing.error;
     const payload = {
-      cuestionario_id: cuestionarioId,
-      ambiente_preferido: soundPreference,
-      solicita_pausas: Boolean(jawBreaks),
-      desea_acompanante: Boolean(companionAllowed),
-      senal_pausa: Boolean(handSignalPledge),
-      explicacion_paso_a_paso: Boolean(explanationStepByStep),
-      notas: String(notes).slice(0, 500),
+      cuestionario_id: body.cuestionarioId,
+      ambiente_preferido:
+        body.soundPreference === "silencio" ? "silencio" : "musica_suave",
+      solicita_pausas: body.jawBreaks === true,
+      desea_acompanante: body.companionAllowed === true,
+      senal_pausa: body.handSignalPledge === true,
+      explicacion_paso_a_paso: body.explanationStepByStep === true,
+      notas: typeof body.notes === "string" ? body.notes.slice(0, 500) : "",
       consent_datos: true,
     };
-
-    const { data, error } = await supabase
-      .from('preferencias_confort')
-      .insert(payload)
-      .select()
-      .single();
-
-    return NextResponse.json(
-      {
-        ok: true,
-        syncedToSupabase: !error,
-        supabaseError: error?.message || null,
-        data: data || {
-          id: `CONF-${Date.now()}`,
-          ...payload,
-          created_at: new Date().toISOString(),
-        },
-      },
-      { status: 201 }
-    );
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Solicitud inválida.' }, { status: 400 });
+    const query = existing.data
+      ? db
+          .from("preferencias_confort")
+          .update(payload)
+          .eq("id", existing.data.id)
+      : db.from("preferencias_confort").insert(payload);
+    const { data, error } = await query.select("id").single();
+    if (error) throw error;
+    return privateJson({ ok: true, syncedToSupabase: true, data });
+  } catch (error) {
+    return accessFailure(error);
   }
 }
