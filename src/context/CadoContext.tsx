@@ -8,7 +8,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { supabase, checkSupabaseConnection } from "@/lib/supabase";
+const authClient = () => import("@/lib/supabase").then((module) => module.supabase);
 
 export interface ComfortProfile {
   anxietyLevel: "tranquilo" | "nervioso" | "fobia" | "no_responde";
@@ -282,12 +282,11 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
   const refreshSupabaseData = useCallback(async () => {
     const version = privateVersion.current;
     const current = () => version === privateVersion.current;
-    const status = await checkSupabaseConnection();
-    if (!current()) return;
-    setSupabaseStatus(status);
+    const started = performance.now();
     try {
       const result = await api("/api/blog");
       if (!current()) return;
+      setSupabaseStatus({ connected: true, tablesReady: true, latencyMs: Math.round(performance.now() - started), message: "Contenido disponible." });
       setBlogPosts(
         result.data.map((r: Record<string, unknown>) => ({
           id: String(r.id),
@@ -314,6 +313,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     } catch {
       if (!current()) return;
       setAvailableSlots([]);
+      setSupabaseStatus({ connected: false, tablesReady: false, latencyMs: Math.round(performance.now() - started), message: "No se pudieron cargar los datos." });
     }
     if (!authorized.current) {
       setAppointments([]);
@@ -460,13 +460,18 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     clearPrivate();
     await Promise.allSettled([
       fetch("/api/auth/session", { method: "DELETE" }),
-      supabase.auth.signOut(),
+      authClient().then((client) => client.auth.signOut()),
     ]);
     if (window.location.pathname.startsWith("/admin"))
       window.location.assign("/admin/login");
   }, [clearPrivate]);
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    if (!isDoctorLoggedIn) return;
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    void authClient().then((client) => {
+      if (cancelled) return;
+      const { data } = client.auth.onAuthStateChange((event, session) => {
       if (
         event === "SIGNED_OUT" ||
         (authorized.current &&
@@ -478,8 +483,10 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         void fetch("/api/auth/session", { method: "DELETE" });
       }
     });
-    return () => data.subscription.unsubscribe();
-  }, [clearPrivate]);
+      unsubscribe = () => data.subscription.unsubscribe();
+    });
+    return () => { cancelled = true; unsubscribe?.(); };
+  }, [clearPrivate, isDoctorLoggedIn]);
   useEffect(() => {
     if (!isDoctorLoggedIn) return;
     let timer: ReturnType<typeof setTimeout>;
@@ -494,8 +501,8 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       );
       if (Date.now() - lastRenewal > 60_000) {
         lastRenewal = Date.now();
-        void supabase.auth
-          .getSession()
+        void authClient()
+          .then((client) => client.auth.getSession())
           .then(async ({ data }) => {
             if (!data.session) return logoutDoctor();
             const result = await fetch("/api/auth/session", {
@@ -528,7 +535,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     clearPrivate();
     try {
       await fetch("/api/auth/session", { method: "DELETE" });
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await (await authClient()).auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password: pass,
       });
@@ -545,7 +552,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       await refreshSupabaseData();
       return { ok: true };
     } catch (error) {
-      await supabase.auth.signOut();
+      await authClient().then((client) => client.auth.signOut());
       return {
         ok: false,
         error:
