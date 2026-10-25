@@ -155,7 +155,7 @@ export const Footer: React.FC = () => {
         {/* ADVERTENCIA MÉDICO-LEGAL */}
         <div className="bg-[#43323D] p-4 rounded-2xl text-[11px] text-gray-300 border border-[#5E4655] leading-relaxed">
           <p>
-            <strong className="text-white">Aviso Legal:</strong> La orientación telemática y los cuestionarios web de CADO Odontología tienen carácter informativo y de acompañamiento previo. No constituyen diagnóstico definitivo ni prescripción de fármacos. Las atenciones y tratamientos definitivos se coordinan presencialmente vía agenda oficial Dentalink.
+            <strong className="text-white">Aviso Legal:</strong> La orientación telemática y los cuestionarios web de CADO Odontología tienen carácter informativo y de acompañamiento previo. No constituyen diagnóstico definitivo ni prescripción de fármacos. Las atenciones y tratamientos definitivos requieren evaluación presencial y se coordinan con CADO.
           </p>
         </div>
 

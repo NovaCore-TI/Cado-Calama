@@ -1,4 +1,5 @@
 'use client';
+import { DentalinkLink } from "@/components/DentalinkLink";
 import { GuideLibrary } from "@/components/GuideLibrary";
 import { Modal } from "@/components/Modal";
 import dynamic from "next/dynamic";
@@ -1453,15 +1454,7 @@ function DoctorDashboard() {
                     Pacientes orientados virtualmente que cuentan con derivación hacia la agenda Dentalink o presencial en Vivar #1580, Calama.
                   </p>
                 </div>
-                <a
-                  href="https://dentalink.cl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-cado-secondary inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold"
-                >
-                  <span>Portal Dentalink</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
+                <DentalinkLink />
               </div>
 
               {derived.length === 0 ? (
