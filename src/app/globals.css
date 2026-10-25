@@ -216,3 +216,8 @@ html { scroll-behavior: smooth; }
 .article-body li + li { margin-top: .4em; }
 .article-body blockquote { border-left: 3px solid #A14B92; padding-left: 1em; font-style: italic; }
 .article-body a { color: #8A3D7D; text-decoration: underline; }
+
+/* Keep the hero immediate; off-screen editorial sections need no layout or
+   decorative fonts until the reader approaches them. Accessibility is retained. */
+.home-page > section:not(:first-child) { content-visibility: auto; contain-intrinsic-size: auto 800px; }
+footer .font-script { content-visibility: auto; contain-intrinsic-size: auto 28px; }
