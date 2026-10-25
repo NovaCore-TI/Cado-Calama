@@ -171,6 +171,7 @@ type ArticleRow = {
   autor_nombre: string;
   tiempo_lectura: string;
   created_at: string;
+  published_at: string | null;
   publicado: boolean;
 };
 type AppointmentRow = {
@@ -297,7 +298,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
           category: r.categoria,
           author: String(r.autor_nombre || ""),
           readTime: String(r.tiempo_lectura || ""),
-          date: String(r.created_at || ""),
+          date: String(r.published_at || ""),
           published: Boolean(r.publicado),
         })),
       );
@@ -398,7 +399,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
           category: r.categoria,
           author: r.autor_nombre,
           readTime: r.tiempo_lectura,
-          date: r.created_at,
+          date: r.published_at || r.created_at,
           published: r.publicado,
         })),
       );
