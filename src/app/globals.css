@@ -222,4 +222,4 @@ html { scroll-behavior: smooth; }
 .home-page > section:not(:first-child) { content-visibility: auto; contain-intrinsic-size: auto 800px; }
 footer .font-script { content-visibility: auto; contain-intrinsic-size: auto 28px; }
 @font-face { font-family: 'CADO Home Title'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/cormorant-home-title.woff2') format('woff2'); }
-.home-hero-title { font-family: 'CADO Home Title', var(--font-cormorant); }
+.home-page .font-title { font-family: 'CADO Home Title', var(--font-cormorant); }
