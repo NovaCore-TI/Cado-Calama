@@ -57,7 +57,8 @@ export async function GET(request: NextRequest) {
     let query = db
       .from("articulos_blog")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order(admin ? "created_at" : "published_at", { ascending: false })
+      .order("id", { ascending: false });
     if (!admin) query = query.eq("publicado", true);
     else query = query.eq("autor_id", doctor!.id);
     const slug = request.nextUrl.searchParams.get("slug");

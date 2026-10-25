@@ -117,8 +117,33 @@ CREATE TABLE IF NOT EXISTS public.articulos_blog (
   publicado boolean NOT NULL DEFAULT true,
   estado_publicacion text NOT NULL DEFAULT 'Publicado',
   created_at timestamptz NOT NULL DEFAULT now(),
-  published_at timestamptz NOT NULL DEFAULT now()
+  published_at timestamptz
 );
+
+-- First publication is assigned by PostgreSQL, independently of client dates.
+CREATE OR REPLACE FUNCTION public.set_article_publication_date()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    NEW.published_at := CASE WHEN NEW.publicado THEN statement_timestamp() ELSE NULL END;
+  ELSE
+    NEW.published_at := OLD.published_at;
+    IF NEW.publicado AND NEW.published_at IS NULL THEN
+      NEW.published_at := statement_timestamp();
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.set_article_publication_date() FROM PUBLIC;
+DROP TRIGGER IF EXISTS article_publication_date ON public.articulos_blog;
+CREATE TRIGGER article_publication_date
+BEFORE INSERT OR UPDATE ON public.articulos_blog
+FOR EACH ROW EXECUTE FUNCTION public.set_article_publication_date();
 
 -- 1.8 Preguntas Frecuentes (FAQ)
 CREATE TABLE IF NOT EXISTS public.preguntas_frecuentes (
