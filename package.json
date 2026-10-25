@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.118.0",
+    "@supabase/supabase-js": "2.118.0",
     "@tiptap/pm": "3.32.0",
     "@tiptap/react": "3.32.0",
     "@tiptap/starter-kit": "3.32.0",
@@ -40,7 +40,7 @@
     "typescript-eslint": "8.72.0"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": "24.x"
   },
   "overrides": {
     "postcss-selector-parser": "7.1.6"
