@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { DentalinkLink } from "@/components/DentalinkLink";
 interface Appointment {
   codigo: string;
   nombre_paciente: string;
   fecha: string;
   hora: string;
   estado_atencion: string;
+  estado_derivacion?: string;
   meet_link: string;
 }
 interface Slot {
@@ -153,6 +155,7 @@ export default function ManageAppointment() {
             {appointment.fecha} · {appointment.hora} ·{" "}
             {appointment.estado_atencion}
           </p>
+          {(appointment.estado_derivacion === "Derivada a Dentalink" || appointment.estado_atencion === "Derivada a Dentalink") && <DentalinkLink />}
           {appointment.estado_atencion === "Programada" && (
             <>
               {appointment.meet_link && (
