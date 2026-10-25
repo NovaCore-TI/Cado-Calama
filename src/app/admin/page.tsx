@@ -180,9 +180,10 @@ function DoctorDashboard() {
   const [postContent, setPostContent] = useState('');
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
+  const hasUnsavedChanges = postDirty && (Boolean(editingPostId) || Boolean(postTitle || postSlug || postExcerpt || articlePlainText(postContent).trim()) || postCategory !== 'Cuidados');
 
   useEffect(() => {
-    if (!postDirty) return;
+    if (!hasUnsavedChanges) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     const leave = (event: MouseEvent) => {
       const link = event.target instanceof Element ? event.target.closest('a') : null;
@@ -192,10 +193,10 @@ function DoctorDashboard() {
     window.addEventListener('beforeunload', warn);
     document.addEventListener('click', leave, true);
     return () => { window.removeEventListener('beforeunload', warn); document.removeEventListener('click', leave, true); };
-  }, [postDirty]);
+  }, [hasUnsavedChanges]);
   function discardPost() {
     if (postSaving.current) return false;
-    if (postDirty && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return false;
+    if (hasUnsavedChanges && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return false;
     setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage('');
     return true;
   }
@@ -1560,14 +1561,14 @@ function DoctorDashboard() {
                 <p role="status" aria-live="polite" className="text-sm text-[#665D66]">{postMessage}</p>
                 <div className="flex flex-wrap justify-end gap-3 pt-2">
                   <button type="button" disabled={postBusy || !postTitle.trim()} onClick={() => setPreviewPost({ id: editingPostId || 'preview', title: postTitle, slug: postSlug, category: postCategory, excerpt: postExcerpt, content: postContent, author: doctorUser?.nombre || '', readTime: '', date: '', published: false })} className="btn-cado-secondary rounded-xl px-4 py-2.5 text-xs font-semibold disabled:opacity-60">Previsualizar cambios</button>
-                  {editingPostId && (
+                  {(editingPostId || hasUnsavedChanges) && (
                     <button
                       type="button"
                       onClick={() => discardPost()}
                       disabled={postBusy}
                       className="btn-cado-secondary rounded-xl px-4 py-2.5 text-xs font-semibold"
                     >
-                      Cancelar
+                      Descartar cambios
                     </button>
                   )}
                   <button
