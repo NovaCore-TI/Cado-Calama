@@ -1,0 +1,38 @@
+{
+  "professionalLogin": {
+    "actualServerLog": "POST /api/auth/login 200",
+    "passwordNotRead": true
+  },
+  "clinicalModal": {
+    "initialFocusInside": true,
+    "tabAndShiftTabStepsInside": 12,
+    "escapeCloses": true,
+    "focusRestored": true
+  },
+  "editor": {
+    "boldPreservedInPreview": true,
+    "lastTabWraps": true,
+    "firstShiftTabWraps": true,
+    "noArticleWrittenToRealDatabase": true,
+    "discardPromptCompletedByUser": true
+  },
+  "pdf": {
+    "renderedRealPdfWithPdfJs": true,
+    "documentLanguage": "es-CL",
+    "tagged": true,
+    "staticLegacyUrlsWithdrawn": true,
+    "clinicalApprovalPending": true,
+    "textVersionKeyboardReachable": true,
+    "tabFromTextVersionWrapsToClose": true
+  },
+  "blog": {
+    "publicArticlesWithProfessionalSession": 3
+  },
+  "responsive": {
+    "attemptedWidth": 360,
+    "observedWidth": 1280,
+    "result": "inconclusive: browser viewport override was not applied; temporary override reset"
+  },
+  "patientsModified": false,
+  "calendarInvitationsSent": false
+}
