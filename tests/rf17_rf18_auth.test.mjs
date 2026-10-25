@@ -14,6 +14,7 @@ test("RF-18: professional session is HttpOnly, SameSite and expires in thirty mi
     "@/lib/doctor-auth": {
       ...real,
       verifyDoctorToken: async () => ({ doctor: { id: "fixture" } }),
+      requireDoctor: async () => ({ doctor: { id: "fixture" } }),
     },
   });
   const r = await guarded.POST(
