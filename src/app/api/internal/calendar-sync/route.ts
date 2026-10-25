@@ -10,7 +10,7 @@ async function synchronize(request: NextRequest, cronOnly = false) {
     const expected = process.env.CRON_SECRET || "";
     const scheduler =
       expected &&
-      supplied.length === expected.length &&
+      Buffer.byteLength(supplied) === Buffer.byteLength(expected) &&
       timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
     if (cronOnly && !scheduler) throw new AccessError(401, "Acceso no autorizado.");
     const doctor = scheduler ? null : (await requireDoctor(request)).doctor;
@@ -38,7 +38,7 @@ async function synchronize(request: NextRequest, cronOnly = false) {
       pending: count("pending"),
       skipped: count("skipped"),
       failed,
-    });
+    }, failed ? 503 : 200);
   } catch (error) {
     return accessFailure(error);
   }

@@ -54,6 +54,7 @@ export function publicAppointment(row: Record<string, unknown>) {
     "fecha",
     "hora",
     "estado_atencion",
+    "estado_derivacion",
     "meet_link",
     "estado_sync",
     "preferencias_confort",

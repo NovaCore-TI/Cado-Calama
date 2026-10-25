@@ -1692,7 +1692,7 @@ function DoctorDashboard() {
                   <h2 className="font-title text-2xl font-semibold text-[#513D49]">
                     Google Meet & Calendar
                   </h2>
-                  <button type="button" className="btn-cado-secondary rounded-xl p-3 text-xs" onClick={async () => { try { const response=await fetch('/api/internal/calendar-sync',{method:'POST'});const result=await response.json();if(!response.ok)throw Error(result.error);setGoogleNotification({type:'success',message:'Se revisaron '+result.attempted+' orientaciones pendientes.'}); } catch {setGoogleNotification({type:'error',message:'No se pudieron reintentar las sincronizaciones.'});} }}>Reintentar sincronización pendiente</button>
+                  <button type="button" className="btn-cado-secondary rounded-xl p-3 text-xs" onClick={async () => { try { const response=await fetch('/api/internal/calendar-sync',{method:'POST'});const result=await response.json();if(!response.ok)throw Error(result.error);setGoogleNotification({type:result.failed ? 'error' : 'success',message:'Sincronizadas: '+result.synced+'. Pendientes: '+result.pending+'. Omitidas: '+result.skipped+'. Fallidas: '+result.failed+'.'}); } catch {setGoogleNotification({type:'error',message:'No se pudieron reintentar las sincronizaciones.'});} }}>Reintentar sincronización pendiente</button>
                   <p className="text-xs leading-relaxed text-[#665D66]">
                     Generación de enlaces seguros para videollamada vespertina de 15 minutos en cada reserva.
                   </p>
