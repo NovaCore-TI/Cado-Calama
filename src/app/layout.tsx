@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import { SITE_URL } from '@/lib/site';
 import './globals.css';
 import { SiteShell } from '@/components/SiteShell';
-import { CadoProvider } from '@/context/CadoContext';
+import { CadoBoundary } from '@/context/CadoBoundary';
+import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -123,9 +124,7 @@ export default function RootLayout({
         >
           Saltar al contenido principal
         </a>
-        <CadoProvider>
-          <SiteShell>{children}</SiteShell>
-        </CadoProvider>
+        <SiteShell footer={<Footer />}><CadoBoundary>{children}</CadoBoundary></SiteShell>
       </body>
     </html>
   );

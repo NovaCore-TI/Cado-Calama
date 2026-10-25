@@ -70,7 +70,7 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <div className="overflow-hidden bg-white text-[#513D49]">
+    <div className="home-page overflow-hidden bg-white text-[#513D49]">
       {/* 1. SECCIÓN HERO */}
       <section className="relative isolate border-b border-[#E2E7E7] bg-[#F6F8F8]">
         <div
