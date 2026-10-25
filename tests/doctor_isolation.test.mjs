@@ -30,6 +30,7 @@ test("Dashboard renders each database profile name without another doctor's iden
           availableSlots: [],
           blockedDates: [],
           blogPosts: [],
+          doctorBlogPosts: [],
           supabaseStatus: {
             connected: true,
             tablesReady: true,
@@ -50,7 +51,7 @@ test("Dashboard renders each database profile name without another doctor's iden
 test("Postgres: three professionals see only their own patients, appointments, questionnaires and comfort", async () => {
   const db = new PGlite();
   try {
-    await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
+    await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS; CREATE ROLE supabase_auth_admin;
       CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY);
       CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;`);
     for (const name of fs
