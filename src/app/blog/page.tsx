@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { articlePlainText } from "@/lib/article-content";
 import { useCado } from '@/context/CadoContext';
 import { 
   BookOpen, 
@@ -27,7 +28,7 @@ export default function BlogPage() {
         !q || 
         post.title.toLowerCase().includes(q) || 
         post.excerpt.toLowerCase().includes(q) ||
-        post.content.toLowerCase().includes(q);
+        articlePlainText(post.content).toLowerCase().includes(q);
       return matchCat && matchQuery && post.published;
     });
   }, [blogPosts, selectedCategory, searchQuery]);

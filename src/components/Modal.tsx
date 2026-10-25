@@ -32,7 +32,7 @@ export function Modal({ children, labelledBy, onClose, className = "" }: {
       onKeyDown={(event) => {
         if (event.key !== "Tab") return;
         const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), iframe, [tabindex]:not([tabindex="-1"])',
+          'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, [contenteditable="true"], iframe, [tabindex]:not([tabindex="-1"])',
         )).filter(item => item.getClientRects().length > 0 && item.tabIndex >= 0);
         const first = items[0], last = items[items.length - 1];
         const current = document.activeElement;

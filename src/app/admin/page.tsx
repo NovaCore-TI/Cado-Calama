@@ -43,7 +43,7 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
-import { useCado, type Appointment, type BlogPost, type QuestionnaireSubmission } from '@/context/CadoContext';
+import { useCado, type Appointment, type BlogPost } from '@/context/CadoContext';
 
 type Section = 'resumen' | 'orientaciones' | 'disponibilidad' | 'derivaciones' | 'contenidos' | 'recursos' | 'integraciones';
 
@@ -141,7 +141,6 @@ function DoctorDashboard() {
     addBlogPost,
     updateBlogPost,
     deleteBlogPost,
-    questionnaires,
     realtimeConnected,
     lastRealtimeEvent,
     isDoctorLoggedIn,
@@ -1915,7 +1914,9 @@ function DoctorDashboard() {
 
                 {/* CUESTIONARIO DE PERFILAMIENTO */}
                 {(() => {
-                  const q = app.questionnaire || questionnaires.find((item: QuestionnaireSubmission) => item.id === app.id || item.reason === app.patientName);
+                  // The API joins the questionnaire by its database relationship.
+                  // A patient's name or reason is never an identifier.
+                  const q = app.questionnaire;
                   return (
                     <div className="rounded-2xl border border-[#A14B92]/30 bg-[#F8EFF6] p-5 space-y-3">
                       <div className="flex items-center justify-between">

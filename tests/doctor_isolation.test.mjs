@@ -15,6 +15,7 @@ test("Dashboard renders each database profile name without another doctor's iden
   ];
   for (const name of names) {
     const Page = loadTs("src/app/admin/page.tsx", {
+      "@/components/GuideLibrary": { GuideLibrary: () => null },
       "@/context/CadoContext": {
         useCado: () => ({
           doctorUser: {
