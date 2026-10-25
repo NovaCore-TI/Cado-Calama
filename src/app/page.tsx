@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { preload } from 'react-dom';
 import {
   ArrowRight,
   CalendarDays,
@@ -69,6 +70,7 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
+  preload('/fonts/cormorant-home-title.woff2', { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
   return (
     <div className="home-page overflow-hidden bg-white text-[#513D49]">
       {/* 1. SECCIÓN HERO */}
@@ -86,7 +88,7 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-4">
-              <h1 className="font-title text-5xl font-semibold leading-[1.08] tracking-tight text-[#513D49] text-balance sm:text-6xl lg:text-7xl">
+              <h1 className="home-hero-title font-title text-5xl font-semibold leading-[1.08] tracking-tight text-[#513D49] text-balance sm:text-6xl lg:text-7xl">
                 Un primer paso hacia tu salud oral, a tu propio ritmo.
               </h1>
               <p className="max-w-xl text-base leading-relaxed text-[#513D49] sm:text-lg">
