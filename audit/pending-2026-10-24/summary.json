@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-24",
+  "scope": "pending audit after security and professional isolation corrections",
+  "findingCount": 16,
+  "high": 3,
+  "medium": 13,
+  "findings": [
+    {
+      "id": "P01",
+      "priority": "Alta",
+      "title": "el límite de acceso no acredita cinco fallos y quince minutos"
+    },
+    {
+      "id": "P02",
+      "priority": "Alta",
+      "title": "el modal clínico no contiene el foco del teclado"
+    },
+    {
+      "id": "P03",
+      "priority": "Alta",
+      "title": "LCP de Inicio fuera del objetivo acordado"
+    },
+    {
+      "id": "P04",
+      "priority": "Media",
+      "title": "estabilidad visual insuficiente en Inicio y Cuestionario"
+    },
+    {
+      "id": "P05",
+      "priority": "Media",
+      "title": "contrastes de texto inferiores a WCAG AA"
+    },
+    {
+      "id": "P06",
+      "priority": "Media",
+      "title": "controles sin nombre accesible y etiqueta discordante"
+    },
+    {
+      "id": "P07",
+      "priority": "Media",
+      "title": "iniciar sesión oculta publicaciones en el blog público"
+    },
+    {
+      "id": "P08",
+      "priority": "Media",
+      "title": "el catálogo de Recursos no respeta una fuente única ni el retiro"
+    },
+    {
+      "id": "P09",
+      "priority": "Media",
+      "title": "confirmación de descarga y métricas no fiables"
+    },
+    {
+      "id": "P10",
+      "priority": "Media",
+      "title": "archivos, metadatos y vista previa de PDF no coinciden"
+    },
+    {
+      "id": "P11",
+      "priority": "Media",
+      "title": "claves heredadas de objeto provocan un error no controlado en descarga"
+    },
+    {
+      "id": "P12",
+      "priority": "Media",
+      "title": "RF-24 sigue incompleto en el editor del blog"
+    },
+    {
+      "id": "P13",
+      "priority": "Media",
+      "title": "Dentalink apunta al sitio genérico, no a una agenda CADO acreditada"
+    },
+    {
+      "id": "P14",
+      "priority": "Media",
+      "title": "el contador de fallos del procesador de calendario puede indicar cero con una cita pendiente"
+    },
+    {
+      "id": "P15",
+      "priority": "Media",
+      "title": "textos de prototipo y horarios contradicen el funcionamiento observado"
+    },
+    {
+      "id": "P16",
+      "priority": "Media",
+      "title": "permanece un aviso de dependencia CSS"
+    }
+  ],
+  "homeLcpPassed": 0,
+  "homeRuns": 5,
+  "testsPassed": 49,
+  "googleEventVerified": true,
+  "realClinicalWrites": false,
+  "sourceCodeChangedDuringAudit": false
+}

@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-24",
+  "mode": "local handlers with isolated database peers; no real writes",
+  "results": [
+    {
+      "probe": "resources_catalog_empty",
+      "status": 200,
+      "source": "backend_catalog",
+      "advertisedGuides": 3
+    },
+    {
+      "probe": "resources_catalog_outage",
+      "status": 200,
+      "source": "backend_catalog",
+      "advertisedGuides": 3
+    },
+    {
+      "probe": "recursos_logging_denied",
+      "status": 200,
+      "ok": true,
+      "guiaId": "not-a-real-guide",
+      "loggedInSupabase": false,
+      "timestamp": "2026-10-24T19:07:22.388Z"
+    },
+    {
+      "probe": "urgencias_logging_denied",
+      "status": 200,
+      "ok": true,
+      "loggedInSupabase": false,
+      "timestamp": "2026-10-24T19:07:22.402Z"
+    },
+    {
+      "probe": "download_allowlist",
+      "input": "guia-post-exodoncia",
+      "status": 200,
+      "contentType": "application/pdf"
+    },
+    {
+      "probe": "download_allowlist",
+      "input": "../../.env.local",
+      "status": 404,
+      "contentType": "application/json"
+    },
+    {
+      "probe": "download_allowlist",
+      "input": "__proto__",
+      "unhandledError": "TypeError",
+      "message": "The \"path\" argument must be of type string. Received undefined"
+    },
+    {
+      "probe": "download_allowlist",
+      "input": "constructor",
+      "unhandledError": "TypeError",
+      "message": "The \"path\" argument must be of type string. Received undefined"
+    },
+    {
+      "probe": "retry_processor_pending_result",
+      "response": {
+        "ok": true,
+        "attempted": 1,
+        "failed": 0
+      },
+      "persistedState": "Pendiente_Reintento"
+    },
+    {
+      "probe": "contrast",
+      "name": "muted_public_text",
+      "foreground": "#9ca3af",
+      "background": "#ffffff",
+      "ratio": 2.539
+    },
+    {
+      "probe": "contrast",
+      "name": "footer_note",
+      "foreground": "#9ca3af",
+      "background": "#513d49",
+      "ratio": 3.914
+    },
+    {
+      "probe": "contrast",
+      "name": "primary_button",
+      "foreground": "#ffffff",
+      "background": "#a14b92",
+      "ratio": 5.334
+    }
+  ]
+}
