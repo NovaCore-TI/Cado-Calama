@@ -1,0 +1,124 @@
+{
+  "probes": 15,
+  "scope": "isolated local dependencies; no external writes",
+  "results": [
+    {
+      "name": "P01: insert conflict still confirms booking",
+      "observation": {
+        "status": 201,
+        "ok": true,
+        "persisted": false
+      }
+    },
+    {
+      "name": "P02: database lookup error does not stop booking and Google side effect",
+      "observation": {
+        "status": 201,
+        "googleCalls": 1
+      }
+    },
+    {
+      "name": "P03: invalid contact and past unconfigured time accepted by handler",
+      "observation": {
+        "status": 201,
+        "queriedAvailability": false
+      }
+    },
+    {
+      "name": "P04: wrong token ignored when code supplied; completed appointment reopened",
+      "observation": {
+        "status": 200,
+        "state": "Programada",
+        "filters": [
+          [
+            "eq",
+            "codigo",
+            "CADO-2026-100"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "P05: no-auth listing returns sensitive row and management token",
+      "observation": {
+        "status": 200,
+        "returnsToken": true,
+        "returnsQuestionnaire": true
+      }
+    },
+    {
+      "name": "P06: comfort consent absent still persists true",
+      "observation": {
+        "status": 201,
+        "consentSaved": true
+      }
+    },
+    {
+      "name": "P07: availability database failure offers unconfigured historic Sunday",
+      "observation": {
+        "status": 200,
+        "offeredSlots": 4,
+        "date": "2000-01-02"
+      }
+    },
+    {
+      "name": "P08: profile serializes secret field returned by database",
+      "observation": {
+        "status": 200,
+        "returnsRefreshToken": true
+      }
+    },
+    {
+      "name": "P09: no-auth doctor disconnect calls credential mutation",
+      "observation": {
+        "status": 200,
+        "credentialMutationCalls": 1
+      }
+    },
+    {
+      "name": "P10: no Google credentials reports synchronized and fabricated URL",
+      "observation": {
+        "eventId": null,
+        "status": "Sincronizado",
+        "source": "standard_meet_room",
+        "link": "https://meet.google.com/cado-fake"
+      }
+    },
+    {
+      "name": "P11: calendar text permits injected ICS property and hour 24",
+      "observation": {
+        "injectedProperty": true,
+        "endHour24": true
+      }
+    },
+    {
+      "name": "P12: actual Supabase query discarded with void does not issue request",
+      "observation": {
+        "callsAfterVoid": 0,
+        "callsAfterAwait": 1
+      }
+    },
+    {
+      "name": "P13: omitting questionnaire inherits previous response; fallback insert omits FK",
+      "observation": {
+        "inheritedPreviousQuestionnaire": true,
+        "savedQuestionnaireForeignKey": false
+      }
+    },
+    {
+      "name": "P14: unified questionnaire vocabulary is rejected by questionnaire API",
+      "observation": {
+        "status": 400,
+        "unifiedValue": "nervioso"
+      }
+    },
+    {
+      "name": "P15: health reports HTTP success for complete DB outage",
+      "observation": {
+        "status": 200,
+        "ok": true,
+        "dbConnected": false
+      }
+    }
+  ]
+}
