@@ -535,23 +535,17 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     clearPrivate();
     try {
       await fetch("/api/auth/session", { method: "DELETE" });
-      const { data, error } = await (await authClient()).auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password: pass,
+      const result = await api("/api/auth/login", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password: pass }),
       });
-      if (error || !data.session)
-        return {
-          ok: false,
-          error: "Credenciales no válidas o acceso temporalmente limitado.",
-        };
-      const result = await api("/api/auth/session", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + data.session.access_token },
-      });
+      const stored = await (await authClient()).auth.setSession(result.session);
+      if (stored.error) throw Error("No se pudo guardar la sesión de acceso.");
       acceptDoctor(result.doctor);
       await refreshSupabaseData();
       return { ok: true };
     } catch (error) {
+      await fetch("/api/auth/session", { method: "DELETE" });
       await authClient().then((client) => client.auth.signOut());
       return {
         ok: false,

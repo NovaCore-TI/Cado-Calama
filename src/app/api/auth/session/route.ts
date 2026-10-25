@@ -21,10 +21,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     checkSameOrigin(request);
+    // A raw Supabase token cannot bypass the application's login gate.
+    // This endpoint renews an existing professional session only.
+    const existing = await requireDoctor(request);
     const token = request.headers
       .get("authorization")
       ?.match(/^Bearer (.+)$/i)?.[1];
     const { doctor } = await verifyDoctorToken(token);
+    if (doctor.id !== existing.doctor.id) return privateJson({ ok: false, error: "La sesión pertenece a otra cuenta." }, 403);
     const response = privateJson({ ok: true, doctor });
     response.cookies.set(DOCTOR_COOKIE, issueProfessionalSession(token!), {
       httpOnly: true,

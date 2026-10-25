@@ -55,6 +55,7 @@ test("Changing professional discards late private responses and public bookings 
   });
   const response = (data) => Response.json({ ok: true, ...data });
   const fetchPeer = async (url, init = {}) => {
+    if (url === "/api/auth/login") { actor = JSON.parse(init.body).email[0]; return response({ doctor: doctor(actor), session: { access_token: "token-" + actor } }); }
     if (url === "/api/auth/session") {
       if (init.method === "POST")
         actor = new Headers(init.headers).get("authorization").slice(-1);
@@ -84,8 +85,8 @@ test("Changing professional discards late private responses and public bookings 
         checkSupabaseConnection: async () => ({ connected: true }),
         supabase: {
           auth: {
-            signInWithPassword: async ({ email }) => ({
-              data: { session: { access_token: `token-${email[0]}` } },
+            setSession: async () => ({
+              data: { session: { access_token: `token-${actor}` } },
             }),
             signOut: async () => {},
           },
