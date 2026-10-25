@@ -1,0 +1,28 @@
+name: Retry pending Calendar synchronization
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: cado-calendar-retry
+  cancel-in-progress: false
+jobs:
+  retry:
+    if: ${{ vars.CADO_APP_URL != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Retry durable pending work
+        env:
+          CADO_APP_URL: ${{ vars.CADO_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CRON_SECRET"
+          [[ "$CADO_APP_URL" =~ ^https://[^/]+/?$ ]]
+          curl --fail-with-body --silent --show-error --max-time 100 --proto '=https' \
+            --request POST --header "Authorization: Bearer $CRON_SECRET" \
+            "${CADO_APP_URL%/}/api/internal/calendar-sync"
