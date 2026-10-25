@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   retry:
-    if: ${{ vars.CADO_APP_URL != '' }}
+    if: ${{ vars.CADO_ENABLE_CALENDAR_CRON == 'true' && vars.CADO_APP_URL != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
