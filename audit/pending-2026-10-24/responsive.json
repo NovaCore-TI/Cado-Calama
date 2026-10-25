@@ -1,0 +1,214 @@
+[
+  {
+    "path": "/",
+    "width": 360,
+    "documentWidth": 354,
+    "offenders": [
+      {
+        "classes": "pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#A14B92]/50 blur-3xl",
+        "tag": "DIV"
+      }
+    ],
+    "overflow": false,
+    "viewport": 360
+  },
+  {
+    "path": "/",
+    "width": 768,
+    "documentWidth": 762,
+    "offenders": [
+      {
+        "classes": "pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#A14B92]/50 blur-3xl",
+        "tag": "DIV"
+      }
+    ],
+    "overflow": false,
+    "viewport": 768
+  },
+  {
+    "path": "/",
+    "width": 1024,
+    "documentWidth": 1018,
+    "offenders": [
+      {
+        "classes": "pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#A14B92]/50 blur-3xl",
+        "tag": "DIV"
+      }
+    ],
+    "overflow": false,
+    "viewport": 1024
+  },
+  {
+    "path": "/",
+    "width": 1440,
+    "documentWidth": 1434,
+    "offenders": [
+      {
+        "classes": "pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#A14B92]/50 blur-3xl",
+        "tag": "DIV"
+      }
+    ],
+    "overflow": false,
+    "viewport": 1440
+  },
+  {
+    "path": "/cuestionario",
+    "width": 360,
+    "documentWidth": 354,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 360
+  },
+  {
+    "path": "/cuestionario",
+    "width": 768,
+    "documentWidth": 762,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 768
+  },
+  {
+    "path": "/cuestionario",
+    "width": 1024,
+    "documentWidth": 1018,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1024
+  },
+  {
+    "path": "/cuestionario",
+    "width": 1440,
+    "documentWidth": 1434,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1440
+  },
+  {
+    "path": "/agendar",
+    "width": 360,
+    "documentWidth": 354,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 360
+  },
+  {
+    "path": "/agendar",
+    "width": 768,
+    "documentWidth": 762,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 768
+  },
+  {
+    "path": "/agendar",
+    "width": 1024,
+    "documentWidth": 1018,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1024
+  },
+  {
+    "path": "/agendar",
+    "width": 1440,
+    "documentWidth": 1434,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1440
+  },
+  {
+    "path": "/recursos",
+    "width": 360,
+    "documentWidth": 366,
+    "offenders": [],
+    "overflow": true,
+    "viewport": 360
+  },
+  {
+    "path": "/recursos",
+    "width": 768,
+    "documentWidth": 762,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 768
+  },
+  {
+    "path": "/recursos",
+    "width": 1024,
+    "documentWidth": 1018,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1024
+  },
+  {
+    "path": "/recursos",
+    "width": 1440,
+    "documentWidth": 1434,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1440
+  },
+  {
+    "path": "/blog",
+    "width": 360,
+    "documentWidth": 354,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 360
+  },
+  {
+    "path": "/blog",
+    "width": 768,
+    "documentWidth": 762,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 768
+  },
+  {
+    "path": "/blog",
+    "width": 1024,
+    "documentWidth": 1018,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1024
+  },
+  {
+    "path": "/blog",
+    "width": 1440,
+    "documentWidth": 1434,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1440
+  },
+  {
+    "path": "/faq",
+    "width": 360,
+    "documentWidth": 354,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 360
+  },
+  {
+    "path": "/faq",
+    "width": 768,
+    "documentWidth": 762,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 768
+  },
+  {
+    "path": "/faq",
+    "width": 1024,
+    "documentWidth": 1018,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1024
+  },
+  {
+    "path": "/faq",
+    "width": 1440,
+    "documentWidth": 1434,
+    "offenders": [],
+    "overflow": false,
+    "viewport": 1440
+  }
+]

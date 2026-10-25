@@ -1,0 +1,9 @@
+{
+  "mode": "read-only Google events.get; no invitations or changes",
+  "eventStatus": "confirmed",
+  "hasMeetLink": true,
+  "conferenceSolution": "hangoutsMeet",
+  "conferenceCreationStatus": "success",
+  "invitationDelivery": "not verified",
+  "successRate19of20": "not measured"
+}
