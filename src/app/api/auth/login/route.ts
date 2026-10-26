@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     });
     const { data, error } = await client.auth.signInWithPassword({ email, password: body.password });
     if (error || !data.session) throw new AccessError(401, "Credenciales no válidas o acceso temporalmente limitado.");
-    const { doctor } = await verifyDoctorToken(data.session.access_token);
+    const { doctor } = await verifyDoctorToken(data.session.access_token, data.user);
     const completed = await db.rpc("complete_professional_login", { p_keys: keys });
     if (completed.error) throw new AccessError(503, "No se pudo completar el acceso.");
     const response = privateJson({ ok: true, doctor, session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token } });
