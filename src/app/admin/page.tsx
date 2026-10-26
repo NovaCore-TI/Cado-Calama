@@ -5,6 +5,7 @@ import { Modal } from "@/components/Modal";
 import dynamic from "next/dynamic";
 import { ArticleBody } from "@/components/ArticleBody";
 import { articlePlainText } from "@/lib/article-content";
+import { standardWeekSlots, saveSlotBatch } from "@/lib/agenda-batch";
 const RichTextEditor = dynamic(() => import("@/components/RichTextEditor"), { ssr: false });
 
 import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
@@ -439,25 +440,16 @@ function DoctorDashboard() {
     }
   }
 
-  function handleGenerateWeek() {
-    const now = new Date();
-    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
-    let count = 0;
-    for (let d = 0; d < 7; d++) {
-      const target = new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
-      const dayOfWeek = target.getDay();
-      if (dayOfWeek === 0) continue; // Omite domingos
-      const dateStr = target.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
-      if (blockedDates.includes(dateStr)) continue;
-      standardTimes.forEach((t) => {
-        const slotKey = `${dateStr}|${t}`;
-        if (!availableSlots.includes(slotKey)) {
-          toggleSlotAvailability(slotKey);
-          count++;
-        }
-      });
-    }
-    alert(`Se añadieron ${count} nuevos bloques vespertinos para los próximos 7 días.`);
+  const slotBatchRunning = useRef(false);
+  async function handleGenerateWeek() {
+    if (slotBatchRunning.current) return;
+    slotBatchRunning.current = true;
+    try {
+      const occupied = appointments.filter(a => a.status === 'Programada').map(a => `${a.date}|${a.time}`);
+      const slots = standardWeekSlots(availableSlots, blockedDates, occupied);
+      const { saved, failed } = await saveSlotBatch(slots, toggleSlotAvailability);
+      alert(`Se guardaron ${saved} bloques vespertinos.${failed ? ` No se pudieron guardar ${failed}; revisa la conexión y vuelve a intentarlo.` : ''}`);
+    } finally { slotBatchRunning.current = false; }
   }
 
   function handleClearDateSlots(dateStr: string) {
@@ -1015,7 +1007,7 @@ function DoctorDashboard() {
                     <span>Control de Agenda Telemática · Calama</span>
                   </div>
                   <p className="leading-relaxed text-[#513D49]">
-                    Configura los bloques vespertinos de 15 minutos (18:00 a 19:45 hrs) para las orientaciones virtuales. Los pacientes solo podrán elegir los bloques habilitados aquí.
+                    Configura los bloques vespertinos de 15 minutos (19:00 a 19:45 hrs) para las orientaciones virtuales. Los pacientes solo podrán elegir los bloques habilitados aquí.
                   </p>
                 </div>
 
@@ -1026,7 +1018,7 @@ function DoctorDashboard() {
                     className="btn-cado-primary inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold shadow-sm active:scale-98"
                   >
                     <Zap className="h-3.5 w-3.5" />
-                    <span>Generar semana estándar (L–S 18:00–19:30)</span>
+                    <span>Generar semana estándar (L–S 19:00–19:45)</span>
                   </button>
 
                   <button
@@ -1099,7 +1091,7 @@ function DoctorDashboard() {
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-[#A14B92] hover:underline"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>Rellenar automáticamente 18:00, 18:15, 18:30 y 19:30 para {newSlotDate}</span>
+                      <span>Rellenar automáticamente 19:00, 19:15, 19:30 y 19:45 para {newSlotDate}</span>
                     </button>
                   </div>
                 </section>
