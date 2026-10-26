@@ -133,7 +133,7 @@ export interface CadoContextType {
 
   // Doctor Availability & Blocked Days
   availableSlots: string[];
-  toggleSlotAvailability: (slot: string) => void;
+  toggleSlotAvailability: (slot: string) => Promise<boolean>;
   blockedDates: string[];
   addBlockedDate: (date: string, reason?: string) => void;
   removeBlockedDate: (date: string) => void;
