@@ -2,7 +2,7 @@
 
 Sprint 2 · CADO-39 y CADO-38.
 
-Aplicar `supabase/migrations/20261030012410_fix_blog_publication_date.sql`
+Aplicar `supabase/migrations/20261030173623_fix_blog_publication_date.sql`
 antes de desplegar este cambio. Probado en PostgreSQL embebido; aplicación remota
 y verificación del despliegue pendientes.
 
