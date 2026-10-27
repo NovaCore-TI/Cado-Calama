@@ -14,7 +14,7 @@ test('Blog publication date: legacy migration, delayed publication, edits and re
       INSERT INTO public.articulos_blog VALUES
       ('old-draft','Draft',false,'2020-01-01','2020-01-01'),
       ('existing','Existing',true,'2021-01-01','2021-06-01');`);
-    const migration = fs.readFileSync('supabase/migrations/20261030012410_fix_blog_publication_date.sql', 'utf8');
+    const migration = fs.readFileSync('supabase/migrations/20261030173623_fix_blog_publication_date.sql', 'utf8');
     await db.exec(migration);
     const row = async id => (await db.query('SELECT * FROM public.articulos_blog WHERE id=$1',[id])).rows[0];
     assert.equal((await row('old-draft')).published_at, null);
