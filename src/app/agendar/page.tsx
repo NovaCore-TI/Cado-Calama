@@ -414,6 +414,7 @@ function BookingWizard() {
                 </div>
 
                 <textarea
+                  aria-label="Detalles del motivo de consulta"
                   rows={2}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
