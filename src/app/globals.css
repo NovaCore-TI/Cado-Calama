@@ -223,3 +223,14 @@ html { scroll-behavior: smooth; }
 footer .font-script { content-visibility: auto; contain-intrinsic-size: auto 28px; }
 @font-face { font-family: 'CADO Home Title'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/cormorant-home-title.woff2') format('woff2'); }
 .home-page .font-title { font-family: 'CADO Home Title', var(--font-cormorant); }
+
+/* RNF-10: zoomed mobile layouts must reflow without clipping long labels,
+   contact addresses or intrinsic grid/flex widths. Keep normal font sizes. */
+@media (max-width: 359px) {
+  body { overflow-wrap: anywhere; }
+  fieldset { min-inline-size: 0; }
+  :where(main, section, article, header, footer, nav, form) { min-width: 0; max-width: 100%; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(a, button, input, textarea, select) { max-width: 100%; }
+  :where(a, button) { white-space: normal; overflow-wrap: anywhere; }
+}
