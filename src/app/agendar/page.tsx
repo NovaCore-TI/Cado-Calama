@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo, useState, useEffect } from 'react';
+import { Suspense, useMemo, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useCado, type Appointment, type ComfortProfile, type QuestionnaireSubmission } from '@/context/CadoContext';
 import { ConfortLiveCard } from '@/components/ConfortLiveCard';
+import { isVideoReady } from '@/lib/appointment-sync-status';
 
 function endTime(time: string) {
   const [hour, minute] = time.split(':').map(Number);
@@ -120,16 +121,36 @@ function BookingWizard() {
   const [googleCalendarUrl, setGoogleCalendarUrl] = useState<string>('');
   const [managementSecret, setManagementSecret] = useState('');
   const [calendarStatus, setCalendarStatus] = useState('Pendiente_Reintento');
+  const [checkingCalendar, setCheckingCalendar] = useState(false);
+  const videoReady = isVideoReady(calendarStatus, createdAppointment?.meetLink);
+
+  const refreshCalendarStatus = useCallback(async (signal?: AbortSignal) => {
+    const response = await fetch('/api/orientaciones', {
+      headers: { 'x-management-token': managementSecret }, cache: 'no-store', signal,
+    });
+    const result = await response.json();
+    if (!response.ok || !result.data) throw Error('No se pudo consultar la videollamada. Tu reserva sigue guardada.');
+    if (signal?.aborted) return false;
+    setCalendarStatus(result.data.estado_sync);
+    setCreatedAppointment(previous => previous ? {
+      ...previous, meetLink: result.data.meet_link || '', status: result.data.estado_atencion,
+    } : previous);
+    return isVideoReady(result.data.estado_sync, result.data.meet_link);
+  }, [managementSecret]);
 
   useEffect(() => {
     if (!managementSecret || currentStep !== 4) return;
-    let active = true;
-    const timer = setInterval(async () => {
-      try {const response=await fetch('/api/orientaciones',{headers:{'x-management-token':managementSecret},cache:'no-store'});const result=await response.json();if(active && response.ok && result.data){setCalendarStatus(result.data.estado_sync);setCreatedAppointment(previous=>previous?{...previous,meetLink:result.data.meet_link || '',status:result.data.estado_atencion}:previous);if(result.data.estado_sync==='Sincronizado')clearInterval(timer);}}catch{}
-    },2000);
-    const timeout=setTimeout(()=>clearInterval(timer),60000);
-    return()=>{active=false;clearInterval(timer);clearTimeout(timeout);};
-  },[managementSecret,currentStep]);
+    const controller = new AbortController();
+    const deadline = Date.now() + 60_000;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      let ready = false;
+      try { ready = await refreshCalendarStatus(controller.signal); } catch { /* Keep the saved reservation visible. */ }
+      if (!ready && !controller.signal.aborted && Date.now() < deadline) timer = setTimeout(poll, 2000);
+    }
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [managementSecret, currentStep, refreshCalendarStatus]);
 
   const validDate = date >= today && !blockedDates.includes(date);
   const slots = availableSlots
@@ -295,7 +316,7 @@ function BookingWizard() {
             {currentStep === 1 && 'Paso 1: Tu historia y nivel de confort'}
             {currentStep === 2 && 'Paso 2: Personalización del box clínico'}
             {currentStep === 3 && 'Paso 3: Reserva tu horario y datos'}
-            {currentStep === 4 && '¡Orientación virtual confirmada!'}
+            {currentStep === 4 && (videoReady ? '¡Orientación virtual confirmada!' : 'Reserva guardada; videollamada pendiente')}
           </h1>
 
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#513D49] sm:text-base">
@@ -883,12 +904,20 @@ function BookingWizard() {
                 Código de Cita: {createdAppointment.id}
               </span>
               <h2 className="font-title text-4xl font-semibold text-[#513D49]">
-                ¡Tu orientación virtual está confirmada!
+                {videoReady ? '¡Tu orientación virtual está confirmada!' : 'Tu horario está reservado'}
               </h2>
-              <p className="text-sm text-[#513D49] max-w-md mx-auto">
-                {calendarStatus === 'Sincronizado' ? 'Tu evento de Google está sincronizado para' : 'La reserva está guardada. La videollamada y la notificación están pendientes para'}{' '}
+              <p role="status" className="text-sm text-[#513D49] max-w-md mx-auto">
+                {videoReady ? 'Tu videollamada está lista y se solicitó el envío de la invitación a' : 'La videollamada y su invitación siguen pendientes para'}{' '}
                 <strong className="text-[#A14B92]">{createdAppointment.email}</strong>.
               </p>
+              {!videoReady && <>
+                <p className="text-sm text-[#513D49]">Conserva tu enlace privado de gestión. No necesitas volver a reservar.</p>
+                <button type="button" disabled={checkingCalendar} className="btn-cado-secondary rounded-xl px-4 py-3 text-xs" onClick={async () => {
+                  setCheckingCalendar(true); setErrorMsg('');
+                  try { await refreshCalendarStatus(); } catch (error) { setErrorMsg(error instanceof Error ? error.message : 'No se pudo consultar el estado.'); }
+                  finally { setCheckingCalendar(false); }
+                }}>{checkingCalendar ? 'Consultando…' : 'Consultar estado de la videollamada'}</button>
+              </>}
             </div>
 
             {/* Tarjeta de horario y enlace Meet */}
@@ -913,7 +942,7 @@ function BookingWizard() {
 
             {/* Botones de Calendario: Google Calendar y Descarga .ics (RF-13 & RF-16) */}
             <div className="grid gap-2.5 sm:grid-cols-2 pt-2">
-              {googleCalendarUrl && (
+              {videoReady && googleCalendarUrl && (
                 <a
                   href={googleCalendarUrl}
                   target="_blank"
@@ -924,7 +953,7 @@ function BookingWizard() {
                   <span>Añadir a Google Calendar</span>
                 </a>
               )}
-              <button type="button" onClick={async () => {
+              <button type="button" disabled={!videoReady} onClick={async () => {
                 try { const response=await fetch('/api/orientaciones/calendar',{headers:{'x-management-token':managementSecret}});if(!response.ok)throw Error();const url=URL.createObjectURL(await response.blob());const link=document.createElement('a');link.href=url;link.download='CADO_Orientacion.ics';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000); } catch {setErrorMsg('No se pudo descargar el calendario.');}
               }} className="btn-cado-secondary rounded-xl px-4 py-3 text-xs font-semibold">Descargar calendario .ics</button>
             </div>
@@ -941,7 +970,7 @@ function BookingWizard() {
             </div>
 
             {/* Botón directo a Google Meet */}
-            {createdAppointment.meetLink && (
+            {videoReady && (
               <a
                 href={createdAppointment.meetLink}
                 target="_blank"
