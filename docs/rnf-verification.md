@@ -21,7 +21,7 @@ sustituye aceptación con usuarios ni certifica automáticamente todo el requisi
 | 13 · Cuestionario: 8/10 en ≤3 min | Implementación y validaciones presentes. | Ensayo con 10 personas reales; pendiente para validación, confirmado por el equipo. |
 | 14 · Reserva: 8/10 en ≤5 min | Implementación y validaciones presentes. | Ensayo con 10 personas reales; pendiente para validación. |
 | 15 · Sin RUT; ≤4 datos identificatorios | `rf12_formulario_minimizado.test.mjs`: rechazo de RUT y falta de consentimiento antes de persistir. | Mantener revisión del formulario ante cambios. |
-| 16 · Críticos 100 %; global ≥90 % | 68/68 pruebas de la suite aprobadas; ensayo concurrente separado aprobado; lint, TypeScript y build aprobados. | El porcentaje corresponde a la suite existente, no a cobertura total de código ni a todos los casos humanos de aceptación. |
+| 16 · Críticos 100 %; global ≥90 % | 76/76 pruebas de la suite aprobadas; ensayo concurrente separado aprobado; lint, TypeScript y build aprobados. | El porcentaje corresponde a la suite existente, no a cobertura total de código ni a todos los casos humanos de aceptación. |
 | 17 · Calendar/Meet en ≥19/20 | Ensayo autorizado contra Google real: 20/20 reservas sincronizadas con evento y enlace Meet usando el correo de prueba indicado por el equipo. Cancelación y limpieza verificadas; sin citas, pacientes o bloques de prueba restantes. | Emisor y destinatario fueron la misma cuenta: no acredita recepción en un buzón independiente. Se ejercitó el código de integración local contra servicios reales, sin certificar el scheduler del hosting. |
 
 ## Correcciones y despliegue
@@ -37,6 +37,26 @@ sustituye aceptación con usuarios ni certifica automáticamente todo el requisi
   registrado en Supabase. La función anterior sigue disponible para compatibilidad.
 - Los cambios de cliente, proxy y CSS deben publicarse para que sustituyan el
   comportamiento del despliegue anterior.
+
+## Sprint 2: reserva y reintentos de Google
+
+- `calendar_recovery.test.mjs` verifica la reutilización del evento tras un 409,
+  la actualización del horario cuando Meet aún está pendiente y la renovación de
+  una solicitud de conferencia fallida. Una conferencia pendiente no se recrea.
+- El procesador no declara sincronizada una cita programada sin evento y enlace.
+  El selector de lotes excluye leases activos; mantiene el control por profesional.
+- `booking_confirmation.test.mjs` comprueba que una sincronización pendiente no
+  se presente como videollamada lista ni produzca un calendario confirmado.
+- Reserva y autogestión consultan el estado durante un minuto y permiten volver a
+  consultarlo. El paciente conserva el enlace privado sin tener que volver a reservar.
+- Prueba de navegador local con API simulada: 30 comprobaciones de los estados
+  pendiente/listo, reprogramación y cancelación en 180, 360, 768, 1024 y 1440 px;
+  sin desbordamiento horizontal. No sustituye el ensayo real de Google.
+- Pendiente operativo: el workflow `calendar-retry.yml` requiere las variables
+  `CADO_ENABLE_CALENDAR_CRON=true`, `CADO_APP_URL` (origen HTTPS sin rutas) y el
+  secreto `CRON_SECRET`, con el mismo valor en el entorno de la aplicación.
+  La revisión de GitHub no encontró estas variables ni este secreto configurados.
+  Tras desplegar, validar el scheduler con citas de prueba antes de aceptar RF-16.
 
 Comandos de desarrollo: `npm test`, `npm run lint`, `npm run typecheck`,
 `npm run build` y `npm run test:concurrency` con una base PostgreSQL local vacía.
