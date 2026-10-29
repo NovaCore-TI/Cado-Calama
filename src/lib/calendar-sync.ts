@@ -59,14 +59,15 @@ export async function synchronizeAppointment(id: string): Promise<SyncOutcome> {
         comfortProfile: row.preferencias_confort,
         managementToken: row.token_gestion,
       });
-    const success =
-      result.ok && (!("status" in result) || result.status === "Sincronizado");
+    const success = Boolean(result.ok &&
+      (!("status" in result) || result.status === "Sincronizado") &&
+      (row.estado_atencion !== "Programada" || (result.eventId && result.meetLink)));
     const { data: updated, error: updateError } = await db
       .from("orientaciones_citas")
       .update({
         estado_sync: success ? "Sincronizado" : "Pendiente_Reintento",
         calendar_event_id: result.eventId || row.calendar_event_id,
-        meet_link: result.meetLink || row.meet_link || "",
+        meet_link: result.meetLink ?? row.meet_link ?? "",
         intentos_sync: (row.intentos_sync || 0) + 1,
       })
       .eq("id", id)
