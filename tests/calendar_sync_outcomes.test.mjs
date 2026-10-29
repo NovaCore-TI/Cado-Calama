@@ -14,7 +14,7 @@ for (const status of ["Sincronizado", "Pendiente_Reintento"]) {
     });
     assert.equal((await synchronizeAppointment("fixture")).status, status === "Sincronizado" ? "synced" : "pending");
     assert.equal(db.calls[1].payload.estado_sync, status);
-    assert.equal(db.calls[2].payload.sync_lease_id, null);
+    assert.equal(db.calls.at(-1).payload.sync_lease_id, null);
   });
 }
 test("Calendar scheduler counts pending, skipped and failed results separately", async () => {

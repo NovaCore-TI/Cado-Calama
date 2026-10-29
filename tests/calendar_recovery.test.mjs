@@ -51,6 +51,20 @@ test("RF-16: failed Meet generation gets a new request ID on the same event", as
   assert.equal(result.status, "Pendiente_Reintento");
 });
 
+test("RF-16: Calendar insert, recovery and patch use bounded network timeouts", async () => {
+  const timeouts=[];
+  const api=googleApi({
+    insert:async (_,options)=>{timeouts.push(options.timeout);throw {code:409};},
+    get:async (_,options)=>{timeouts.push(options.timeout);return {data:event("failure")};},
+    patch:async (_,options)=>{timeouts.push(options.timeout);return {data:event()};},
+    delete:async (_,options)=>{timeouts.push(options.timeout);},
+  });
+  await api.createGoogleAppointmentEvent(booking);
+  await api.rescheduleGoogleAppointmentEvent({eventId:"existing",doctorId:"doctor",nuevaFecha:booking.fecha,nuevaHora:booking.hora});
+  await api.cancelGoogleAppointmentEvent({eventId:"existing",doctorId:"doctor"});
+  assert.deepEqual(timeouts,[15000,15000,15000,15000,15000]);
+});
+
 test("RF-15/16: rescheduling without a returned Meet stays pending instead of confirming an old link", async () => {
   const api = googleApi({ patch: async () => ({ data: { id: "existing" } }) });
   const result = await api.rescheduleGoogleAppointmentEvent({ eventId: "existing", doctorId: "doctor", nuevaFecha: booking.fecha, nuevaHora: "19:30" });

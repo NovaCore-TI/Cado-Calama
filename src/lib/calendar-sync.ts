@@ -34,31 +34,39 @@ export async function synchronizeAppointment(id: string): Promise<SyncOutcome> {
       meetLink?: string;
       status?: string;
     };
-    if (row.estado_atencion === "Cancelada")
-      result = await cancelGoogleAppointmentEvent({
-        eventId: row.calendar_event_id || googleEventId(row.codigo),
-        doctorId: row.doctor_id,
-      });
-    else if (row.estado_atencion !== "Programada") result = { ok: true };
-    else if (row.calendar_event_id && row.meet_link)
-      result = await rescheduleGoogleAppointmentEvent({
-        eventId: row.calendar_event_id,
-        doctorId: row.doctor_id,
-        nuevaFecha: row.fecha,
-        nuevaHora: row.hora,
-      });
-    else
-      result = await createGoogleAppointmentEvent({
-        codigo: row.codigo,
-        fecha: row.fecha,
-        hora: row.hora,
-        patientName: row.nombre_paciente,
-        patientEmail: row.email_paciente,
-        patientPhone: row.telefono_paciente,
-        doctorId: row.doctor_id,
-        comfortProfile: row.preferencias_confort,
-        managementToken: row.token_gestion,
-      });
+    let providerThrew = false;
+    try {
+      if (row.estado_atencion === "Cancelada")
+        result = await cancelGoogleAppointmentEvent({
+          eventId: row.calendar_event_id || googleEventId(row.codigo),
+          doctorId: row.doctor_id,
+        });
+      else if (row.estado_atencion !== "Programada") result = { ok: true };
+      else if (row.calendar_event_id && row.meet_link)
+        result = await rescheduleGoogleAppointmentEvent({
+          eventId: row.calendar_event_id,
+          doctorId: row.doctor_id,
+          nuevaFecha: row.fecha,
+          nuevaHora: row.hora,
+        });
+      else
+        result = await createGoogleAppointmentEvent({
+          codigo: row.codigo,
+          fecha: row.fecha,
+          hora: row.hora,
+          patientName: row.nombre_paciente,
+          patientEmail: row.email_paciente,
+          patientPhone: row.telefono_paciente,
+          doctorId: row.doctor_id,
+          comfortProfile: row.preferencias_confort,
+          managementToken: row.token_gestion,
+        });
+    } catch {
+      // Keep durable retry state even when a provider throws before returning.
+      // Never copy the exception: provider errors may contain credentials or PII.
+      providerThrew = true;
+      result = { ok: false };
+    }
     const success = Boolean(result.ok &&
       (!("status" in result) || result.status === "Sincronizado") &&
       (row.estado_atencion !== "Programada" || (result.eventId && result.meetLink)));
@@ -79,6 +87,22 @@ export async function synchronizeAppointment(id: string): Promise<SyncOutcome> {
       .maybeSingle();
     if (updateError) throw updateError;
     if (!updated) return { status: "skipped" };
+    if (!success) {
+      try {
+        const { error: auditError } = await db.from("logs_auditoria").insert({
+          usuario_id: row.doctor_id,
+          accion: "REINTENTO_GOOGLE_PENDIENTE",
+          entidad: "orientaciones_citas",
+          entidad_id: row.id,
+          detalle: JSON.stringify({
+            estado: row.estado_atencion,
+            intento: (row.intentos_sync || 0) + 1,
+            motivo: providerThrew ? "proveedor_no_disponible" : "sincronizacion_no_completada",
+          }),
+        });
+        if (auditError) console.warn("No se pudo registrar la incidencia de sincronización.");
+      } catch { console.warn("No se pudo registrar la incidencia de sincronización."); }
+    }
     return { status: success ? "synced" : "pending" };
   } finally {
     await db
