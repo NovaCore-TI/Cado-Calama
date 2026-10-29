@@ -21,8 +21,8 @@ sustituye aceptación con usuarios ni certifica automáticamente todo el requisi
 | 13 · Cuestionario: 8/10 en ≤3 min | Implementación y validaciones presentes. | Ensayo con 10 personas reales; pendiente para validación, confirmado por el equipo. |
 | 14 · Reserva: 8/10 en ≤5 min | Implementación y validaciones presentes. | Ensayo con 10 personas reales; pendiente para validación. |
 | 15 · Sin RUT; ≤4 datos identificatorios | `rf12_formulario_minimizado.test.mjs`: rechazo de RUT y falta de consentimiento antes de persistir. | Mantener revisión del formulario ante cambios. |
-| 16 · Críticos 100 %; global ≥90 % | 76/76 pruebas de la suite aprobadas; ensayo concurrente separado aprobado; lint, TypeScript y build aprobados. | El porcentaje corresponde a la suite existente, no a cobertura total de código ni a todos los casos humanos de aceptación. |
-| 17 · Calendar/Meet en ≥19/20 | Ensayo autorizado contra Google real: 20/20 reservas sincronizadas con evento y enlace Meet usando el correo de prueba indicado por el equipo. Cancelación y limpieza verificadas; sin citas, pacientes o bloques de prueba restantes. | Emisor y destinatario fueron la misma cuenta: no acredita recepción en un buzón independiente. Se ejercitó el código de integración local contra servicios reales, sin certificar el scheduler del hosting. |
+| 16 · Críticos 100 %; global ≥90 % | 82/82 pruebas de la suite aprobadas; 29/29 del comando específico de Sprint 2; ensayo concurrente separado aprobado; lint, TypeScript y build aprobados. | El porcentaje corresponde a la suite existente, no a cobertura total de código ni a todos los casos humanos de aceptación. |
+| 17 · Calendar/Meet en ≥19/20 | Ensayo autorizado contra Google real: 20/20 reservas sincronizadas con evento y enlace Meet. Prueba adicional con destinatario independiente: evento y Meet verificados, recepción de invitación confirmada por el usuario. Limpieza comprobada; sin citas, pacientes o bloques de prueba restantes. | Se ejercitó el código de integración local contra servicios reales, sin certificar la ejecución periódica del scheduler del hosting. |
 
 ## Correcciones y despliegue
 
@@ -45,6 +45,21 @@ sustituye aceptación con usuarios ni certifica automáticamente todo el requisi
   una solicitud de conferencia fallida. Una conferencia pendiente no se recrea.
 - El procesador no declara sincronizada una cita programada sin evento y enlace.
   El selector de lotes excluye leases activos; mantiene el control por profesional.
+- Una excepción del proveedor conserva el trabajo pendiente, cuenta el intento y
+  libera el lease. La auditoría registra estado, número de intento y motivo fijo;
+  no copia mensajes del proveedor que puedan contener datos privados. Un fallo
+  de auditoría no impide el reintento. Las llamadas de Calendar tienen timeout de 15 s.
+- `booking_lifecycle.test.mjs` ejecuta las rutas de disponibilidad y reservas contra
+  las seis migraciones en PGlite, adaptando solo el transporte PostgREST. Comprueba
+  colisiones, token incorrecto, reprogramación sin perder la cita ante conflicto,
+  conservación de preferencias, cancelación y reutilización del cupo liberado.
+- Concurrencia repetida en PostgreSQL nativo: 20 sesiones observadas solapadas,
+  una respuesta 201 y 19 respuestas 409; una cita activa y un paciente, en 244 ms.
+- Ensayo real de recuperación: una excepción inyectada dejó la reserva pendiente
+  con contador y auditoría; el handler de scheduler autenticado recuperó el evento
+  y Meet. Su selección se limitó en el arnés a esa única cita de prueba. El usuario
+  confirmó la recepción en el destinatario independiente autorizado para una ocasión.
+  Se eliminaron el evento y los datos de prueba, sin solicitar otra notificación.
 - `booking_confirmation.test.mjs` comprueba que una sincronización pendiente no
   se presente como videollamada lista ni produzca un calendario confirmado.
 - Reserva y autogestión consultan el estado durante un minuto y permiten volver a
@@ -56,8 +71,12 @@ sustituye aceptación con usuarios ni certifica automáticamente todo el requisi
   `CADO_ENABLE_CALENDAR_CRON=true`, `CADO_APP_URL` (origen HTTPS sin rutas) y el
   secreto `CRON_SECRET`, con el mismo valor en el entorno de la aplicación.
   La revisión de GitHub no encontró estas variables ni este secreto configurados.
+  Vercel sí dispone de una variable `CRON_SECRET`: no se modificó su valor.
   Tras desplegar, validar el scheduler con citas de prueba antes de aceptar RF-16.
+  GitHub ejecuta los eventos programados desde la rama predeterminada; activar la
+  versión de `test` exige un paso de publicación autorizado por el equipo. Véase
+  [documentación de schedule](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
 
-Comandos de desarrollo: `npm test`, `npm run lint`, `npm run typecheck`,
+Comandos de desarrollo: `npm run test:sprint2`, `npm test`, `npm run lint`, `npm run typecheck`,
 `npm run build` y `npm run test:concurrency` con una base PostgreSQL local vacía.
 Los informes completos y los datos privados de fixtures permanecen fuera de Git.

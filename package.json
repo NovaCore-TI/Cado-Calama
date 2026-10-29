@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint src --max-warnings 0",
     "test": "node --test tests/*.test.mjs",
+    "test:sprint2": "node --test tests/rf10_rf11_bloques_colisiones.test.mjs tests/rf12_formulario_minimizado.test.mjs tests/rf13_rf16_google_calendar.test.mjs tests/rf14_rf15_cancelacion_reprogramacion.test.mjs tests/calendar_*.test.mjs tests/booking_*.test.mjs",
     "test:concurrency": "node --test tests/integration/booking-concurrency.test.mjs",
     "typecheck": "tsc --noEmit"
   },
