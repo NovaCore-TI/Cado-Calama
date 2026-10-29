@@ -12,6 +12,7 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const REDIRECT_URI = `${APP_URL}/api/auth/google/callback`;
+const CALENDAR_TIMEOUT_MS = 15_000;
 
 export function getOAuth2Client(customRedirectUri?: string) {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
@@ -215,13 +216,13 @@ export async function createGoogleAppointmentEvent(params: {
                 ],
               },
             },
-          })
+          }, { timeout: CALENDAR_TIMEOUT_MS })
           .catch(async (error: { code?: number }) => {
             if (Number(error.code) !== 409) throw error;
             const existing = await calendar.events.get({
               calendarId: "primary",
               eventId: googleEventId(codigo),
-            });
+            }, { timeout: CALENDAR_TIMEOUT_MS });
             if (existing.data.status === "cancelled")
               throw new Error("El evento de Google fue cancelado; requiere revisión profesional.");
             const request = existing.data.conferenceData?.createRequest;
@@ -243,7 +244,7 @@ export async function createGoogleAppointmentEvent(params: {
                   conferenceSolutionKey: { type: "hangoutsMeet" },
                 } } } : {}),
               },
-            });
+            }, { timeout: CALENDAR_TIMEOUT_MS });
           });
 
         const createdEvent = calendarResponse.data;
@@ -334,7 +335,7 @@ export async function rescheduleGoogleAppointmentEvent(params: {
         start: { dateTime: startIso, timeZone: "America/Santiago" },
         end: { dateTime: endIso, timeZone: "America/Santiago" },
       },
-    });
+    }, { timeout: CALENDAR_TIMEOUT_MS });
 
     const meetLink = eventMeetLink(response.data);
     return {
@@ -375,7 +376,7 @@ export async function cancelGoogleAppointmentEvent(params: {
       calendarId: "primary",
       eventId,
       sendUpdates: "all", // Notifica la cancelación a paciente y doctor
-    });
+    }, { timeout: CALENDAR_TIMEOUT_MS });
 
     return { ok: true };
   } catch (err) {
