@@ -13,6 +13,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useCado } from '@/context/CadoContext';
+import { FEELING_OPTIONS } from '@/lib/questionnaire-feeling';
 
 const steps = [
   'Motivo de consulta',
@@ -218,16 +219,11 @@ export default function CuestionarioPage() {
                       Puedes elegir «Prefiero no responder» sin bloquear tu avance.
                     </p>
                     <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                      {[
-                        'Me siento tranquilo/a',
-                        'Tengo algunas inquietudes',
-                        'Me cuesta dar este paso',
-                        'Prefiero no responder',
-                      ].map((option) => (
+                      {FEELING_OPTIONS.map((option) => (
                         <label
-                          key={option}
+                          key={option.id}
                           className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 text-sm transition ${
-                            feeling === option
+                            feeling === option.id
                               ? 'border-[#A14B92] bg-[#F8EFF6] font-semibold'
                               : 'border-[#E2E7E7] hover:bg-[#F6F8F8]'
                           }`}
@@ -235,11 +231,11 @@ export default function CuestionarioPage() {
                           <input
                             type="radio"
                             name="feeling"
-                            checked={feeling === option}
-                            onChange={() => setFeeling(option)}
+                            checked={feeling === option.id}
+                            onChange={() => setFeeling(option.id)}
                             className="accent-[#A14B92]"
                           />
-                          {option}
+                          {option.label}
                         </label>
                       ))}
                     </div>
