@@ -25,6 +25,7 @@ import {
 import { useCado, type Appointment, type ComfortProfile, type QuestionnaireSubmission } from '@/context/CadoContext';
 import { ConfortLiveCard } from '@/components/ConfortLiveCard';
 import { isVideoReady } from '@/lib/appointment-sync-status';
+import { normalizeFeeling } from '@/lib/questionnaire-feeling';
 
 function endTime(time: string) {
   const [hour, minute] = time.split(':').map(Number);
@@ -87,7 +88,7 @@ function BookingWizard() {
 
   // Estados del Paso 1: Cuestionario
   const [reason, setReason] = useState(activeQuestionnaire?.reason || '');
-  const [feeling, setFeeling] = useState<string>(activeQuestionnaire?.feeling || 'nervioso');
+  const [feeling, setFeeling] = useState<string>(normalizeFeeling(activeQuestionnaire?.feeling) || 'nervioso');
   const [previousExp, setPreviousExp] = useState(activeQuestionnaire?.previousExperience || 'Prefiero no responder');
   const [sensitivity, setSensitivity] = useState(activeQuestionnaire?.painSensitivity || 'Alta sensibilidad; avisar antes de cada paso');
   const [communication, setCommunication] = useState(activeQuestionnaire?.communicationPreference || 'Explicación paso a paso con lenguaje sencillo');
@@ -102,7 +103,7 @@ function BookingWizard() {
   const [breaks, setBreaks] = useState(activeComfortProfile.jawBreaks ?? true);
   const [companion, setCompanion] = useState(activeComfortProfile.companionAllowed ?? false);
   const [stopSignal, setStopSignal] = useState(activeComfortProfile.handSignalPledge ?? true);
-  const [explanation, setExplanation] = useState(true);
+  const [explanation, setExplanation] = useState(activeComfortProfile.explanationStepByStep ?? true);
   const [comfortNotes, setComfortNotes] = useState(activeComfortProfile.notes || '');
 
   // Estados del Paso 3: Agendamiento de Fecha y Hora

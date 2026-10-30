@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useCado, type ComfortProfile } from '@/context/CadoContext';
 import { ConfortLiveCard } from '@/components/ConfortLiveCard';
+import { normalizeFeeling } from '@/lib/questionnaire-feeling';
 
 const soundOptions = [
   { id: 'musica_suave', label: 'Música suave', detail: 'Prefiero escuchar música tranquila durante la atención.', icon: Volume2 },
@@ -30,7 +31,7 @@ export default function TestConfortPage() {
   const [breaks, setBreaks] = useState(activeComfortProfile.jawBreaks);
   const [companion, setCompanion] = useState(activeComfortProfile.companionAllowed);
   const [stopSignal, setStopSignal] = useState(activeComfortProfile.handSignalPledge);
-  const [explanation, setExplanation] = useState(true);
+  const [explanation, setExplanation] = useState(activeComfortProfile.explanationStepByStep ?? true);
   const [notes, setNotes] = useState(activeComfortProfile.notes || '');
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -42,7 +43,7 @@ export default function TestConfortPage() {
     setSavedSuccess(false);
 
     const profile: ComfortProfile = {
-      anxietyLevel: activeComfortProfile.anxietyLevel || 'nervioso',
+      anxietyLevel: normalizeFeeling(activeQuestionnaire?.feeling) || activeComfortProfile.anxietyLevel || 'nervioso',
       soundPreference: sound,
       jawBreaks: breaks,
       companionAllowed: companion,
@@ -99,7 +100,7 @@ export default function TestConfortPage() {
               {soundOptions.map(({ id, label, detail, icon: Icon }) => (
                 <label
                   key={id}
-                  className={`cursor-pointer rounded-2xl border p-4 transition ${
+                  className={`cursor-pointer rounded-2xl border p-4 transition focus-within:ring-2 focus-within:ring-[#8A3D7D] focus-within:ring-offset-2 ${
                     sound === id
                       ? 'border-[#A14B92] bg-white shadow-[0_8px_20px_rgba(81,61,73,.09)]'
                       : 'border-white bg-white/60 hover:bg-white'
@@ -170,7 +171,7 @@ export default function TestConfortPage() {
                       change(event.target.checked);
                       setSavedSuccess(false);
                     }}
-                    className="mt-1 accent-[#A14B92]"
+                    className="mt-1 shrink-0 accent-[#A14B92]"
                   />
                   <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#A14B92]" />
                   <span>{label}</span>
