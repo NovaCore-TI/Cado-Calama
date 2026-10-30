@@ -1,5 +1,3 @@
-'use client';
-
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -61,7 +59,7 @@ export const Footer: React.FC = () => {
                 <Clock className="w-4 h-4 text-[#A14B92] shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold text-white block">Consultas presenciales:</span>
-                  <span>Bloques de 19:00 y 20:00 hrs. Horario virtual por confirmar.</span>
+                  <span>Bloques de 19:00 y 20:00 hrs. Orientación virtual según disponibilidad.</span>
                 </div>
               </li>
               <li className="flex items-center gap-2.5">
@@ -128,7 +126,7 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/urgencias" className="text-red-400 hover:text-red-300 font-bold">
+                <Link href="/urgencias" className="text-red-200 hover:text-red-100 font-bold">
                   Urgencias Dentales Calama
                 </Link>
               </li>
@@ -146,8 +144,8 @@ export const Footer: React.FC = () => {
               <span className="px-2.5 py-1 rounded-lg bg-white/10 text-gray-200">Transformación</span>
               <span className="px-2.5 py-1 rounded-lg bg-white/10 text-gray-200">Excelencia</span>
             </div>
-            <p className="text-[11px] text-gray-400 leading-relaxed pt-2">
-              Las preguntas del doctor aún no se incorporan al cuestionario. El test de confort es una demostración local que no envía respuestas.
+            <p className="text-[11px] text-gray-300 leading-relaxed pt-2">
+              Tus preferencias de confort se incorporan a la reserva cuando la confirmas. El cuestionario previo solicita tu consentimiento antes de guardar las respuestas.
             </p>
           </div>
         </div>
@@ -155,12 +153,12 @@ export const Footer: React.FC = () => {
         {/* ADVERTENCIA MÉDICO-LEGAL */}
         <div className="bg-[#43323D] p-4 rounded-2xl text-[11px] text-gray-300 border border-[#5E4655] leading-relaxed">
           <p>
-            <strong className="text-white">Aviso Legal:</strong> La orientación telemática y los cuestionarios web de CADO Odontología tienen carácter informativo y de acompañamiento previo. No constituyen diagnóstico definitivo ni prescripción de fármacos. Las atenciones y tratamientos definitivos se coordinan presencialmente vía agenda oficial Dentalink.
+            <strong className="text-white">Aviso Legal:</strong> La orientación telemática y los cuestionarios web de CADO Odontología tienen carácter informativo y de acompañamiento previo. No constituyen diagnóstico definitivo ni prescripción de fármacos. Las atenciones y tratamientos definitivos requieren evaluación presencial y se coordinan con CADO.
           </p>
         </div>
 
         {/* PIE DE PÁGINA INFERIOR */}
-        <div className="pt-6 border-t border-[#664E5D]/60 flex flex-col sm:flex-row justify-between items-center text-[11px] text-gray-400 gap-3">
+        <div className="pt-6 border-t border-[#664E5D]/60 flex flex-col sm:flex-row justify-between items-center text-[11px] text-gray-300 gap-3">
           <p>© 2026 CADO Odontología — Calama. Dr. Javier Beiza Ayala. Todos los derechos reservados.</p>
           <p>
             Desarrollado por <strong className="text-gray-300">NovaCore</strong> · Proyecto de Integración INACAP Calama

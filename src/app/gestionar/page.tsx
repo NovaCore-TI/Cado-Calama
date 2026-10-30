@@ -1,104 +1,246 @@
-import Link from 'next/link';
-import {
-  ArrowRight,
-  CalendarDays,
-  CalendarX2,
-  Clock3,
-  HelpCircle,
-  LockKeyhole,
-  MessageCircle,
-  ShieldCheck,
-} from 'lucide-react';
-
-export const metadata = {
-  title: 'Gestión y Reprogramación de Orientación | CADO Odontología',
-  robots: { index: false, follow: false },
-};
-
-export default function GestionarPage() {
+"use client";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { DentalinkLink } from "@/components/DentalinkLink";
+interface Appointment {
+  codigo: string;
+  nombre_paciente: string;
+  fecha: string;
+  hora: string;
+  estado_atencion: string;
+  estado_derivacion?: string;
+  meet_link: string;
+}
+interface Slot {
+  fecha: string;
+  hora: string;
+  slotKey: string;
+}
+export default function ManageAppointment() {
+  const [token, setToken] = useState("");
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [selection, setSelection] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [cancelConfirm, setCancelConfirm] = useState(false);
+  useEffect(() => {
+    const secret = new URLSearchParams(window.location.hash.slice(1)).get(
+      "token",
+    );
+    if (secret) setToken(secret);
+  }, []);
+  useEffect(() => {
+    if (!/^[a-f0-9]{32,64}$/.test(token)) return;
+    let active = true;
+    setBusy(true);
+    setError("");
+    void fetch("/api/orientaciones", {
+      headers: { "x-management-token": token },
+      cache: "no-store",
+    })
+      .then(async (r) => {
+        const j = await r.json();
+        if (!r.ok) throw Error(j.error);
+        if (active) setAppointment(j.data);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token]);
+  async function loadSlots() {
+    setError("");
+    try {
+      const r = await fetch("/api/bloques", { cache: "no-store" });
+      const j = await r.json();
+      if (!r.ok) throw Error(j.error);
+      setSlots(j.slots);
+      setSelection("");
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "No se pudo cargar la disponibilidad.",
+      );
+    }
+  }
+  async function change(action: "cancelar" | "reprogramar") {
+    if (!appointment) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const [nuevaFecha, nuevaHora] = selection.split("|");
+      const r = await fetch("/api/orientaciones", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-management-token": token,
+        },
+        body: JSON.stringify({
+          codigo: appointment.codigo,
+          action,
+          nuevaFecha: action === "reprogramar" ? nuevaFecha : undefined,
+          nuevaHora: action === "reprogramar" ? nuevaHora : undefined,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw Error(j.error);
+      setAppointment(j.data);
+      setCancelConfirm(false);
+      setSlots([]);
+      setMessage(
+        action === "cancelar"
+          ? "Tu orientación fue cancelada."
+          : "Tu orientación fue reprogramada.",
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "No se pudo guardar el cambio.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function download() {
+    setError("");
+    try {
+      const r = await fetch("/api/orientaciones/calendar", {
+        headers: { "x-management-token": token },
+      });
+      if (!r.ok) throw Error("No se pudo descargar el calendario.");
+      const url = URL.createObjectURL(await r.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "CADO_Orientacion.ics";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error de descarga.");
+    }
+  }
   return (
-    <main className="min-h-screen bg-[#F6F8F8] px-6 py-16 text-[#513D49] sm:py-24">
-      <div className="mx-auto max-w-5xl space-y-10">
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-[#B3BFBF] bg-white px-3.5 py-1 text-xs font-semibold text-[#513D49]">
-            <Clock3 className="h-3.5 w-3.5 text-[#A14B92]" aria-hidden="true" />
-            <span>Autogestión de Citas Telemáticas</span>
-          </div>
-
-          <h1 className="font-title text-4xl font-semibold leading-tight text-[#513D49] sm:text-5xl text-balance">
-            Tu orientación, bajo tu control.
-          </h1>
-
-          <p className="max-w-2xl text-base leading-relaxed text-[#665D66]">
-            Si necesitas modificar tu horario de orientación virtual o cancelarlo por imprevistos laborales, puedes hacerlo de forma simple respetando el tiempo del doctor y de otros pacientes de Calama.
+    <section className="mx-auto max-w-3xl space-y-6 px-6 py-16 text-[#513D49]">
+      <h1 className="font-title text-4xl">Gestionar mi orientación</h1>
+      <p>
+        Usa el enlace privado que recibiste al confirmar tu reserva. El código
+        de cita por sí solo no permite consultar ni modificar tus datos.
+      </p>
+      {!token && (
+        <p className="rounded-xl border p-4">
+          Abre tu enlace privado de gestión. Si lo perdiste, comunícate con CADO
+          por los canales oficiales.
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">
+          {error}
+        </p>
+      )}
+      {message && (
+        <p role="status" className="rounded-xl bg-green-50 p-4 text-green-800">
+          {message}
+        </p>
+      )}
+      {busy && <p role="status">Procesando…</p>}
+      {appointment && (
+        <div className="clay-card space-y-5 rounded-3xl p-7">
+          <h2 className="font-title text-2xl">{appointment.nombre_paciente}</h2>
+          <p>
+            {appointment.fecha} · {appointment.hora} ·{" "}
+            {appointment.estado_atencion}
           </p>
+          {(appointment.estado_derivacion === "Derivada a Dentalink" || appointment.estado_atencion === "Derivada a Dentalink") && <DentalinkLink />}
+          {appointment.estado_atencion === "Programada" && (
+            <>
+              {appointment.meet_link && (
+                <a
+                  href={appointment.meet_link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block underline"
+                >
+                  Abrir Google Meet
+                </a>
+              )}
+              <div className="flex flex-wrap gap-4">
+                <button
+                  onClick={() => void download()}
+                  className="btn-cado-secondary rounded-xl p-3"
+                >
+                  Descargar calendario
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => void loadSlots()}
+                  className="btn-cado-secondary rounded-xl p-3"
+                >
+                  Elegir otra fecha
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => setCancelConfirm(true)}
+                  className="rounded-xl border border-red-300 p-3 text-red-800"
+                >
+                  Cancelar orientación
+                </button>
+              </div>
+              {slots.length > 0 && (
+                <div className="space-y-3">
+                  <label className="block">
+                    Nuevo horario
+                    <select
+                      value={selection}
+                      onChange={(e) => setSelection(e.target.value)}
+                      className="mt-2 block w-full rounded-xl border p-3"
+                    >
+                      <option value="">Selecciona un bloque</option>
+                      {slots.map((s) => (
+                        <option key={s.slotKey} value={s.slotKey}>
+                          {s.fecha} · {s.hora}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    disabled={busy || !selection}
+                    onClick={() => void change("reprogramar")}
+                    className="btn-cado-primary rounded-xl p-3"
+                  >
+                    Confirmar reprogramación
+                  </button>
+                </div>
+              )}
+              {cancelConfirm && (
+                <div className="space-y-3 rounded-xl border border-red-300 p-4">
+                  <p>¿Confirmas que deseas cancelar tu orientación?</p>
+                  <button
+                    disabled={busy}
+                    onClick={() => void change("cancelar")}
+                    className="mr-4 rounded-xl bg-red-700 p-3 text-white"
+                  >
+                    Sí, cancelar
+                  </button>
+                  <button
+                    onClick={() => setCancelConfirm(false)}
+                    className="underline"
+                  >
+                    Conservar mi reserva
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* TARJETA REPROGRAMAR */}
-          <article className="clay-card rounded-3xl p-7 sm:p-9 space-y-5">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#A14B92]/10 text-[#A14B92]">
-              <Clock3 className="h-6 w-6" aria-hidden="true" />
-            </span>
-            <div className="space-y-2">
-              <h2 className="font-title text-2xl font-semibold text-[#513D49]">
-                Reprogramar horario
-              </h2>
-              <p className="text-sm leading-relaxed text-[#665D66]">
-                Elige un nuevo bloque vespertino libre. Tu cita previa se mantiene activa hasta que confirmes la nueva fecha, actualizando el enlace de Google Meet sin duplicar registros.
-              </p>
-            </div>
-            <Link
-              href="/agendar"
-              className="btn-cado-primary inline-flex items-center gap-2 rounded-xl px-5 py-3 text-xs font-bold text-white shadow-sm"
-            >
-              <span>Ver bloques disponibles para reagendar</span>
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </article>
-
-          {/* TARJETA CANCELAR */}
-          <article className="clay-card rounded-3xl p-7 sm:p-9 space-y-5">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-700">
-              <CalendarX2 className="h-6 w-6" aria-hidden="true" />
-            </span>
-            <div className="space-y-2">
-              <h2 className="font-title text-2xl font-semibold text-[#513D49]">
-                Cancelar orientación
-              </h2>
-              <p className="text-sm leading-relaxed text-[#665D66]">
-                Si ya no necesitas la cita, avísanos con al menos 2 horas de anticipación para que otra persona que esté esperando atención pueda tomar el bloque.
-              </p>
-            </div>
-            <a
-              href="https://wa.me/56944657815?text=Hola%20Dr.%20Javier%20Beiza,%20necesito%20cancelar%20mi%20orientaci%C3%B3n%20virtual."
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-cado-secondary inline-flex items-center gap-2 rounded-xl px-5 py-3 text-xs font-semibold"
-            >
-              <MessageCircle className="h-3.5 w-3.5 text-[#A14B92]" aria-hidden="true" />
-              <span>Avisar cancelación por WhatsApp</span>
-            </a>
-          </article>
-        </div>
-
-        {/* NOTA DE PRIVACIDAD */}
-        <div className="glass-panel flex flex-col gap-4 rounded-3xl p-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <LockKeyhole className="mt-1 h-5 w-5 shrink-0 text-[#A14B92]" aria-hidden="true" />
-            <p className="max-w-2xl text-xs leading-relaxed text-[#665D66]">
-              Por estricto cumplimiento de la Ley N° 19.628 de protección de datos personales, ninguna cita ni historial clínico se muestra públicamente en esta pantalla sin el enlace seguro enviado a tu correo.
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[#8A3D7D] hover:underline"
-          >
-            <span>Volver a la portada</span>
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </Link>
-        </div>
-      </div>
-    </main>
+      )}
+      <Link href="/" className="inline-block underline">
+        Volver al inicio
+      </Link>
+    </section>
   );
 }

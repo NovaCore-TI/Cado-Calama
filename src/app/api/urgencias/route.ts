@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServerDatabase } from '@/lib/server-db';
+import { accessFailure, AccessError, checkSameOrigin } from '@/lib/doctor-auth';
 
 // Backend de Urgencias Dentales, canales prioritarios y registro de derivación urgente
 export async function GET() {
@@ -29,21 +30,14 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    checkSameOrigin(request);
     const body = await request.json();
-    const { canal = 'whatsapp', motivo = 'Urgencia dental general' } = body;
-
-    const { error } = await supabase.from('logs_auditoria').insert({
-      accion: `CONTACTO_URGENCIA_${String(canal).toUpperCase()}`,
-      entidad: 'urgencias',
-      detalle: motivo,
+    if (!["whatsapp", "telefono"].includes(body.canal)) throw new AccessError(400, "Canal inválido.");
+    const { error } = await getServerDatabase().from("logs_auditoria").insert({
+      accion: "CONTACTO_URGENCIA_" + body.canal.toUpperCase(), entidad: "urgencias",
+      detalle: "Solicitud de apertura del canal; no acredita contacto ni atención.",
     });
-
-    return NextResponse.json({
-      ok: true,
-      loggedInSupabase: !error,
-      timestamp: new Date().toISOString(),
-    });
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Solicitud inválida' }, { status: 400 });
-  }
+    if (error) throw new AccessError(503, "No se pudo registrar la solicitud.");
+    return NextResponse.json({ ok: true, event: "canal_solicitado" }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return accessFailure(error); }
 }

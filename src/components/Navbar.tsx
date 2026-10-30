@@ -122,6 +122,8 @@ export const Navbar: React.FC = () => {
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="lg:hidden p-2 rounded-xl text-[#513D49] hover:bg-[#F6F8F8] focus:outline-none focus:ring-2 focus:ring-[#A14B92]"
           aria-label={isMobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={isMobileMenuOpen}
+          aria-controls="mobile-navigation"
         >
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -129,7 +131,7 @@ export const Navbar: React.FC = () => {
 
       {/* MENÚ DESPLEGABLE MOBILE */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden bg-white border-b border-cado-silver-border px-4 py-4 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-200">
+        <div id="mobile-navigation" className="lg:hidden bg-white border-b border-cado-silver-border px-4 py-4 space-y-2 shadow-lg animate-in slide-in-from-top-2 duration-200">
           <div className="space-y-1">
             {navLinks.map((item) => (
               <Link

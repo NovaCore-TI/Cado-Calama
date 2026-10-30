@@ -1,0 +1,10 @@
+{
+  "http": 200,
+  "ok": true,
+  "attempted": 0,
+  "synced": 0,
+  "pending": 0,
+  "skipped": 0,
+  "failed": 0,
+  "note": "Empty batch only; no Calendar event or invitation sent."
+}

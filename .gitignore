@@ -43,3 +43,12 @@ next-env.d.ts
 skills-lock.json
 
 AGENTS.md
+
+.google-doctor-tokens.json
+supabase/.temp/
+
+# Generated QA artifacts (retain compact evidence and source scripts)
+/output/
+/audit/**/raw/
+/audit/pending-2026-10-24/lighthouse-*.json
+!/audit/pending-2026-10-24/lighthouse-summary.json

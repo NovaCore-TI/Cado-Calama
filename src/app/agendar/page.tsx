@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -90,7 +90,7 @@ function BookingWizard() {
   const [previousExp, setPreviousExp] = useState(activeQuestionnaire?.previousExperience || 'Prefiero no responder');
   const [sensitivity, setSensitivity] = useState(activeQuestionnaire?.painSensitivity || 'Alta sensibilidad; avisar antes de cada paso');
   const [communication, setCommunication] = useState(activeQuestionnaire?.communicationPreference || 'Explicación paso a paso con lenguaje sencillo');
-  const [questionnaireConsent, setQuestionnaireConsent] = useState(true);
+  const [questionnaireConsent, setQuestionnaireConsent] = useState(false);
   const [isSkippingQuestionnaire, setIsSkippingQuestionnaire] = useState(false);
   const [savedQuestionnaire, setSavedQuestionnaire] = useState<QuestionnaireSubmission | null>(null);
 
@@ -111,12 +111,25 @@ function BookingWizard() {
   );
   const [date, setDate] = useState(today);
   const [slot, setSlot] = useState('');
-  const [finalConsent, setFinalConsent] = useState(true);
+  const [finalConsent, setFinalConsent] = useState(false);
 
   // Estados de proceso
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [createdAppointment, setCreatedAppointment] = useState<Appointment | null>(null);
+  const [googleCalendarUrl, setGoogleCalendarUrl] = useState<string>('');
+  const [managementSecret, setManagementSecret] = useState('');
+  const [calendarStatus, setCalendarStatus] = useState('Pendiente_Reintento');
+
+  useEffect(() => {
+    if (!managementSecret || currentStep !== 4) return;
+    let active = true;
+    const timer = setInterval(async () => {
+      try {const response=await fetch('/api/orientaciones',{headers:{'x-management-token':managementSecret},cache:'no-store'});const result=await response.json();if(active && response.ok && result.data){setCalendarStatus(result.data.estado_sync);setCreatedAppointment(previous=>previous?{...previous,meetLink:result.data.meet_link || '',status:result.data.estado_atencion}:previous);if(result.data.estado_sync==='Sincronizado')clearInterval(timer);}}catch{}
+    },2000);
+    const timeout=setTimeout(()=>clearInterval(timer),60000);
+    return()=>{active=false;clearInterval(timer);clearTimeout(timeout);};
+  },[managementSecret,currentStep]);
 
   const validDate = date >= today && !blockedDates.includes(date);
   const slots = availableSlots
@@ -166,8 +179,7 @@ function BookingWizard() {
       setCurrentStep(2);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
-      // Fallback local en CadoContext
-      setCurrentStep(2);
+      setErrorMsg('No se pudo guardar el cuestionario. Intenta nuevamente.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
@@ -184,6 +196,7 @@ function BookingWizard() {
       companionAllowed: companion,
       handSignalPledge: stopSignal,
       notes: comfortNotes.trim(),
+      explanationStepByStep: explanation,
     };
 
     setIsSubmitting(true);
@@ -212,6 +225,7 @@ function BookingWizard() {
       companionAllowed: companion,
       handSignalPledge: stopSignal,
       notes: comfortNotes.trim(),
+      explanationStepByStep: explanation,
     };
 
     try {
@@ -237,6 +251,12 @@ function BookingWizard() {
         return;
       }
 
+      if (json.googleCalendarUrl) {
+        setGoogleCalendarUrl(json.googleCalendarUrl);
+      }
+
+      setManagementSecret(json.data.token_gestion);
+      setCalendarStatus(json.data.estado_sync);
       const app = addAppointment({
         id: json.data?.codigo || undefined,
         patientName: patientDraftInfo.name.trim(),
@@ -255,28 +275,14 @@ function BookingWizard() {
       setCurrentStep(4);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
-      const app = addAppointment({
-        patientName: patientDraftInfo.name.trim(),
-        email: patientDraftInfo.email.trim(),
-        phone: patientDraftInfo.phone.trim(),
-        date,
-        time: slot,
-        comfortProfile: comfortPayload,
-        questionnaire: isSkippingQuestionnaire ? undefined : (activeQuestionnaire || undefined),
-        meetLink: '',
-        derivationStatus: 'Sin derivación',
-      });
-
-      setCreatedAppointment(app);
-      setCurrentStep(4);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setErrorMsg('No se pudo confirmar la reserva. Intenta nuevamente.');
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-white pb-24 text-[#513D49]">
+    <section className="min-h-screen bg-white pb-24 text-[#513D49]">
       {/* CABECERA Y STEPPER DE PROGRESO */}
       <section className="border-b border-[#E2E7E7] bg-[#F6F8F8] px-6 py-12 sm:py-16">
         <div className="mx-auto max-w-5xl">
@@ -879,7 +885,7 @@ function BookingWizard() {
                 ¡Tu orientación virtual está confirmada!
               </h2>
               <p className="text-sm text-[#513D49] max-w-md mx-auto">
-                Hemos enviado un correo con los detalles a{' '}
+                {calendarStatus === 'Sincronizado' ? 'Tu evento de Google está sincronizado para' : 'La reserva está guardada. La videollamada y la notificación están pendientes para'}{' '}
                 <strong className="text-[#A14B92]">{createdAppointment.email}</strong>.
               </p>
             </div>
@@ -899,9 +905,38 @@ function BookingWizard() {
               <div className="flex items-center justify-between text-xs">
                 <span className="font-semibold text-[#513D49]">Pacto de confort:</span>
                 <span className="text-[#10B981] font-semibold">
-                  ✓ {createdAppointment.comfortProfile.soundPreference === 'silencio' ? 'Silencio' : 'Música'} · Señal de mano pactada
+                  ✓ {createdAppointment.comfortProfile.soundPreference === 'silencio' ? 'Silencio' : 'Música'} · {createdAppointment.comfortProfile.handSignalPledge ? 'Señal de pausa solicitada' : 'Preferencias registradas'}
                 </span>
               </div>
+            </div>
+
+            {/* Botones de Calendario: Google Calendar y Descarga .ics (RF-13 & RF-16) */}
+            <div className="grid gap-2.5 sm:grid-cols-2 pt-2">
+              {googleCalendarUrl && (
+                <a
+                  href={googleCalendarUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-xs font-semibold text-[#513D49] hover:border-[#A14B92] hover:bg-[#F6F8F8] transition shadow-sm"
+                >
+                  <CalendarDays className="h-4 w-4 text-[#A14B92]" aria-hidden="true" />
+                  <span>Añadir a Google Calendar</span>
+                </a>
+              )}
+              <button type="button" onClick={async () => {
+                try { const response=await fetch('/api/orientaciones/calendar',{headers:{'x-management-token':managementSecret}});if(!response.ok)throw Error();const url=URL.createObjectURL(await response.blob());const link=document.createElement('a');link.href=url;link.download='CADO_Orientacion.ics';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000); } catch {setErrorMsg('No se pudo descargar el calendario.');}
+              }} className="btn-cado-secondary rounded-xl px-4 py-3 text-xs font-semibold">Descargar calendario .ics</button>
+            </div>
+
+            {/* Acceso a autogestión */}
+            <div className="pt-2 text-xs text-[#766C75]">
+              ¿Necesitas reprogramar o anular más adelante?{' '}
+              <Link
+                href={`/gestionar#token=${managementSecret}`}
+                className="font-semibold text-[#A14B92] hover:underline"
+              >
+                Gestionar o reprogramar mi orientación aquí
+              </Link>
             </div>
 
             {/* Botón directo a Google Meet */}
@@ -943,7 +978,7 @@ function BookingWizard() {
           </div>
         )}
       </div>
-    </main>
+    </section>
   );
 }
 
