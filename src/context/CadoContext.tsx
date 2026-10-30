@@ -282,10 +282,28 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
   );
   const refreshSupabaseData = useCallback(async () => {
     const version = privateVersion.current;
+    const isAuth = authorized.current;
     const current = () => version === privateVersion.current;
     const started = performance.now();
+    const publicTask = Promise.all([
+      api("/api/blog"),
+      api(isAuth ? "/api/bloques?admin=1" : "/api/bloques"),
+    ]);
+    const privateTask = isAuth
+      ? Promise.all([
+          fetch("/api/auth/session", { cache: "no-store" }).catch(() => null),
+          api("/api/orientaciones").then(
+            (r) => ({ ok: true as const, data: r.data }),
+            () => ({ ok: false as const, data: null }),
+          ),
+          api("/api/blog?admin=1").then(
+            (r) => r.data as ArticleRow[],
+            () => null,
+          ),
+        ])
+      : null;
     try {
-      const result = await api("/api/blog");
+      const [result, blocks] = await publicTask;
       if (!current()) return;
       setSupabaseStatus({ connected: true, tablesReady: true, latencyMs: Math.round(performance.now() - started), message: "Contenido disponible." });
       setBlogPosts(
@@ -302,10 +320,6 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
           published: Boolean(r.publicado),
         })),
       );
-      const blocks = await api(
-        authorized.current ? "/api/bloques?admin=1" : "/api/bloques",
-      );
-      if (!current()) return;
       if (authorized.current && blocks.blockedDates)
         setBlockedDates(blocks.blockedDates);
       setAvailableSlots(
@@ -316,13 +330,13 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       setAvailableSlots([]);
       setSupabaseStatus({ connected: false, tablesReady: false, latencyMs: Math.round(performance.now() - started), message: "No se pudieron cargar los datos." });
     }
-    if (!authorized.current) {
+    if (!privateTask || !authorized.current) {
       setAppointments([]);
       return;
     }
-    const session = await fetch("/api/auth/session", { cache: "no-store" });
+    const [session, orientacionesResult, posts] = await privateTask;
     if (!current()) return;
-    if (!session.ok) {
+    if (!session || !session.ok) {
       clearPrivate();
       return;
     }
@@ -333,16 +347,14 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setDoctorUser(profile);
-    let rows;
-    try {
-      rows = (await api("/api/orientaciones")).data;
-    } catch {
+    if (!orientacionesResult.ok) {
       setSupabaseStatus((s) => ({
         ...s,
         message: "No se pudieron cargar las orientaciones.",
       }));
       return;
     }
+    const rows = orientacionesResult.data;
     if (!current() || !authorized.current) return;
     const mappedAppointments: Appointment[] = (rows || []).map(
       (r: AppointmentRow) => {
@@ -387,7 +399,6 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       ),
     );
     // Drafts are visible only to the verified professional.
-    const posts = (await api("/api/blog?admin=1")).data;
     if (current() && authorized.current && posts)
       setDoctorBlogPosts(
         posts.map((r: ArticleRow) => ({
@@ -422,15 +433,33 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       sessionStorage.removeItem("cado_demo_session_v2");
     } catch {}
     let active = true;
-    void api("/api/auth/session")
-      .then((r) => {
-        if (active) {
-          acceptDoctor(r.doctor);
-          void refreshSupabaseData();
-        }
-      })
-      .catch(() => {});
-    void refreshSupabaseData();
+    const path =
+      typeof window !== "undefined" ? window.location.pathname : "";
+    if (path === "/admin/login") {
+      return () => {
+        active = false;
+      };
+    }
+    if (path.startsWith("/admin")) {
+      void api("/api/auth/session")
+        .then((r) => {
+          if (active) acceptDoctor(r.doctor);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (active) void refreshSupabaseData();
+        });
+    } else {
+      void refreshSupabaseData();
+      void api("/api/auth/session")
+        .then((r) => {
+          if (active) {
+            acceptDoctor(r.doctor);
+            void refreshSupabaseData();
+          }
+        })
+        .catch(() => {});
+    }
     return () => {
       active = false;
     };
@@ -535,19 +564,24 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
   const loginDoctor: CadoContextType["loginDoctor"] = async (email, pass) => {
     clearPrivate();
     try {
-      await fetch("/api/auth/session", { method: "DELETE" });
-      const result = await api("/api/auth/login", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password: pass }),
-      });
-      const stored = await (await authClient()).auth.setSession(result.session);
+      const [result, client] = await Promise.all([
+        api("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim().toLowerCase(), password: pass }),
+        }),
+        authClient(),
+      ]);
+      const stored = await client.auth.setSession(result.session);
       if (stored.error) throw Error("No se pudo guardar la sesión de acceso.");
       acceptDoctor(result.doctor);
       await refreshSupabaseData();
       return { ok: true };
     } catch (error) {
-      await fetch("/api/auth/session", { method: "DELETE" });
-      await authClient().then((client) => client.auth.signOut());
+      await Promise.allSettled([
+        fetch("/api/auth/session", { method: "DELETE" }),
+        authClient().then((client) => client.auth.signOut()),
+      ]);
       return {
         ok: false,
         error:
