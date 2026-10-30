@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export default function BlogPage() {
-  const { blogPosts } = useCado();
+  const { blogPosts, blogLoadState, refreshSupabaseData } = useCado();
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
   const categories = ['Todos', 'Miedo Dental', 'Cuidados', 'Bruxismo', 'Urgencias'];
@@ -90,7 +90,14 @@ export default function BlogPage() {
 
       {/* 3. GRID DE ARTÍCULOS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {filteredPosts.length === 0 ? (
+        {blogLoadState === 'loading' ? (
+          <p role="status" className="col-span-full p-8 text-center">Cargando artículos…</p>
+        ) : blogLoadState === 'error' ? (
+          <div role="alert" className="col-span-full space-y-4 rounded-2xl border p-8 text-center">
+            <p>No pudimos cargar los artículos. Vuelve a intentarlo.</p>
+            <button type="button" onClick={() => void refreshSupabaseData()} className="btn-cado-secondary rounded-xl px-4 py-3">Volver a cargar artículos</button>
+          </div>
+        ) : filteredPosts.length === 0 ? (
           <div className="col-span-3 p-12 text-center bg-[#F8FAFA] rounded-3xl border border-[#E2E7E7] space-y-2">
             <p className="text-sm text-gray-600 font-medium font-sans">
               {blogPosts.some(post => post.published) ? 'No se encontraron artículos en esta categoría o búsqueda.' : 'Los artículos educativos estarán disponibles después de su revisión profesional.'}
