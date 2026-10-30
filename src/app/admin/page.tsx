@@ -1,7 +1,15 @@
 'use client';
+import { DentalinkLink } from "@/components/DentalinkLink";
+import { GuideLibrary } from "@/components/GuideLibrary";
+import { Modal } from "@/components/Modal";
+import dynamic from "next/dynamic";
+import { ArticleBody } from "@/components/ArticleBody";
+import { articlePlainText } from "@/lib/article-content";
+const RichTextEditor = dynamic(() => import("@/components/RichTextEditor"), { ssr: false });
 
-import { useState, useEffect, useMemo, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
 import Image from 'next/image';
+import DoctorLogin from './login/page';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -12,14 +20,11 @@ import {
   ChevronRight,
   Clock3,
   ExternalLink,
-  Eye,
-  EyeOff,
   FileText,
   Filter,
   Hand,
   HeartHandshake,
   LayoutDashboard,
-  LockKeyhole,
   LogOut,
   MessageCircle,
   PauseCircle,
@@ -38,9 +43,9 @@ import {
   XCircle,
   Zap,
 } from 'lucide-react';
-import { useCado, type Appointment, type BlogPost, type QuestionnaireSubmission } from '@/context/CadoContext';
+import { useCado, type Appointment, type BlogPost } from '@/context/CadoContext';
 
-type Section = 'resumen' | 'orientaciones' | 'disponibilidad' | 'derivaciones' | 'contenidos' | 'integraciones';
+type Section = 'resumen' | 'orientaciones' | 'disponibilidad' | 'derivaciones' | 'contenidos' | 'recursos' | 'integraciones';
 
 const navigation = [
   { id: 'resumen', label: 'Resumen', icon: LayoutDashboard },
@@ -48,13 +53,14 @@ const navigation = [
   { id: 'disponibilidad', label: 'Disponibilidad', icon: CalendarDays },
   { id: 'derivaciones', label: 'Derivaciones', icon: ArrowRight },
   { id: 'contenidos', label: 'Contenidos Blog', icon: FileText },
+  { id: 'recursos', label: 'Guías para pacientes', icon: FileText },
   { id: 'integraciones', label: 'Integraciones', icon: Video },
 ] as const;
 
 const sectionTitles: Record<Section, { eyebrow: string; title: string; description: string }> = {
   resumen: {
     eyebrow: 'Vista General',
-    title: 'Panel Clínico · Dr. Javier Beiza',
+    title: 'Panel Clínico',
     description: 'Resumen consolidado de orientaciones telemáticas, estado de agenda y sincronización con Supabase.',
   },
   orientaciones: {
@@ -77,6 +83,7 @@ const sectionTitles: Record<Section, { eyebrow: string; title: string; descripti
     title: 'Gestor de Contenidos del Blog',
     description: 'Redacta, edita y publica artículos orientados a resolver dudas sobre fobia dental, bruxismo y postoperatorio.',
   },
+  recursos: { eyebrow: 'Biblioteca', title: 'Guías para pacientes', description: 'Revisa el documento completo antes de publicarlo. Puedes retirar una guía de la biblioteca pública en cualquier momento.' },
   integraciones: {
     eyebrow: 'Infraestructura',
     title: 'Estado de Integraciones Backend',
@@ -112,6 +119,12 @@ function StatCard({
 }
 
 export default function AdminPage() {
+  const { isDoctorLoggedIn, doctorUser } = useCado();
+  if (!isDoctorLoggedIn || !doctorUser?.id) return <DoctorLogin />;
+  return <DoctorDashboard key={doctorUser.id} />;
+}
+
+function DoctorDashboard() {
   const {
     supabaseStatus,
     refreshSupabaseData,
@@ -124,26 +137,21 @@ export default function AdminPage() {
     blockedDates,
     addBlockedDate,
     removeBlockedDate,
-    blogPosts,
+    doctorBlogPosts: blogPosts,
     addBlogPost,
     updateBlogPost,
     deleteBlogPost,
-    questionnaires,
     realtimeConnected,
     lastRealtimeEvent,
     isDoctorLoggedIn,
     doctorUser,
     authMethod,
-    loginDoctor,
     logoutDoctor,
   } = useCado();
 
+  const currentDoctorId = useRef(doctorUser?.id);
+  currentDoctorId.current = doctorUser?.id;
   const [section, setSection] = useState<Section>('resumen');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loginError, setLoginError] = useState('');
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filtros de orientaciones
@@ -154,32 +162,47 @@ export default function AdminPage() {
   // Disponibilidad
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
   const [newSlotDate, setNewSlotDate] = useState(today);
-  const [newSlot, setNewSlot] = useState('18:00');
+  const [newSlot, setNewSlot] = useState('19:00');
   const [newBlockedDate, setNewBlockedDate] = useState('');
   const [scheduleViewFilter, setScheduleViewFilter] = useState<'proximos' | 'con_citas' | 'todos'>('proximos');
   const [slotTimeInputByDate, setSlotTimeInputByDate] = useState<Record<string, string>>({});
 
   // Blog CMS
   const [postTitle, setPostTitle] = useState('');
+  const [postSlug, setPostSlug] = useState('');
+  const [postDirty, setPostDirty] = useState(false);
+  const [postBusy, setPostBusy] = useState(false);
+  const postSaving = useRef(false);
+  const [postMessage, setPostMessage] = useState('');
   const [postCategory, setPostCategory] = useState<BlogPost['category']>('Cuidados');
   const [postExcerpt, setPostExcerpt] = useState('');
   const [postContent, setPostContent] = useState('');
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
+  const hasUnsavedChanges = postDirty && (Boolean(editingPostId) || Boolean(postTitle || postSlug || postExcerpt || articlePlainText(postContent).trim()) || postCategory !== 'Cuidados');
 
-  // Modal ESC handler
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        if (openAppointmentId) setOpenAppointmentId(null);
-        if (previewPost) setPreviewPost(null);
-      }
-    }
-    if (openAppointmentId || previewPost) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [openAppointmentId, previewPost]);
+    if (!hasUnsavedChanges) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    const leave = (event: MouseEvent) => {
+      const link = event.target instanceof Element ? event.target.closest('a') : null;
+      if (!link || link.target === '_blank' || event.ctrlKey || event.metaKey || event.button !== 0 || link.href === window.location.href) return;
+      if (!window.confirm('Hay cambios sin guardar. ¿Quieres salir y descartarlos?')) { event.preventDefault(); event.stopImmediatePropagation(); }
+    };
+    window.addEventListener('beforeunload', warn);
+    document.addEventListener('click', leave, true);
+    return () => { window.removeEventListener('beforeunload', warn); document.removeEventListener('click', leave, true); };
+  }, [hasUnsavedChanges]);
+  function discardPost() {
+    if (postSaving.current) return false;
+    if (hasUnsavedChanges && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return false;
+    setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage('');
+    return true;
+  }
+  function navigateSection(next: Section) {
+    if (section === 'contenidos' && next !== section && !discardPost()) return;
+    setSection(next);
+  }
 
   // Desduplicación estricta de citas para evitar duplicados en memoria o estado local
   const uniqueAppointments = useMemo(() => {
@@ -210,23 +233,76 @@ export default function AdminPage() {
     return matchesQuery && matchesStatus;
   });
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoginError('');
-    setIsLoggingIn(true);
-    const res = await loginDoctor(email, password);
-    setIsLoggingIn(false);
-    if (!res.ok) {
-      setLoginError(res.error || 'Credenciales no válidas. Por favor verifique sus datos.');
-    } else {
-      setLoginError('');
-    }
-  }
+  // Integración Google Calendar & Meet (RF-13)
+  const [googleDoctor, setGoogleDoctor] = useState<{
+    id: string;
+    nombre: string;
+    email: string;
+    rol?: string;
+    google_conectado: boolean;
+    google_email?: string | null;
+  } | null>(null);
+  const [googleNotification, setGoogleNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  function handleFillDemoCredentials() {
-    setEmail('demo@cado.local');
-    setPassword('DEMO');
-  }
+  const fetchGoogleDoctorStatus = async () => {
+    const requestedDoctor = doctorUser?.id;
+    if (!requestedDoctor) return;
+    try {
+      const res = await fetch('/api/doctores');
+      const json = await res.json();
+      if (currentDoctorId.current === requestedDoctor && json.ok && Array.isArray(json.data) && json.data[0]?.id === requestedDoctor) {
+        setGoogleDoctor(json.data[0]);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    setQuery('');
+    setStatusFilter('todas');
+    setSection('resumen');
+    setPostCategory('Cuidados');
+    setNewBlockedDate('');
+    setSlotTimeInputByDate({});
+    setGoogleDoctor(null);
+    setGoogleNotification(null);
+    setOpenAppointmentId(null);
+    setPreviewPost(null);
+    setPostTitle('');
+    setPostExcerpt('');
+    setPostContent('');
+    setEditingPostId(null);
+    fetchGoogleDoctorStatus();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('google_success') === 'true') {
+        setGoogleNotification({
+          type: 'success',
+          message: 'Cuenta de Google Calendar vinculada. Revisa tu conexión en Integraciones.',
+        });
+        setSection('integraciones');
+      } else if (params.get('google_error')) {
+        setGoogleNotification({
+          type: 'error',
+          message: `Error al vincular Google Calendar: ${params.get('google_error')}`,
+        });
+        setSection('integraciones');
+      }
+    }
+  }, [doctorUser?.id]);
+
+  const handleDisconnectGoogle = async (doctorId: string) => {
+    if (!confirm('¿Deseas desvincular la cuenta de Google Calendar?')) return;
+    try {
+      await fetch('/api/doctores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'desconectar', doctorId }),
+      });
+      await fetchGoogleDoctorStatus();
+    } catch {
+      alert('Error al desvincular cuenta.');
+    }
+  };
 
   async function handleRefreshBackend() {
     setIsRefreshing(true);
@@ -234,53 +310,35 @@ export default function AdminPage() {
     setIsRefreshing(false);
   }
 
-  function handleSavePost(event: FormEvent<HTMLFormElement>) {
+  async function handleSavePost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!postTitle.trim() || !postContent.trim()) return;
-    const excerpt = postExcerpt.trim() || `${postContent.trim().slice(0, 140)}…`;
-    if (editingPostId) {
-      updateBlogPost(editingPostId, {
-        title: postTitle.trim(),
-        category: postCategory,
-        excerpt,
-        content: postContent.trim(),
-      });
-    } else {
-      addBlogPost({
-        title: postTitle.trim(),
-        slug: postTitle
-          .trim()
-          .toLowerCase()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-|-$/g, ''),
-        category: postCategory,
-        excerpt,
-        content: postContent.trim(),
-        author: 'Dr. Javier Beiza Ayala',
-        readTime: `${Math.max(2, Math.ceil(postContent.trim().split(/\s+/).length / 180))} min de lectura`,
-        published: false,
-      });
-    }
-    setEditingPostId(null);
-    setPostTitle('');
-    setPostExcerpt('');
-    setPostContent('');
+    if (postSaving.current) return;
+    const text = articlePlainText(postContent).trim();
+    if (!postTitle.trim() || !text) { setPostMessage('Completa el título y contenido del artículo.'); return; }
+    postSaving.current = true; setPostBusy(true); setPostMessage('Guardando…');
+    try {
+      const slug = postSlug.trim() || postTitle.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const content = { title: postTitle.trim(), slug, category: postCategory, excerpt: postExcerpt.trim() || text.slice(0, 140), content: postContent };
+      const saved = editingPostId ? await updateBlogPost(editingPostId, content) : await addBlogPost({ ...content, author: doctorUser?.nombre || 'Profesional CADO', readTime: '2 min de lectura', published: false });
+      if (!saved) { setPostMessage('No se pudo guardar. Tu texto continúa en el editor.'); return; }
+      setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage('Artículo guardado.');
+    } finally { postSaving.current = false; setPostBusy(false); }
   }
-
   function editPost(post: BlogPost) {
-    setEditingPostId(post.id);
-    setPostTitle(post.title);
-    setPostCategory(post.category);
-    setPostExcerpt(post.excerpt);
-    setPostContent(post.content);
+    if (!discardPost()) return;
+    setEditingPostId(post.id); setPostTitle(post.title); setPostSlug(post.slug); setPostCategory(post.category); setPostExcerpt(post.excerpt); setPostContent(post.content); setPostDirty(false);
     window.scrollTo({ top: 300, behavior: 'smooth' });
+  }
+  async function mutatePost(action: () => Promise<boolean>) {
+    if (postSaving.current) return;
+    postSaving.current = true; setPostBusy(true);
+    try { setPostMessage(await action() ? 'Cambio guardado.' : 'No se pudo guardar el cambio.'); }
+    finally { postSaving.current = false; setPostBusy(false); }
   }
 
   function handleGenerateCalamaEveningSlots() {
     if (!newSlotDate) return;
-    const standardTimes = ['18:00', '18:15', '18:30', '19:30'];
+    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
     standardTimes.forEach((t) => {
       const slotKey = `${newSlotDate}|${t}`;
       if (!availableSlots.includes(slotKey)) {
@@ -383,7 +441,7 @@ export default function AdminPage() {
 
   function handleGenerateWeek() {
     const now = new Date();
-    const standardTimes = ['18:00', '18:15', '18:30', '19:30'];
+    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
     let count = 0;
     for (let d = 0; d < 7; d++) {
       const target = new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
@@ -411,7 +469,7 @@ export default function AdminPage() {
   }
 
   function handleAddStandardSlotsForDate(dateStr: string) {
-    const standardTimes = ['18:00', '18:15', '18:30', '19:30'];
+    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
     standardTimes.forEach((t) => {
       const key = `${dateStr}|${t}`;
       if (!availableSlots.includes(key)) {
@@ -433,149 +491,18 @@ export default function AdminPage() {
   // =========================================================================
   // PANTALLA DE ACCESO CLÍNICO (LOGIN)
   // =========================================================================
-  if (!isDoctorLoggedIn) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F6F8F8] px-6 py-14 text-[#513D49]">
-        <div className="grid w-full max-w-5xl overflow-hidden rounded-[2.5rem] bg-white shadow-[0_24px_80px_rgba(81,61,73,.12)] lg:grid-cols-2">
-          {/* LADO IZQUIERDO: MARCA */}
-          <div className="relative flex flex-col justify-between overflow-hidden border-b border-[#E2E7E7] bg-[#F6F8F8] p-8 sm:p-12 lg:border-b-0 lg:border-r">
-            <div
-              className="absolute -right-24 -top-20 h-72 w-72 rounded-full bg-[#A14B92]/15 blur-3xl pointer-events-none"
-              aria-hidden="true"
-            />
-            <div className="relative space-y-6">
-              <Image
-                src="/brand/image2.png"
-                alt="CADO Odontología"
-                width={180}
-                height={65}
-                className="h-12 w-auto object-contain"
-                priority
-              />
-              <span className="inline-flex rounded-full border border-[#B3BFBF] bg-white px-3.5 py-1 text-xs font-semibold text-[#A14B92]">
-                Portal Clínico Privado
-              </span>
-              <h1 className="font-title text-4xl font-semibold leading-tight sm:text-5xl text-balance">
-                Gestión cercana, ética y personalizada.
-              </h1>
-              <p className="max-w-sm text-sm leading-relaxed text-[#665D66]">
-                Espacio de trabajo del <strong>Dr. Javier Beiza Ayala</strong> para revisar el cuestionario previo y las preferencias de confort de cada paciente antes de la orientación virtual.
-              </p>
-            </div>
-
-            <div className="relative mt-12 rounded-2xl border border-[#E2E7E7] bg-white p-4 text-xs leading-relaxed text-[#665D66]">
-              <div className="flex items-start gap-2.5">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" aria-hidden="true" />
-                <span>
-                  Protección de datos bajo la Ley N° 19.628 y N° 20.584. Conexión cifrada de extremo a extremo con base de datos clínica.
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* LADO DERECHO: FORMULARIO */}
-          <div className="flex flex-col justify-center p-8 sm:p-12">
-            <Link
-              href="/"
-              className="mb-8 inline-flex items-center gap-1.5 text-xs font-semibold text-[#8A3D7D] hover:underline"
-            >
-              ← Volver al sitio público
-            </Link>
-
-            <span className="section-eyebrow">Acceso del Profesional</span>
-            <h2 className="mt-2 font-title text-3xl font-semibold text-[#513D49]">
-              Ingresar a la Intranet
-            </h2>
-            <p className="mt-2 text-xs leading-relaxed text-[#766C75]">
-              Ingresa tus credenciales profesionales para gestionar orientaciones y contenidos.
-            </p>
-
-            <form onSubmit={handleLogin} className="mt-8 space-y-5">
-              <label className="block text-xs font-semibold text-[#513D49]">
-                Usuario / Correo clínico
-                <input
-                  type="email"
-                  required
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm outline-none focus:border-[#A14B92]"
-                  placeholder="demo@cado.local"
-                />
-              </label>
-
-              <label className="block text-xs font-semibold text-[#513D49]">
-                Contraseña
-                <div className="relative mt-1.5">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 pr-11 text-sm outline-none focus:border-[#A14B92]"
-                    placeholder="••••••••"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
-                    className="absolute right-3.5 top-3.5 text-[#766C75] hover:text-[#513D49]"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </label>
-
-              {loginError && (
-                <div
-                  role="alert"
-                  className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800"
-                >
-                  {loginError}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isLoggingIn}
-                className="btn-cado-primary flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold shadow-md active:scale-98 disabled:opacity-60"
-              >
-                {isLoggingIn ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <LockKeyhole className="h-4 w-4" aria-hidden="true" />
-                )}
-                <span>{isLoggingIn ? 'Verificando credenciales…' : 'Entrar al panel de gestión'}</span>
-              </button>
-            </form>
-
-            <div className="mt-6 flex flex-col gap-2 rounded-2xl border border-[#E2E7E7] bg-[#F6F8F8] p-4 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-[#513D49]">Acceso de prueba:</span>
-                <button
-                  type="button"
-                  onClick={handleFillDemoCredentials}
-                  className="text-xs font-bold text-[#A14B92] hover:underline"
-                >
-                  Rellenar automáticamente
-                </button>
-              </div>
-              <p className="text-[#766C75]">
-                Usuario: <code className="font-mono text-[#513D49]">demo@cado.local</code> · Clave:{' '}
-                <code className="font-mono text-[#513D49]">DEMO</code>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!isDoctorLoggedIn) return <DoctorLogin />;
 
   // =========================================================================
   // PANEL ADMINISTRATIVO PRINCIPAL (AUTENTICADO)
   // =========================================================================
-  const title = sectionTitles[section];
+  const rawTitle = sectionTitles[section];
+  const title = {
+    ...rawTitle,
+    title: section === 'resumen'
+      ? `Panel Clínico · ${doctorUser?.nombre || 'Profesional CADO'}`
+      : rawTitle.title,
+  };
 
   return (
     <div className="min-h-screen bg-[#F6F8F8] text-[#513D49] lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -599,9 +526,9 @@ export default function AdminPage() {
             Espacio Clínico
           </p>
           <h2 className="mt-1 font-title text-xl font-semibold text-[#513D49]">
-            Dr. Javier Beiza Ayala
+            {doctorUser?.nombre || 'Profesional CADO'}
           </h2>
-          <p className="text-xs text-[#766C75]">CADO Odontología · Calama</p>
+          <p className="text-xs text-[#766C75]">{doctorUser?.rol || 'CADO Odontología · Calama'}</p>
         </div>
 
         {/* MENÚ DE SECCIONES */}
@@ -615,7 +542,7 @@ export default function AdminPage() {
               <button
                 key={id}
                 type="button"
-                onClick={() => setSection(id)}
+                onClick={() => navigateSection(id)}
                 aria-current={isCurrent ? 'page' : undefined}
                 className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-left text-xs font-semibold transition lg:w-full ${
                   isCurrent
@@ -648,7 +575,7 @@ export default function AdminPage() {
               }`}
             />
             <span className="truncate">
-              {realtimeConnected ? 'En vivo (Automático)' : supabaseStatus.connected ? 'Base de datos en línea' : 'Modo local'}
+              {realtimeConnected ? 'En vivo (Automático)' : supabaseStatus.connected ? 'Base de datos en línea' : 'Sin conexión'}
             </span>
           </div>
 
@@ -674,7 +601,7 @@ export default function AdminPage() {
               <p className="text-sm font-semibold text-[#513D49]">Portal de Gestión Clínica</p>
               <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-800">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {authMethod === 'supabase' ? 'Sesión Verificada' : 'Sesión Clínica'} · {doctorUser?.email || 'Dr. Javier Beiza'}
+                {authMethod === 'supabase' ? 'Sesión Verificada' : 'Sesión Clínica'} · {doctorUser?.nombre || doctorUser?.email || 'Profesional CADO'}
               </span>
             </div>
           </div>
@@ -687,7 +614,7 @@ export default function AdminPage() {
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                   : 'border-amber-200 bg-amber-50 text-amber-800'
               }`}
-              title={realtimeConnected ? 'Sincronización instantánea activa' : 'Conectando sincronización en vivo...'}
+              title={realtimeConnected ? 'Sincronización instantánea activa' : 'Actualización periódica de la agenda'}
             >
               <span className="relative flex h-2 w-2">
                 {realtimeConnected && (
@@ -699,7 +626,7 @@ export default function AdminPage() {
                   }`}
                 />
               </span>
-              <span>{realtimeConnected ? 'En vivo' : 'Conectando…'}</span>
+              <span>{realtimeConnected ? 'En vivo' : 'Actualización periódica'}</span>
             </div>
 
             <button
@@ -717,7 +644,7 @@ export default function AdminPage() {
 
             <button
               type="button"
-              onClick={logoutDoctor}
+              onClick={() => { if (discardPost()) void logoutDoctor(); }}
               className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
             >
               <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
@@ -728,6 +655,25 @@ export default function AdminPage() {
 
         {/* CUERPO PRINCIPAL SEGÚN SECCIÓN */}
         <main className="mx-auto max-w-7xl space-y-8 px-6 py-8 sm:px-9 sm:py-10">
+          {googleNotification && (
+            <aside
+              aria-label="Notificación de Google Calendar"
+              className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-xs font-medium shadow-sm ${
+                googleNotification.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                  : 'border-rose-200 bg-rose-50 text-rose-900'
+              }`}
+            >
+              <span>{googleNotification.message}</span>
+              <button
+                type="button"
+                onClick={() => setGoogleNotification(null)}
+                className="rounded-lg px-2 py-1 hover:bg-black/5"
+              >
+                ✕
+              </button>
+            </aside>
+          )}
           {/* BANNER DE NOTIFICACIÓN DE SINCRONIZACIÓN EN TIEMPO REAL */}
           {lastRealtimeEvent && (
             <aside
@@ -871,7 +817,7 @@ export default function AdminPage() {
                     <p className="font-semibold text-[#513D49]">
                       Estado:{' '}
                       <span className="text-[#10B981]">
-                        {supabaseStatus.connected ? 'Conectado a la nube' : 'Modo local activo'}
+                        {supabaseStatus.connected ? 'Conectado a la nube' : 'Sin conexión'}
                       </span>
                     </p>
                     <p className="text-[#766C75]">
@@ -904,6 +850,7 @@ export default function AdminPage() {
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    aria-label="Buscar orientaciones por nombre, código o correo"
                     placeholder="Buscar por nombre, código de cita o correo..."
                     className="w-full rounded-2xl border border-[#B3BFBF] bg-white py-3 pl-11 pr-4 text-xs sm:text-sm outline-none focus:border-[#A14B92]"
                   />
@@ -952,6 +899,7 @@ export default function AdminPage() {
                           <p className="text-xs text-[#766C75]">
                             {app.date} a las {app.time} hrs · {app.email} · {app.phone}
                           </p>
+                          <p className="text-xs text-[#766C75]">Google: {app.syncStatus === 'Sincronizado' ? 'Sincronizado' : 'Pendiente de sincronización'}</p>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2">
@@ -1506,15 +1454,7 @@ export default function AdminPage() {
                     Pacientes orientados virtualmente que cuentan con derivación hacia la agenda Dentalink o presencial en Vivar #1580, Calama.
                   </p>
                 </div>
-                <a
-                  href="https://dentalink.cl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-cado-secondary inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold"
-                >
-                  <span>Portal Dentalink</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </a>
+                <DentalinkLink />
               </div>
 
               {derived.length === 0 ? (
@@ -1555,6 +1495,7 @@ export default function AdminPage() {
           {/* =============================================================== */}
           {/* SECCIÓN 5: GESTOR DE CONTENIDOS DEL BLOG                        */}
           {/* =============================================================== */}
+          {section === 'recursos' && <section className="clay-card rounded-3xl p-6 sm:p-8"><GuideLibrary admin /></section>}
           {section === 'contenidos' && (
             <div className="grid gap-8 xl:grid-cols-[1.3fr_1fr]">
               {/* FORMULARIO EDITAR / CREAR */}
@@ -1567,27 +1508,31 @@ export default function AdminPage() {
                     {editingPostId ? 'Editar artículo' : 'Redactar nuevo artículo'}
                   </h2>
                   <p className="text-xs text-[#766C75]">
-                    Los artículos guardados se sincronizan con la base de datos clínica (`articulos_blog`).
+                    Guarda un borrador, revisa su vista previa y publícalo cuando esté listo.
                   </p>
                 </div>
 
+                <fieldset disabled={postBusy} className="space-y-4">
                 <label className="block text-xs font-semibold text-[#513D49]">
                   Título del artículo
                   <input
                     type="text"
                     required
                     value={postTitle}
-                    onChange={(e) => setPostTitle(e.target.value)}
+                    onChange={(e) => { setPostTitle(e.target.value); setPostDirty(true); }}
                     placeholder="Ej: Cómo prepararse para una consulta sin dolor en Calama"
                     className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-sm outline-none focus:border-[#A14B92]"
                   />
                 </label>
 
+                <label className="block text-xs font-semibold text-[#513D49]">URL del artículo (slug)
+                  <input value={postSlug} onChange={(event) => { setPostSlug(event.target.value); setPostDirty(true); }} pattern="[a-z0-9]+(-[a-z0-9]+)*" maxLength={160} placeholder="Se genera a partir del título si lo dejas vacío" className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-sm" />
+                </label>
                 <label className="block text-xs font-semibold text-[#513D49]">
                   Categoría
                   <select
                     value={postCategory}
-                    onChange={(e) => setPostCategory(e.target.value as BlogPost['category'])}
+                    onChange={(e) => { setPostCategory(e.target.value as BlogPost['category']); setPostDirty(true); }}
                     className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-sm font-semibold text-[#513D49] outline-none"
                   >
                     <option value="Miedo Dental">Miedo Dental</option>
@@ -1602,46 +1547,38 @@ export default function AdminPage() {
                   <textarea
                     rows={2}
                     value={postExcerpt}
-                    onChange={(e) => setPostExcerpt(e.target.value)}
+                    onChange={(e) => { setPostExcerpt(e.target.value); setPostDirty(true); }}
                     placeholder="Breve descripción que se mostrará en la tarjeta del blog..."
                     className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-xs outline-none focus:border-[#A14B92]"
                   />
                 </label>
 
-                <label className="block text-xs font-semibold text-[#513D49]">
-                  Cuerpo del artículo (Texto completo)
-                  <textarea
-                    rows={8}
-                    required
-                    value={postContent}
-                    onChange={(e) => setPostContent(e.target.value)}
-                    placeholder="Escribe aquí las indicaciones y explicaciones con lenguaje claro y respetuoso..."
-                    className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3 text-sm leading-relaxed outline-none focus:border-[#A14B92]"
-                  />
-                </label>
-
+                <div className="space-y-2">
+                  <p id="article-content-label" className="text-xs font-semibold text-[#513D49]">Cuerpo del artículo</p>
+                  <RichTextEditor value={postContent} onChange={(value) => { setPostContent(value); setPostDirty(true); }} disabled={postBusy} />
+                </div>
+                <p role="status" aria-live="polite" className="text-sm text-[#665D66]">{postMessage}</p>
                 <div className="flex flex-wrap justify-end gap-3 pt-2">
-                  {editingPostId && (
+                  <button type="button" disabled={postBusy || !postTitle.trim()} onClick={() => setPreviewPost({ id: editingPostId || 'preview', title: postTitle, slug: postSlug, category: postCategory, excerpt: postExcerpt, content: postContent, author: doctorUser?.nombre || '', readTime: '', date: '', published: false })} className="btn-cado-secondary rounded-xl px-4 py-2.5 text-xs font-semibold disabled:opacity-60">Previsualizar cambios</button>
+                  {(editingPostId || hasUnsavedChanges) && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditingPostId(null);
-                        setPostTitle('');
-                        setPostExcerpt('');
-                        setPostContent('');
-                      }}
+                      onClick={() => discardPost()}
+                      disabled={postBusy}
                       className="btn-cado-secondary rounded-xl px-4 py-2.5 text-xs font-semibold"
                     >
-                      Cancelar
+                      Descartar cambios
                     </button>
                   )}
                   <button
                     type="submit"
-                    className="btn-cado-primary rounded-xl px-6 py-2.5 text-xs font-semibold shadow-md"
+                    disabled={postBusy}
+                    className="btn-cado-primary rounded-xl px-6 py-2.5 text-xs font-semibold shadow-md disabled:opacity-60"
                   >
-                    {editingPostId ? 'Guardar cambios' : 'Crear artículo borrador'}
+                    {postBusy ? 'Guardando…' : editingPostId ? 'Guardar cambios' : 'Crear artículo borrador'}
                   </button>
                 </div>
+                </fieldset>
               </form>
 
               {/* LISTA DE ARTÍCULOS */}
@@ -1681,6 +1618,7 @@ export default function AdminPage() {
                       <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
                         <button
                           type="button"
+                          disabled={postBusy}
                           onClick={() => setPreviewPost(post)}
                           className="font-semibold text-[#8A3D7D] hover:underline"
                         >
@@ -1688,6 +1626,7 @@ export default function AdminPage() {
                         </button>
                         <button
                           type="button"
+                          disabled={postBusy}
                           onClick={() => editPost(post)}
                           className="font-semibold text-[#513D49] hover:underline"
                         >
@@ -1695,8 +1634,9 @@ export default function AdminPage() {
                         </button>
                         <button
                           type="button"
+                          disabled={postBusy}
                           onClick={() =>
-                            updateBlogPost(post.id, { published: !post.published })
+                            mutatePost(() => updateBlogPost(post.id, { published: !post.published }))
                           }
                           className="font-semibold text-[#A14B92] hover:underline"
                         >
@@ -1704,9 +1644,10 @@ export default function AdminPage() {
                         </button>
                         <button
                           type="button"
+                          disabled={postBusy}
                           onClick={() => {
                             if (window.confirm(`¿Eliminar «${post.title}»?`)) {
-                              deleteBlogPost(post.id);
+                              void mutatePost(() => deleteBlogPost(post.id));
                             }
                           }}
                           className="ml-auto font-semibold text-red-600 hover:underline"
@@ -1739,7 +1680,7 @@ export default function AdminPage() {
                   </p>
                   <div className="pt-2">
                     <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                      {supabaseStatus.connected ? `Activo · ${supabaseStatus.latencyMs}ms` : 'Modo local'}
+                      {supabaseStatus.connected ? `Activo · ${supabaseStatus.latencyMs}ms` : 'Sin conexión'}
                     </span>
                   </div>
                 </article>
@@ -1751,12 +1692,13 @@ export default function AdminPage() {
                   <h2 className="font-title text-2xl font-semibold text-[#513D49]">
                     Google Meet & Calendar
                   </h2>
+                  <button type="button" className="btn-cado-secondary rounded-xl p-3 text-xs" onClick={async () => { try { const response=await fetch('/api/internal/calendar-sync',{method:'POST'});const result=await response.json();if(!response.ok)throw Error(result.error);setGoogleNotification({type:result.failed ? 'error' : 'success',message:'Sincronizadas: '+result.synced+'. Pendientes: '+result.pending+'. Omitidas: '+result.skipped+'. Fallidas: '+result.failed+'.'}); } catch {setGoogleNotification({type:'error',message:'No se pudieron reintentar las sincronizaciones.'});} }}>Reintentar sincronización pendiente</button>
                   <p className="text-xs leading-relaxed text-[#665D66]">
                     Generación de enlaces seguros para videollamada vespertina de 15 minutos en cada reserva.
                   </p>
                   <div className="pt-2">
                     <span className="inline-flex rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-[#A14B92]">
-                      Operativo en agendamiento
+                      {googleDoctor?.google_conectado ? 'Cuenta vinculada' : 'Pendiente de vinculación'}
                     </span>
                   </div>
                 </article>
@@ -1778,6 +1720,87 @@ export default function AdminPage() {
                   </div>
                 </article>
               </div>
+
+              {/* Panel de Conexión Google Calendar & Meet (RF-13) */}
+              <section className="rounded-[1.7rem] border border-[#E2E7E7] bg-white p-6 shadow-xs sm:p-8">
+                <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E2E7E7] pb-5">
+                  <div>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#A14B92]">
+                      Integración Externa (RF-13)
+                    </span>
+                    <h2 className="mt-1 font-title text-2xl font-semibold sm:text-3xl text-[#513D49]">
+                      Conexión Google Calendar & Meet
+                    </h2>
+                    <p className="mt-2 max-w-3xl text-xs leading-6 text-[#665D66]">
+                      Vincula una cuenta de Google para sincronización de teleorientaciones. Al confirmarse una reserva telemática, se creará un evento automático en la agenda y se generará una sala de Google Meet oficial.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <div className="max-w-xl rounded-2xl border border-[#E2E7E7] bg-[#F6F8F8] p-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#A14B92] shadow-xs">
+                          <Video className="h-5 w-5" />
+                        </span>
+                        <div>
+                          <h3 className="font-semibold text-[#513D49]">
+                            {doctorUser?.nombre || googleDoctor?.nombre || 'Profesional CADO'}
+                          </h3>
+                          <p className="text-xs text-[#766C75]">
+                            {doctorUser?.rol || googleDoctor?.rol || 'Profesional CADO'}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold border ${
+                          googleDoctor?.google_conectado
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-white text-[#766C75] border-[#E2E7E7]'
+                        }`}
+                      >
+                        {googleDoctor?.google_conectado ? '● Conectado a Google' : '○ No conectado'}
+                      </span>
+                    </div>
+
+                    {googleDoctor?.google_email && (
+                      <div className="mt-4 rounded-xl bg-emerald-50/70 border border-emerald-100 p-3 text-xs text-emerald-900">
+                        Cuenta vinculada: <strong>{googleDoctor.google_email}</strong>
+                      </div>
+                    )}
+
+                    <div className="mt-6 flex flex-wrap gap-3 border-t border-[#E2E7E7] pt-4">
+                      {googleDoctor?.google_conectado ? (
+                        <>
+                          <a
+                            href="/api/auth/google"
+                            className="btn-cado-secondary inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold"
+                          >
+                            <CalendarDays className="h-4 w-4" />
+                            <span>Re-conectar cuenta</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDisconnectGoogle(googleDoctor.id)}
+                            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                          >
+                            Desvincular
+                          </button>
+                        </>
+                      ) : (
+                        <a
+                          href="/api/auth/google"
+                          className="btn-cado-primary inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-semibold"
+                        >
+                          <CalendarDays className="h-4 w-4" />
+                          <span>Vincular Google Calendar con cuenta de prueba</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
             </div>
           )}
         </main>
@@ -1791,15 +1814,7 @@ export default function AdminPage() {
         (() => {
           const app = appointments.find((item) => item.id === openAppointmentId)!;
           return (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="modal-patient-name"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) setOpenAppointmentId(null);
-              }}
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in duration-200"
-            >
+            <Modal labelledBy="modal-patient-name" onClose={() => setOpenAppointmentId(null)}>
               <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl sm:p-9 space-y-6">
                 <div className="flex items-start justify-between gap-4 border-b border-[#E2E7E7] pb-4">
                   <div>
@@ -1899,7 +1914,9 @@ export default function AdminPage() {
 
                 {/* CUESTIONARIO DE PERFILAMIENTO */}
                 {(() => {
-                  const q = app.questionnaire || questionnaires.find((item: QuestionnaireSubmission) => item.id === app.id || item.reason === app.patientName);
+                  // The API joins the questionnaire by its database relationship.
+                  // A patient's name or reason is never an identifier.
+                  const q = app.questionnaire;
                   return (
                     <div className="rounded-2xl border border-[#A14B92]/30 bg-[#F8EFF6] p-5 space-y-3">
                       <div className="flex items-center justify-between">
@@ -1951,7 +1968,7 @@ export default function AdminPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                   <a
                     href={`https://wa.me/${app.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                      `Hola ${app.patientName}, le saluda el Dr. Javier Beiza de CADO Odontología Calama respecto a su orientación telemática del día ${app.date}.`
+                      `Hola ${app.patientName}, le saluda ${doctorUser?.nombre || 'tu profesional'} de CADO Odontología Calama respecto a su orientación telemática del día ${app.date}.`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -1970,7 +1987,7 @@ export default function AdminPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </Modal>
           );
         })()}
 
@@ -1978,27 +1995,21 @@ export default function AdminPage() {
       {/* MODAL: VISTA PREVIA DEL ARTÍCULO                                  */}
       {/* =================================================================== */}
       {previewPost && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setPreviewPost(null);
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
-        >
+        <Modal labelledBy="post-preview-title" onClose={() => setPreviewPost(null)}>
           <article className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl sm:p-9 space-y-4">
             <div className="flex items-start justify-between gap-4 border-b border-[#E2E7E7] pb-3">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-[#A14B92]">
                   {previewPost.category} · {previewPost.published ? 'Publicado' : 'Borrador'}
                 </span>
-                <h2 className="mt-1 font-title text-3xl font-semibold text-[#513D49]">
+                <h2 id="post-preview-title" className="mt-1 font-title text-3xl font-semibold text-[#513D49]">
                   {previewPost.title}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setPreviewPost(null)}
+                aria-label="Cerrar vista previa"
                 className="rounded-xl border border-[#B3BFBF] p-2 hover:bg-[#F6F8F8]"
               >
                 <X className="h-4 w-4" />
@@ -2006,9 +2017,7 @@ export default function AdminPage() {
             </div>
 
             <p className="text-sm font-semibold text-[#513D49]">{previewPost.excerpt}</p>
-            <div className="whitespace-pre-wrap text-sm leading-relaxed text-[#665D66]">
-              {previewPost.content}
-            </div>
+            <ArticleBody content={previewPost.content} />
 
             <div className="pt-3 border-t border-[#E2E7E7] flex justify-end">
               <button
@@ -2020,7 +2029,7 @@ export default function AdminPage() {
               </button>
             </div>
           </article>
-        </div>
+        </Modal>
       )}
     </div>
   );

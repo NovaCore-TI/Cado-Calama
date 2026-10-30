@@ -103,6 +103,7 @@ export default function FaqPage() {
           <Search className="w-5 h-5 text-gray-400 absolute left-4 top-4" />
           <input
             type="text"
+            aria-label="Buscar preguntas frecuentes"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Busca por palabra clave (ej: dolor, fobia, RUT, turnos, Dentalink, Meet)..."
@@ -112,6 +113,7 @@ export default function FaqPage() {
             <button
               type="button"
               onClick={() => setSearchTerm('')}
+              aria-label="Limpiar búsqueda"
               className="absolute right-3.5 top-3.5 p-1 rounded-full text-gray-400 hover:text-[#513D49]"
             >
               <X className="w-4 h-4" />
@@ -172,6 +174,8 @@ export default function FaqPage() {
                 <button
                   type="button"
                   onClick={() => toggleAccordion(faq.id)}
+                  aria-expanded={isOpen}
+                  aria-controls={`faq-answer-${faq.id}`}
                   className="w-full p-5 text-left flex items-center justify-between gap-4 hover:bg-[#F6F8F8]/50 transition-colors"
                 >
                   <span className="font-title font-bold text-base sm:text-lg text-[#513D49]">
@@ -185,7 +189,7 @@ export default function FaqPage() {
                 </button>
 
                 {isOpen && (
-                  <div className="px-5 pb-5 pt-1 text-xs sm:text-[13px] text-gray-600 leading-relaxed border-t border-gray-100 bg-[#F6F8F8]/30">
+                  <div id={`faq-answer-${faq.id}`} className="px-5 pb-5 pt-1 text-xs sm:text-[13px] text-gray-600 leading-relaxed border-t border-gray-100 bg-[#F6F8F8]/30">
                     <p>{faq.a}</p>
                   </div>
                 )}

@@ -1,20 +1,29 @@
-import { MetadataRoute } from 'next';
-
-export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.cadoodontologia.cl';
-  const currentDate = new Date().toISOString();
-
+import { MetadataRoute } from "next";
+import { supabase } from "@/lib/supabase";
+import { SITE_URL } from "@/lib/site";
+export const dynamic = "force-dynamic";
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const routes = [
-    { url: `${baseUrl}`, lastModified: currentDate, changeFrequency: 'weekly' as const, priority: 1.0 },
-    { url: `${baseUrl}/equipo`, lastModified: currentDate, changeFrequency: 'monthly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urgencias`, lastModified: currentDate, changeFrequency: 'daily' as const, priority: 0.95 },
-    { url: `${baseUrl}/cuestionario`, lastModified: currentDate, changeFrequency: 'monthly' as const, priority: 0.85 },
-    { url: `${baseUrl}/test-confort`, lastModified: currentDate, changeFrequency: 'monthly' as const, priority: 0.8 },
-    { url: `${baseUrl}/agendar`, lastModified: currentDate, changeFrequency: 'daily' as const, priority: 0.9 },
-    { url: `${baseUrl}/faq`, lastModified: currentDate, changeFrequency: 'weekly' as const, priority: 0.8 },
-    { url: `${baseUrl}/recursos`, lastModified: currentDate, changeFrequency: 'monthly' as const, priority: 0.75 },
-    { url: `${baseUrl}/blog`, lastModified: currentDate, changeFrequency: 'weekly' as const, priority: 0.8 },
+    "",
+    "/equipo",
+    "/urgencias",
+    "/cuestionario",
+    "/test-confort",
+    "/agendar",
+    "/faq",
+    "/recursos",
+    "/blog",
   ];
-
-  return routes;
+  const { data, error } = await supabase
+    .from("articulos_blog")
+    .select("slug,published_at")
+    .eq("publicado", true);
+  if (error) throw new Error("No se pudo generar el sitemap de publicaciones.");
+  return [
+    ...routes.map((route) => ({ url: SITE_URL + route })),
+    ...(data || []).map((article) => ({
+      url: SITE_URL + "/blog/" + article.slug,
+      lastModified: article.published_at,
+    })),
+  ];
 }

@@ -48,26 +48,8 @@ export default function TestConfortPage() {
       companionAllowed: companion,
       handSignalPledge: stopSignal,
       notes: notes.trim(),
+      explanationStepByStep: explanation,
     };
-
-    try {
-      await fetch('/api/confort', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cuestionarioId: activeQuestionnaire?.id || null,
-          soundPreference: sound,
-          jawBreaks: breaks,
-          companionAllowed: companion,
-          handSignalPledge: stopSignal,
-          explanationStepByStep: explanation,
-          notes: notes.trim(),
-          consent: true,
-        }),
-      });
-    } catch {
-      // Fallback handled in context
-    }
 
     await saveComfortPreferences(profile);
     setIsSaving(false);
@@ -75,7 +57,7 @@ export default function TestConfortPage() {
   }
 
   return (
-    <main className="bg-white pb-24 text-[#513D49]">
+    <section className="bg-white pb-24 text-[#513D49]">
       <section className="bg-[#F6F8F8] px-6 py-16 sm:py-20">
         <div className="mx-auto max-w-5xl">
           <p className="section-eyebrow">Test de Confort Ambiental</p>
@@ -265,7 +247,7 @@ export default function TestConfortPage() {
 
             {savedSuccess && (
               <div className="mt-4 rounded-2xl bg-[#F8EFF6] p-4 text-xs leading-5 text-[#513D49]">
-                <strong>Sincronizado:</strong> El doctor podrá ver estas preferencias en su bandeja de orientaciones.
+                <strong>Preferencias listas:</strong> Se enviarán al doctor cuando confirmes tu reserva.
                 <Link
                   href="/agendar?step=3"
                   className="btn-cado-primary mt-3 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold text-white shadow-sm"
@@ -283,6 +265,6 @@ export default function TestConfortPage() {
           </div>
         </aside>
       </section>
-    </main>
+    </section>
   );
 }

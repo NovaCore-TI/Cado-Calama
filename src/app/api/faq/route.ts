@@ -26,18 +26,16 @@ export async function GET(request: NextRequest) {
   if (category && category !== 'todas') {
     dbQuery = dbQuery.eq('categoria', category);
   }
-  if (q) {
-    dbQuery = dbQuery.or(`pregunta.ilike.%${q}%,respuesta.ilike.%${q}%`);
-  }
+
 
   const { data: sbFaqs, error } = await dbQuery;
 
-  if (!error && sbFaqs && sbFaqs.length > 0) {
+  if (!error && sbFaqs) {
     return NextResponse.json({
       ok: true,
       source: 'supabase',
       count: sbFaqs.length,
-      data: sbFaqs.map((row: Record<string, unknown>) => ({
+      data: sbFaqs.filter((row: Record<string, unknown>) => !q || String(row.pregunta).toLowerCase().includes(q) || String(row.respuesta).toLowerCase().includes(q)).map((row: Record<string, unknown>) => ({
         id: row.id,
         category: row.categoria,
         q: row.pregunta,

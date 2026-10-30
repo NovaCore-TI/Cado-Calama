@@ -1,0 +1,500 @@
+[
+  {
+    "file": "lighthouse-agendar.json",
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "performance": 0.66,
+    "accessibility": 0.96,
+    "seo": 1,
+    "LCP_ms": 4635.96975,
+    "CLS": 0,
+    "TBT_ms": 339,
+    "failedAccessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "nodes": [
+          "div.space-y-3 > ul.space-y-2 > li > a.text-red-400",
+          "div.max-w-7xl > div.grid > div.space-y-3 > p.text-[11px]",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p"
+        ]
+      }
+    ],
+    "layoutShiftDetails": [
+      {
+        "id": "cumulative-layout-shift",
+        "displayValue": "0",
+        "details": [
+          {
+            "cumulativeLayoutShiftMainFrame": 0,
+            "newEngineResult": {
+              "cumulativeLayoutShift": 0,
+              "cumulativeLayoutShiftMainFrame": 0
+            },
+            "newEngineResultDiffered": false
+          }
+        ]
+      },
+      {
+        "id": "layout-shifts",
+        "details": []
+      }
+    ]
+  },
+  {
+    "file": "lighthouse-cuestionario.json",
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "performance": 0.68,
+    "accessibility": 0.96,
+    "seo": 1,
+    "LCP_ms": 4209.586825,
+    "CLS": 0.1423582853004549,
+    "TBT_ms": 256,
+    "failedAccessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "nodes": [
+          "div.space-y-3 > ul.space-y-2 > li > a.text-red-400",
+          "div.max-w-7xl > div.grid > div.space-y-3 > p.text-[11px]",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p"
+        ]
+      }
+    ],
+    "layoutShiftDetails": [
+      {
+        "id": "cumulative-layout-shift",
+        "displayValue": "0.142",
+        "details": [
+          {
+            "cumulativeLayoutShiftMainFrame": 0.1423582853004549,
+            "newEngineResult": {
+              "cumulativeLayoutShift": 0.1423582853004549,
+              "cumulativeLayoutShiftMainFrame": 0.1423582853004549
+            },
+            "newEngineResultDiffered": false
+          }
+        ]
+      },
+      {
+        "id": "layout-shifts",
+        "displayValue": "1 layout shift found",
+        "details": [
+          {
+            "node": {
+              "type": "node",
+              "lhId": "page-0-P",
+              "path": "1,HTML,1,BODY,3,MAIN,0,SECTION,0,DIV,0,DIV,2,P",
+              "selector": "section.bg-[#F6F8F8] > div.mx-auto > div.max-w-3xl > p.mt-5",
+              "boundingRect": {
+                "top": 337,
+                "bottom": 497,
+                "left": 24,
+                "right": 388,
+                "width": 364,
+                "height": 160
+              },
+              "snippet": "<p class=\"mt-5 leading-8 text-[#665D66]\">",
+              "nodeLabel": "Estas preguntas ayudan al Dr. Javier Beiza a comprender cómo acercarse a cada p…"
+            },
+            "score": 0.1423582853004549
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "file": "lighthouse-home-1.json",
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "performance": 0.88,
+    "accessibility": 0.96,
+    "seo": 1,
+    "LCP_ms": 2723.62155,
+    "CLS": 0.1154126815614279,
+    "TBT_ms": 204.5,
+    "failedAccessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "nodes": [
+          "div.space-y-3 > ul.space-y-2 > li > a.text-red-400",
+          "div.max-w-7xl > div.grid > div.space-y-3 > p.text-[11px]",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p"
+        ]
+      },
+      {
+        "id": "label-content-name-mismatch",
+        "title": "Elements with visible text labels do not have matching accessible names.",
+        "nodes": [
+          "div.relative > div.relative > div.flex > a.inline-flex"
+        ]
+      }
+    ],
+    "layoutShiftDetails": [
+      {
+        "id": "cumulative-layout-shift",
+        "displayValue": "0.115",
+        "details": [
+          {
+            "cumulativeLayoutShiftMainFrame": 0.1154126815614279,
+            "newEngineResultDiffered": false
+          }
+        ]
+      },
+      {
+        "id": "layout-shifts",
+        "displayValue": "1 layout shift found",
+        "details": [
+          {
+            "node": {
+              "type": "node",
+              "lhId": "page-1-DIV",
+              "path": "1,HTML,1,BODY,3,MAIN,0,DIV,0,SECTION,1,DIV,0,DIV,2,DIV",
+              "selector": "section.relative > div.mx-auto > div.space-y-6 > div.flex",
+              "boundingRect": {
+                "top": 542,
+                "bottom": 660,
+                "left": 24,
+                "right": 388,
+                "width": 364,
+                "height": 118
+              },
+              "snippet": "<div class=\"flex flex-col gap-3 pt-2 sm:flex-row sm:items-center\">",
+              "nodeLabel": "Conocer la orientación virtual\nCuestionario previo"
+            },
+            "score": 0.1154126815614279,
+            "subItems": {
+              "type": "subitems",
+              "items": [
+                {
+                  "extra": {
+                    "type": "url",
+                    "value": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459WlhyyTh89Y.woff2"
+                  },
+                  "cause": "Web font loaded"
+                },
+                {
+                  "extra": {
+                    "type": "url",
+                    "value": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2"
+                  },
+                  "cause": "Web font loaded"
+                },
+                {
+                  "extra": {
+                    "type": "url",
+                    "value": "https://fonts.gstatic.com/s/caveat/v23/Wnz6HAc5bAfYB2Q7ZjYYiAzcPA.woff2"
+                  },
+                  "cause": "Web font loaded"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "file": "lighthouse-home-2.json",
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "performance": 0.59,
+    "accessibility": 0.96,
+    "seo": 1,
+    "LCP_ms": 5073.6484,
+    "CLS": 0,
+    "TBT_ms": 464.0000000000009,
+    "failedAccessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "nodes": [
+          "div.space-y-3 > ul.space-y-2 > li > a.text-red-400",
+          "div.max-w-7xl > div.grid > div.space-y-3 > p.text-[11px]",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p"
+        ]
+      },
+      {
+        "id": "label-content-name-mismatch",
+        "title": "Elements with visible text labels do not have matching accessible names.",
+        "nodes": [
+          "div.relative > div.relative > div.flex > a.inline-flex"
+        ]
+      }
+    ],
+    "layoutShiftDetails": [
+      {
+        "id": "cumulative-layout-shift",
+        "displayValue": "0",
+        "details": [
+          {
+            "cumulativeLayoutShiftMainFrame": 0,
+            "newEngineResult": {
+              "cumulativeLayoutShift": 0,
+              "cumulativeLayoutShiftMainFrame": 0
+            },
+            "newEngineResultDiffered": false
+          }
+        ]
+      },
+      {
+        "id": "layout-shifts",
+        "details": []
+      }
+    ]
+  },
+  {
+    "file": "lighthouse-home-3.json",
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "performance": 0.68,
+    "accessibility": 0.96,
+    "seo": 1,
+    "LCP_ms": 4898.728325,
+    "CLS": 0,
+    "TBT_ms": 205.99999999999955,
+    "failedAccessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "nodes": [
+          "div.space-y-3 > ul.space-y-2 > li > a.text-red-400",
+          "div.max-w-7xl > div.grid > div.space-y-3 > p.text-[11px]",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p"
+        ]
+      },
+      {
+        "id": "label-content-name-mismatch",
+        "title": "Elements with visible text labels do not have matching accessible names.",
+        "nodes": [
+          "div.relative > div.relative > div.flex > a.inline-flex"
+        ]
+      }
+    ],
+    "layoutShiftDetails": [
+      {
+        "id": "cumulative-layout-shift",
+        "displayValue": "0",
+        "details": [
+          {
+            "cumulativeLayoutShiftMainFrame": 0,
+            "newEngineResult": {
+              "cumulativeLayoutShift": 0,
+              "cumulativeLayoutShiftMainFrame": 0
+            },
+            "newEngineResultDiffered": false
+          }
+        ]
+      },
+      {
+        "id": "layout-shifts",
+        "details": []
+      }
+    ]
+  },
+  {
+    "file": "lighthouse-home-4.json",
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "performance": 0.68,
+    "accessibility": 0.96,
+    "seo": 1,
+    "LCP_ms": 4438.881625,
+    "CLS": 0.1154126815614279,
+    "TBT_ms": 259.78335000000015,
+    "failedAccessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "nodes": [
+          "div.space-y-3 > ul.space-y-2 > li > a.text-red-400",
+          "div.max-w-7xl > div.grid > div.space-y-3 > p.text-[11px]",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p"
+        ]
+      },
+      {
+        "id": "label-content-name-mismatch",
+        "title": "Elements with visible text labels do not have matching accessible names.",
+        "nodes": [
+          "div.relative > div.relative > div.flex > a.inline-flex"
+        ]
+      }
+    ],
+    "layoutShiftDetails": [
+      {
+        "id": "cumulative-layout-shift",
+        "displayValue": "0.115",
+        "details": [
+          {
+            "cumulativeLayoutShiftMainFrame": 0.1154126815614279,
+            "newEngineResult": {
+              "cumulativeLayoutShift": 0.1154126815614279,
+              "cumulativeLayoutShiftMainFrame": 0.1154126815614279
+            },
+            "newEngineResultDiffered": false
+          }
+        ]
+      },
+      {
+        "id": "layout-shifts",
+        "displayValue": "1 layout shift found",
+        "details": [
+          {
+            "node": {
+              "type": "node",
+              "lhId": "page-1-DIV",
+              "path": "1,HTML,1,BODY,3,MAIN,0,DIV,0,SECTION,1,DIV,0,DIV,2,DIV",
+              "selector": "section.relative > div.mx-auto > div.space-y-6 > div.flex",
+              "boundingRect": {
+                "top": 542,
+                "bottom": 660,
+                "left": 24,
+                "right": 388,
+                "width": 364,
+                "height": 118
+              },
+              "snippet": "<div class=\"flex flex-col gap-3 pt-2 sm:flex-row sm:items-center\">",
+              "nodeLabel": "Conocer la orientación virtual\nCuestionario previo"
+            },
+            "score": 0.1154126815614279
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "file": "lighthouse-home-5.json",
+    "lighthouse": "13.5.0",
+    "formFactor": "mobile",
+    "throttling": {
+      "rttMs": 150,
+      "throughputKbps": 1638.4,
+      "requestLatencyMs": 562.5,
+      "downloadThroughputKbps": 1474.5600000000002,
+      "uploadThroughputKbps": 675,
+      "cpuSlowdownMultiplier": 4
+    },
+    "performance": 0.71,
+    "accessibility": 0.96,
+    "seo": 1,
+    "LCP_ms": 4413.767475,
+    "CLS": 0.1154126815614279,
+    "TBT_ms": 173.50000000000045,
+    "failedAccessibility": [
+      {
+        "id": "color-contrast",
+        "title": "Background and foreground colors do not have a sufficient contrast ratio.",
+        "nodes": [
+          "div.space-y-3 > ul.space-y-2 > li > a.text-red-400",
+          "div.max-w-7xl > div.grid > div.space-y-3 > p.text-[11px]",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p",
+          "footer.bg-[#513D49] > div.max-w-7xl > div.pt-6 > p"
+        ]
+      },
+      {
+        "id": "label-content-name-mismatch",
+        "title": "Elements with visible text labels do not have matching accessible names.",
+        "nodes": [
+          "div.relative > div.relative > div.flex > a.inline-flex"
+        ]
+      }
+    ],
+    "layoutShiftDetails": [
+      {
+        "id": "cumulative-layout-shift",
+        "displayValue": "0.115",
+        "details": [
+          {
+            "cumulativeLayoutShiftMainFrame": 0.1154126815614279,
+            "newEngineResult": {
+              "cumulativeLayoutShift": 0.1154126815614279,
+              "cumulativeLayoutShiftMainFrame": 0.1154126815614279
+            },
+            "newEngineResultDiffered": false
+          }
+        ]
+      },
+      {
+        "id": "layout-shifts",
+        "displayValue": "1 layout shift found",
+        "details": [
+          {
+            "node": {
+              "type": "node",
+              "lhId": "page-1-DIV",
+              "path": "1,HTML,1,BODY,3,MAIN,0,DIV,0,SECTION,1,DIV,0,DIV,2,DIV",
+              "selector": "section.relative > div.mx-auto > div.space-y-6 > div.flex",
+              "boundingRect": {
+                "top": 542,
+                "bottom": 660,
+                "left": 24,
+                "right": 388,
+                "width": 364,
+                "height": 118
+              },
+              "snippet": "<div class=\"flex flex-col gap-3 pt-2 sm:flex-row sm:items-center\">",
+              "nodeLabel": "Conocer la orientación virtual\nCuestionario previo"
+            },
+            "score": 0.1154126815614279
+          }
+        ]
+      }
+    ]
+  }
+]

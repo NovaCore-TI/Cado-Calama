@@ -115,13 +115,13 @@ export function ConfortLiveCard({
               </span>
               <div>
                 <strong className="block text-sm font-semibold text-[#513D49]">
-                  Señal de mano acordada (Stop Signal)
+                  {handSignalPledge ? 'Señal de mano solicitada' : 'Puedes acordar una señal de pausa'}
                 </strong>
                 <p className="mt-1 text-xs leading-5 text-[#665D66]">
                   Si levantas la mano izquierda durante cualquier momento de la atención, el Dr. Javier Beiza detiene el instrumental de inmediato. Tú tienes el control en todo momento.
                 </p>
                 <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-[#A14B92]/10 px-2.5 py-1 text-[11px] font-semibold text-[#8A3D7D]">
-                  <Sparkles className="h-3 w-3" /> Compromiso firmado por protocolo
+                  <Sparkles className="h-3 w-3" /> {handSignalPledge ? 'Preferencia seleccionada' : 'Puedes solicitarla antes de la atención'}
                 </div>
               </div>
             </div>
