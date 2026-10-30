@@ -1,0 +1,72 @@
+[
+  {
+    "file": "raw/home-release-1.json",
+    "bytes": 714885,
+    "sha256": "1098cd2d91ceb04aeb84d6020424e39d8e6f42498edf8b53f7666e7a3549ff1f"
+  },
+  {
+    "file": "raw/home-release-2.json",
+    "bytes": 715524,
+    "sha256": "609101b68ad4c76551d5b81c69956d70ae9b2ae7c9f85ddec35f32fde0e04e38"
+  },
+  {
+    "file": "raw/home-release-3.json",
+    "bytes": 714725,
+    "sha256": "736d22f3680bebc6a202f5ebb4b28adeb18ea71c14ba9e61942e27a3af20b814"
+  },
+  {
+    "file": "raw/home-release-4.json",
+    "bytes": 715394,
+    "sha256": "96033f0a26d1608dbf412c81408aeebec1c870fbfa562bb33d86bb68e93365cf"
+  },
+  {
+    "file": "raw/home-release-5.json",
+    "bytes": 714875,
+    "sha256": "dc47f3332d1bef274cf9f5f74bc1fd42a7113a30d1efb3f602346ff23874d3a5"
+  },
+  {
+    "file": "raw/home-complete-1.json",
+    "bytes": 715576,
+    "sha256": "ae30f7a2236e4077051990e81b11d27c813e8d7b1d6efcda42b4aae947cd11c9"
+  },
+  {
+    "file": "raw/home-complete-2.json",
+    "bytes": 715219,
+    "sha256": "664d3314df05709b5e0075e3829fe8b834c41f4519a41521f730b7caeb4a69a1"
+  },
+  {
+    "file": "raw/home-complete-3.json",
+    "bytes": 715075,
+    "sha256": "e5cca73d12a210812de491217f4382413b0df746a2c4f5b5f390a69aba1f0472"
+  },
+  {
+    "file": "raw/home-complete-4.json",
+    "bytes": 715210,
+    "sha256": "ddd5520ca1fa0a7365faf95b2efe27e1a998bf98c5992437e1ddd21a52356c2b"
+  },
+  {
+    "file": "raw/home-complete-5.json",
+    "bytes": 715227,
+    "sha256": "d8b33a6cc95c8b00aed2e4f41933521bd4cc728b19d3a9c0240e679b0da66401"
+  },
+  {
+    "file": "raw/verified-cuestionario.json",
+    "bytes": 620663,
+    "sha256": "5f09d9904c91b15fcb10c278c76a2452a7bdb0bf067961fcc737ee28590a60e1"
+  },
+  {
+    "file": "raw/verified-agendar.json",
+    "bytes": 588184,
+    "sha256": "0b7ad85e50db2c51fc246ba714830c3bb8cbff925ade04405918279ac7cf5663"
+  },
+  {
+    "file": "raw/verified-recursos.json",
+    "bytes": 551232,
+    "sha256": "461c687f6b43ecdff348c6e269386d5f1ed1e1823334c0ae015149c7fa265a75"
+  },
+  {
+    "file": "raw/verified-blog.json",
+    "bytes": 576399,
+    "sha256": "602e0e845c89999f3cdc6e6e1f026fc4c5146091251f6a88255b8b8f96509021"
+  }
+]

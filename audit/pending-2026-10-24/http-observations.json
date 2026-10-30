@@ -1,0 +1,94 @@
+[
+  {
+    "path": "/api/blog",
+    "status": 200,
+    "contentType": "application/json",
+    "cacheControl": "no-store",
+    "count": 3,
+    "slugs": [
+      "como-superar-miedo-al-dentista-calama",
+      "bruxismo-tension-mandibular-senales-alivio",
+      "cuidados-despues-de-extraccion-dental"
+    ]
+  },
+  {
+    "path": "/api/recursos",
+    "status": 200,
+    "contentType": "application/json",
+    "cacheControl": null,
+    "count": 3,
+    "source": "backend_catalog"
+  },
+  {
+    "path": "/api/health",
+    "status": 200,
+    "contentType": "application/json",
+    "cacheControl": "no-store"
+  },
+  {
+    "path": "/api/pacientes",
+    "status": 401,
+    "contentType": "application/json",
+    "cacheControl": "no-store"
+  },
+  {
+    "path": "/api/orientaciones",
+    "status": 401,
+    "contentType": "application/json",
+    "cacheControl": "no-store"
+  },
+  {
+    "path": "/api/cuestionario",
+    "status": 401,
+    "contentType": "application/json",
+    "cacheControl": "no-store"
+  },
+  {
+    "path": "/api/confort",
+    "status": 401,
+    "contentType": "application/json",
+    "cacheControl": "no-store"
+  },
+  {
+    "path": "/api/bloques?admin=1",
+    "status": 401,
+    "contentType": "application/json",
+    "cacheControl": "no-store"
+  },
+  {
+    "path": "/guias/CADO_Guia_Cuidados_Post_Exodoncia.pdf",
+    "status": 200,
+    "contentType": "application/pdf",
+    "cacheControl": "public, max-age=0"
+  },
+  {
+    "path": "/api/recursos/download?id=guia-post-exodoncia",
+    "status": 200,
+    "contentType": "application/pdf",
+    "cacheControl": "public, max-age=86400, stale-while-revalidate=604800"
+  },
+  {
+    "path": "/api/recursos/download?id=../../.env.local",
+    "status": 404,
+    "contentType": "application/json",
+    "cacheControl": null
+  },
+  {
+    "path": "/blog/no-existe-auditoria",
+    "status": 404,
+    "contentType": "text/html; charset=utf-8",
+    "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate"
+  },
+  {
+    "path": "/robots.txt",
+    "status": 200,
+    "contentType": "text/plain",
+    "cacheControl": "public, max-age=0, must-revalidate"
+  },
+  {
+    "path": "/sitemap.xml",
+    "status": 200,
+    "contentType": "application/xml",
+    "cacheControl": "public, max-age=0, must-revalidate"
+  }
+]

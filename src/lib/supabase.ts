@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://zccvmxtaxbigyqopqftd.supabase.co';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.invalid';
 const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  'sb_publishable_9wkLwfFoQcJ5RZ8HutBlNg_BRjHEhwd';
+  'not-configured';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -24,7 +24,7 @@ export async function checkSupabaseConnection(): Promise<{
         connected: true,
         tablesReady: true,
         latencyMs,
-        message: 'Conectado a Supabase PostgreSQL (Tablas sincronizadas)',
+        message: 'Contenido público disponible en Supabase',
       };
     }
 
@@ -42,14 +42,14 @@ export async function checkSupabaseConnection(): Promise<{
       connected: true,
       tablesReady: false,
       latencyMs,
-      message: `Supabase conectado (${error.message})`,
+      message: `No se pudo comprobar el contenido público (${error.message})`,
     };
   } catch {
     return {
       connected: false,
       tablesReady: false,
       latencyMs: Math.round(performance.now() - start),
-      message: 'Modo respaldo local activo',
+      message: 'No se pudo conectar con el contenido público.',
     };
   }
 }

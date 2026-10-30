@@ -1,0 +1,13 @@
+{
+  "node": "v24.18.0",
+  "vulnerabilities": {
+    "info": 0,
+    "low": 0,
+    "moderate": 0,
+    "high": 0,
+    "critical": 0,
+    "total": 0
+  },
+  "override": "postcss-selector-parser@7.1.6",
+  "tailwind": "3.4.19"
+}

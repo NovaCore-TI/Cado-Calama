@@ -1,0 +1,10 @@
+{
+  "sample": "home hero image",
+  "requestedFormats": "AVIF or WebP",
+  "delivered": "image/webp",
+  "bytes": 12206,
+  "reservedDimensions": true,
+  "altAttribute": true,
+  "homeImageCount": 8,
+  "imagesWithoutAlt": 0
+}

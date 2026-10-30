@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-24",
+  "method": "CUA accessibility tree, real keyboard and read-only DOM inspection",
+  "clinicalModal": {
+    "openedWithEnter": true,
+    "initialFocusInside": false,
+    "focusAfterTab": "background phone link",
+    "backgroundInert": false,
+    "labelledByPresent": true,
+    "patientIdentifiersPersisted": false
+  },
+  "resourceModal": {
+    "initialFocusInside": false,
+    "accessibleNamePresent": false
+  },
+  "authenticatedPublicBlog": {
+    "publishedArticlesFromPublicApi": 3,
+    "ownArticlesInAdmin": 0,
+    "visiblePublicArticlesAfterSessionLoad": 0,
+    "emptyMessageDisplayed": true
+  },
+  "authRateLimits": {
+    "source": "Supabase Authentication / Rate Limits, read-only",
+    "signUpSignInRequestsPer5Minutes": 30,
+    "scope": "IP address",
+    "displayedHourlyEquivalent": 360,
+    "fiveFailureFifteenMinuteAccountPolicyVerified": false,
+    "realFailedPasswordAttemptsPerformed": false
+  },
+  "footerComputedStyles": {
+    "foreground": "rgb(156, 163, 175)",
+    "background": "rgb(81, 61, 73)",
+    "fontSize": "11px"
+  },
+  "responsiveFollowUp": {
+    "initialObservationsFile": "responsive.json",
+    "laterRequestedWidth": 360,
+    "laterObservedWidth": 1280,
+    "laterMeasurementsAt1280ExcludedFrom360Conclusion": true,
+    "independent360LighthouseReport": "lighthouse-recursos-360.json",
+    "fullResponsiveAcceptance": false
+  }
+}

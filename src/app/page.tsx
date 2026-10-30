@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { preload } from 'react-dom';
 import {
   ArrowRight,
   CalendarDays,
@@ -69,8 +70,9 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
+  preload('/fonts/cormorant-home-title.woff2', { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
   return (
-    <div className="overflow-hidden bg-white text-[#513D49]">
+    <div className="home-page overflow-hidden bg-white text-[#513D49]">
       {/* 1. SECCIÓN HERO */}
       <section className="relative isolate border-b border-[#E2E7E7] bg-[#F6F8F8]">
         <div
@@ -86,7 +88,7 @@ export default function HomePage() {
             </div>
 
             <div className="space-y-4">
-              <h1 className="font-title text-5xl font-semibold leading-[1.08] tracking-tight text-[#513D49] text-balance sm:text-6xl lg:text-7xl">
+              <h1 className="home-hero-title font-title text-5xl font-semibold leading-[1.08] tracking-tight text-[#513D49] text-balance sm:text-6xl lg:text-7xl">
                 Un primer paso hacia tu salud oral, a tu propio ritmo.
               </h1>
               <p className="max-w-xl text-base leading-relaxed text-[#513D49] sm:text-lg">
@@ -372,7 +374,7 @@ export default function HomePage() {
                 href="https://wa.me/56944657815"
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Contactar a CADO Odontología por WhatsApp (abre en una nueva ventana)"
+                aria-label="WhatsApp prioritario: contactar a CADO Odontología (abre en una nueva ventana)"
                 className="inline-flex items-center gap-2 rounded-2xl border border-white/40 bg-white/10 px-5 py-3.5 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               >
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />

@@ -1,0 +1,27 @@
+{
+  "localDate": "2026-10-24",
+  "timezone": "America/Santiago",
+  "recordedAt": "2026-10-25T00:56:50.722Z",
+  "sourceRevision": "8993fe4f6aa65160ed11158afe96be5b69db04e0",
+  "node": "v24.18.0",
+  "lint": {
+    "exitCode": 0
+  },
+  "typecheck": {
+    "exitCode": 0
+  },
+  "tests": {
+    "passed": 61,
+    "failed": 0,
+    "skipped": 0
+  },
+  "build": {
+    "command": "next build --webpack",
+    "exitCode": 0
+  },
+  "npmAudit": {
+    "totalVulnerabilities": 0
+  },
+  "productionDeployed": false,
+  "pushed": false
+}

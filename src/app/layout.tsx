@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
+import { SITE_URL } from '@/lib/site';
 import './globals.css';
 import { SiteShell } from '@/components/SiteShell';
-import { CadoProvider } from '@/context/CadoContext';
+import { CadoBoundary } from '@/context/CadoBoundary';
+import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://www.cadoodontologia.cl'),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: 'CADO Odontología Calama | Dr. Javier Beiza — Atención cercana',
     template: '%s | CADO Odontología Calama',
@@ -104,6 +106,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
+        <link rel="preload" href="/fonts/montserrat-normal-100-900.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icon.png" />
@@ -120,9 +123,7 @@ export default function RootLayout({
         >
           Saltar al contenido principal
         </a>
-        <CadoProvider>
-          <SiteShell>{children}</SiteShell>
-        </CadoProvider>
+        <SiteShell footer={<Footer />}><CadoBoundary>{children}</CadoBoundary></SiteShell>
       </body>
     </html>
   );

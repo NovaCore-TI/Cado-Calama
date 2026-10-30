@@ -1,0 +1,83 @@
+[
+  {
+    "route": "/",
+    "status": 200,
+    "cache": "s-maxage=31536000"
+  },
+  {
+    "route": "/admin",
+    "status": 307,
+    "cache": null
+  },
+  {
+    "route": "/admin/login",
+    "status": 200,
+    "cache": "s-maxage=31536000"
+  },
+  {
+    "route": "/api/health",
+    "status": 200,
+    "cache": "no-store",
+    "ok": true
+  },
+  {
+    "route": "/api/orientaciones",
+    "status": 401,
+    "cache": "no-store",
+    "ok": false
+  },
+  {
+    "route": "/api/cuestionario",
+    "status": 401,
+    "cache": "no-store",
+    "ok": false
+  },
+  {
+    "route": "/api/pacientes",
+    "status": 401,
+    "cache": "no-store",
+    "ok": false
+  },
+  {
+    "route": "/api/recursos",
+    "status": 200,
+    "cache": "no-store",
+    "ok": true,
+    "count": 0
+  },
+  {
+    "route": "/api/recursos?admin=1",
+    "status": 401,
+    "cache": "no-store",
+    "ok": false
+  },
+  {
+    "route": "/api/recursos/download?id=__proto__",
+    "status": 404,
+    "cache": "no-store",
+    "ok": false
+  },
+  {
+    "route": "/api/recursos/download?id=constructor",
+    "status": 404,
+    "cache": "no-store",
+    "ok": false
+  },
+  {
+    "route": "/api/recursos/download?id=guia-post-exodoncia",
+    "status": 404,
+    "cache": "no-store",
+    "ok": false
+  },
+  {
+    "route": "/guias/CADO_Guia_Cuidados_Post_Exodoncia.pdf",
+    "status": 404,
+    "cache": "private, no-cache, no-store, max-age=0, must-revalidate"
+  },
+  {
+    "route": "/api/internal/calendar-sync",
+    "status": 401,
+    "cache": "no-store",
+    "ok": false
+  }
+]
