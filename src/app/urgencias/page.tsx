@@ -40,7 +40,8 @@ const emergencyProtocols = [
     steps: [
       'Toma el diente únicamente por la corona (la parte blanca), nunca toques la raíz.',
       'Si está sucio, enjuágalo brevemente con leche o suero fisiológico (sin frotar).',
-      'Intenta reposicionarlo en el alveolo suavemente si es posible, o guárdalo en un vaso con leche entera o saliva propia.',
+      'Si es un diente definitivo, puedes intentar recolocarlo suavemente sin forzarlo; si no es posible, consérvalo en leche o saliva en un recipiente.',
+      'Si es un diente de leche, no intentes recolocarlo: podrías dañar el diente definitivo que se está formando.',
       'Acude de inmediato a consulta odontológica urgente.',
     ],
     tag: 'Crítico (< 60 min)',
@@ -150,6 +151,7 @@ export default function UrgenciasPage() {
                       </li>
                     ))}
                   </ul>
+                  {item.title.includes('Avulsión') && <p className="mt-4 text-xs"><a href="https://www.nhs.uk/conditions/knocked-out-tooth/" target="_blank" rel="noopener noreferrer" className="underline">Referencia de primeros auxilios: NHS (en inglés)</a></p>}
                 </div>
               </div>
             );

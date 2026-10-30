@@ -18,6 +18,7 @@ async function synchronize(request: NextRequest, cronOnly = false) {
       .from("orientaciones_citas")
       .select("id")
       .eq("estado_sync", "Pendiente_Reintento")
+      .or("sync_lock_until.is.null,sync_lock_until.lt." + new Date().toISOString())
       .order("updated_at")
       .limit(10);
     if (doctor) query = query.eq("doctor_id", doctor.id);

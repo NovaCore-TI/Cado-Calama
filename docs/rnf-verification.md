@@ -1,0 +1,107 @@
+# RNF de CADO: verificación durante el desarrollo
+
+Referencia: documentación de CADO-7 en Jira. Corte de revisión: 30/10/2026.
+Sprint 5 conserva la validación final. Una implementación o prueba técnica no
+sustituye aceptación con usuarios ni certifica automáticamente todo el requisito.
+
+| RNF | Evidencia técnica disponible | Validación restante |
+|---|---|---|
+| 01 · LCP ≤ 2,5 s en 3/5 | Inicio publicado: 1,304; 1,111; 1,175; 1,026; 1,117 s. Cinco mediciones Lighthouse móvil con throttling simulado. | Repetir si cambia el contenido, las fuentes o el despliegue. |
+| 02 · CLS ≤ 0,1 | Publicado: Inicio 0–0,038; Cuestionario 0,041; Reserva 0,005 en cargas medidas. | Verificar también interacciones y estados dinámicos. |
+| 03 · 20 intentos concurrentes | Ensayo HTTP/SQL con 20 sesiones PostgreSQL observadas simultáneamente: 1 reserva y 19 conflictos; sin paciente adicional. Repetido incluyendo la nueva migración. | Mantener CI y repetir ante cambios transaccionales. |
+| 04 · 5 intentos / 15 minutos | `login_limits.test.mjs`: contador persistente, bloqueo, reinicio y rechazo antes de contactar Auth. | Ensayo de acceso en hosting con cuenta de prueba. |
+| 05 · 30 min de inactividad | Cookie HttpOnly/Secure/SameSite, expiración firmada, rechazo de cookie falsa/expirada y cierre: `rf17_rf18_auth.test.mjs`. Temporizador de interacción en el proveedor. | Prueba prolongada y de múltiples pestañas con sesión real. |
+| 06 · 401/403 en privados | APIs publicadas sin sesión: 401. Ajuste de proxy y `private_page_status.test.mjs` para que /admin también rechace con 401/403 y ofrezca un enlace al formulario de acceso. Los fallos del servicio conservan 503. | Verificar el ajuste tras desplegar. |
+| 07 · HTTPS / TLS | Publicado: HTTP 308 hacia HTTPS; TLS 1.3; HSTS `max-age=63072000; includeSubDomains; preload`. | Vigilar dominio y servicios externos al cambiar configuración. |
+| 08 · Sin secretos expuestos | Sin coincidencias de secretos privados conocidos ni firmas de claves privadas en archivos rastreados y 9 paquetes JS públicos revisados. Variables privadas fuera del cliente. | Mantener escaneo; esto no es una garantía frente a cualquier patrón desconocido ni una auditoría exhaustiva del historial Git. |
+| 09 · Contraste AA | Lighthouse accesibilidad 100 en Inicio, Cuestionario y Reserva publicados. | Completar contraste de todos los estados del panel y controles interactivos. Lighthouse 100 no certifica WCAG completa. |
+| 10 · Texto/zoom 200 % | Detectado desbordamiento al emular reflujo de 360 a 180 CSS px. Corrección conserva tipografía y permite ajuste de texto, flex/grid y fieldset. | Validar también panel autenticado y zoom nativo en distintos navegadores. |
+| 11 · Teclado | Primer Tab alcanza «Saltar al contenido principal» con contorno visible. Tests y componente Modal cubren foco. Etiqueta accesible añadida al motivo de consulta en Reserva. | Recorrido completo de todos los pasos, modales y panel con teclado y lector de pantalla. |
+| 12 · 360/768/1024/1440 | Diez páginas públicas: sin desbordamiento horizontal en los cuatro anchos (40 casos). | Panel autenticado y estados completos de formularios. |
+| 13 · Cuestionario: 8/10 en ≤3 min | Implementación y validaciones presentes. | Ensayo con 10 personas reales; pendiente para validación, confirmado por el equipo. |
+| 14 · Reserva: 8/10 en ≤5 min | Implementación y validaciones presentes. | Ensayo con 10 personas reales; pendiente para validación. |
+| 15 · Sin RUT; ≤4 datos identificatorios | `rf12_formulario_minimizado.test.mjs`: rechazo de RUT y falta de consentimiento antes de persistir. | Mantener revisión del formulario ante cambios. |
+| 16 · Críticos 100 %; global ≥90 % | 87/87 pruebas de la suite aprobadas; 27/27 del comando específico de Sprint 1 y 29/29 de Sprint 2; ensayo concurrente separado aprobado; lint, TypeScript y build aprobados. | El porcentaje corresponde a la suite existente, no a cobertura total de código ni a todos los casos humanos de aceptación. |
+| 17 · Calendar/Meet en ≥19/20 | Ensayo autorizado contra Google real: 20/20 reservas sincronizadas con evento y enlace Meet. Prueba adicional con destinatario independiente: evento y Meet verificados, recepción de invitación confirmada por el usuario. Limpieza comprobada; sin citas, pacientes o bloques de prueba restantes. | Se ejercitó el código de integración local contra servicios reales, sin certificar la ejecución periódica del scheduler del hosting. |
+
+## Correcciones y despliegue
+
+- El lote de agenda espera confirmaciones y reporta resultados reales; excluye
+  horarios pasados, domingos, fechas bloqueadas y citas ya ocupadas.
+- La lectura clínica recorre páginas de 200 registros y nunca devuelve una lista
+  truncada como si estuviera completa; conserva RLS por profesional. Existe un
+  límite explícito de 20.000 registros que falla de forma visible: una futura
+  interfaz de historial masivo deberá incorporar filtrado/paginación de pantalla.
+- Las migraciones `20261030173551_paginate_clinical_records.sql` y
+  `20261030173623_fix_blog_publication_date.sql` coinciden con el historial ya
+  registrado en Supabase. La función anterior sigue disponible para compatibilidad.
+- Los cambios de cliente, proxy y CSS deben publicarse para que sustituyan el
+  comportamiento del despliegue anterior.
+
+## Revisión de subtareas arrastradas de Sprint 1
+
+Validación técnica completada el 30/10/2026 sobre `test`. La reasociación en Jira
+solicitada por el equipo conserva la fecha real de la revisión; no acredita una
+finalización anterior al cierre del Sprint 1 ni sustituye la QA integral de Sprint 5.
+
+| Subtarea | Verificación y corrección |
+|---|---|
+| CADO-37 · Perfil | Datos de identidad y ubicación definidos en Jira, experiencia visible al desplazarse, enlaces de teléfono, WhatsApp y navegación. No se enviaron mensajes ni efectuaron llamadas. |
+| CADO-38 · Blog frontend | Carga, búsqueda, categorías, ocultación de borradores, estado vacío, error y recuperación. La carga del blog es independiente de fallos de agenda. |
+| CADO-39 · Blog backend | Pruebas existentes de autoría, RLS, contenido seguro y fecha de publicación; lectura individual limitada a artículos publicados. |
+| CADO-40 · Blog QA | Lectura individual con formato, metadatos de publicación, artículo ausente, filtros y recuperación; `article_page.test.mjs` y `blog_loading.test.mjs`. |
+| CADO-43 · FAQ | Catálogo completo cargado una vez, filtro inmediato sin depender de nuevas solicitudes, búsqueda sin tildes, categorías, acordeón por teclado y conteo filtrado correcto; `faq_search.test.mjs`. |
+| CADO-49 · Urgencias | Enlaces de llamada y WhatsApp, dirección y aviso hospitalario; se aclara que un diente de leche no debe reimplantarse. Fuente: [NHS](https://www.nhs.uk/conditions/knocked-out-tooth/). La revisión funcional no certifica la aprobación clínica de todos los textos. |
+| CADO-52 · Cuestionario | Seis pasos, progreso, omisión de respuestas sensibles, consentimiento desmarcado, error de guardado y reintento. Identificadores de percepción unificados para no cambiar el significado entre recorridos. |
+| CADO-55 · Confort | Música/silencio, pausas, acompañante, señal y explicación conservados en la reserva. Casillas que no encogen e indicador de foco en la elección de sonido. |
+| CADO-58 · Validación/privacidad | Sin acceso público a respuestas; sin diagnósticos/presupuestos automáticos; los errores conservan el formulario. Preferencias pendientes en memoria antes de la reserva consentida. |
+| CADO-61 · Consentimiento | Rutas reales y seis migraciones en PGlite: rechazo sin consentimiento, cookie HttpOnly/SameSite, rechazo de recorrido ajeno/vencido, vinculación con paciente y consumo único del cuestionario; `questionnaire_consent.test.mjs`. |
+
+Navegador local con respuestas API simuladas: 65 comprobaciones de estados y
+reflujo en 180/360/768/1024/1440 px, sin desbordamiento horizontal. El ancho 180
+ejercita reflujo estrecho; no es una certificación de zoom nativo. Las pruebas SQL
+de consentimiento ejecutan las funciones reales y adaptan únicamente el transporte.
+No se alteraron las migraciones ni se escribieron datos de prueba en producción.
+
+## Sprint 2: reserva y reintentos de Google
+
+- `calendar_recovery.test.mjs` verifica la reutilización del evento tras un 409,
+  la actualización del horario cuando Meet aún está pendiente y la renovación de
+  una solicitud de conferencia fallida. Una conferencia pendiente no se recrea.
+- El procesador no declara sincronizada una cita programada sin evento y enlace.
+  El selector de lotes excluye leases activos; mantiene el control por profesional.
+- Una excepción del proveedor conserva el trabajo pendiente, cuenta el intento y
+  libera el lease. La auditoría registra estado, número de intento y motivo fijo;
+  no copia mensajes del proveedor que puedan contener datos privados. Un fallo
+  de auditoría no impide el reintento. Las llamadas de Calendar tienen timeout de 15 s.
+- `booking_lifecycle.test.mjs` ejecuta las rutas de disponibilidad y reservas contra
+  las seis migraciones en PGlite, adaptando solo el transporte PostgREST. Comprueba
+  colisiones, token incorrecto, reprogramación sin perder la cita ante conflicto,
+  conservación de preferencias, cancelación y reutilización del cupo liberado.
+- Concurrencia repetida en PostgreSQL nativo: 20 sesiones observadas solapadas,
+  una respuesta 201 y 19 respuestas 409; una cita activa y un paciente, en 244 ms.
+- Ensayo real de recuperación: una excepción inyectada dejó la reserva pendiente
+  con contador y auditoría; el handler de scheduler autenticado recuperó el evento
+  y Meet. Su selección se limitó en el arnés a esa única cita de prueba. El usuario
+  confirmó la recepción en el destinatario independiente autorizado para una ocasión.
+  Se eliminaron el evento y los datos de prueba, sin solicitar otra notificación.
+- `booking_confirmation.test.mjs` comprueba que una sincronización pendiente no
+  se presente como videollamada lista ni produzca un calendario confirmado.
+- Reserva y autogestión consultan el estado durante un minuto y permiten volver a
+  consultarlo. El paciente conserva el enlace privado sin tener que volver a reservar.
+- Prueba de navegador local con API simulada: 30 comprobaciones de los estados
+  pendiente/listo, reprogramación y cancelación en 180, 360, 768, 1024 y 1440 px;
+  sin desbordamiento horizontal. No sustituye el ensayo real de Google.
+- Pendiente operativo: el workflow `calendar-retry.yml` requiere las variables
+  `CADO_ENABLE_CALENDAR_CRON=true`, `CADO_APP_URL` (origen HTTPS sin rutas) y el
+  secreto `CRON_SECRET`, con el mismo valor en el entorno de la aplicación.
+  La revisión de GitHub no encontró estas variables ni este secreto configurados.
+  Vercel sí dispone de una variable `CRON_SECRET`: no se modificó su valor.
+  Tras desplegar, validar el scheduler con citas de prueba antes de aceptar RF-16.
+  GitHub ejecuta los eventos programados desde la rama predeterminada; activar la
+  versión de `test` exige un paso de publicación autorizado por el equipo. Véase
+  [documentación de schedule](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+
+Comandos de desarrollo: `npm run test:sprint1`, `npm run test:sprint2`, `npm test`, `npm run lint`, `npm run typecheck`,
+`npm run build` y `npm run test:concurrency` con una base PostgreSQL local vacía.
+Los informes completos y los datos privados de fixtures permanecen fuera de Git.

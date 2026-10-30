@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { google } from "googleapis";
+import { google, type calendar_v3 } from "googleapis";
 import { getServerDatabase } from "@/lib/server-db";
 import {
   getDoctorGoogleCredentials,
@@ -12,6 +12,7 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || "";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const REDIRECT_URI = `${APP_URL}/api/auth/google/callback`;
+const CALENDAR_TIMEOUT_MS = 15_000;
 
 export function getOAuth2Client(customRedirectUri?: string) {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
@@ -90,6 +91,22 @@ function formatChileDateTime(fecha: string, hora: string) {
   const endIso = `${fecha}T${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}:00`;
 
   return { startIso, endIso, cleanHour };
+}
+
+function eventMeetLink(event: calendar_v3.Schema$Event) {
+  return event.hangoutLink || event.conferenceData?.entryPoints?.find(
+    (entry) => entry.entryPointType === "video",
+  )?.uri || "";
+}
+
+function matchesChileTime(value: string | null | undefined, localTime: string) {
+  if (!value || !Number.isFinite(Date.parse(value))) return false;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Santiago", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date(value));
+  const part = (type: string) => parts.find((item) => item.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}:00` === localTime;
 }
 
 // 3. Crear evento en Google Calendar y sala Google Meet con el doctor asignado (RF-13 & RF-16)
@@ -199,22 +216,39 @@ export async function createGoogleAppointmentEvent(params: {
                 ],
               },
             },
-          })
+          }, { timeout: CALENDAR_TIMEOUT_MS })
           .catch(async (error: { code?: number }) => {
-            if (error.code !== 409) throw error;
-            return calendar.events.get({
+            if (Number(error.code) !== 409) throw error;
+            const existing = await calendar.events.get({
               calendarId: "primary",
               eventId: googleEventId(codigo),
-            });
+            }, { timeout: CALENDAR_TIMEOUT_MS });
+            if (existing.data.status === "cancelled")
+              throw new Error("El evento de Google fue cancelado; requiere revisión profesional.");
+            const request = existing.data.conferenceData?.createRequest;
+            // A pending conference must finish before issuing another request.
+            const renewConference = !eventMeetLink(existing.data) && request?.status?.statusCode !== "pending";
+            const wrongTime = !matchesChileTime(existing.data.start?.dateTime, startIso) ||
+              !matchesChileTime(existing.data.end?.dateTime, endIso);
+            if (!wrongTime && !renewConference) return existing;
+            return calendar.events.patch({
+              calendarId: "primary",
+              eventId: googleEventId(codigo),
+              conferenceDataVersion: 1,
+              sendUpdates: "all",
+              requestBody: {
+                start: { dateTime: startIso, timeZone: "America/Santiago" },
+                end: { dateTime: endIso, timeZone: "America/Santiago" },
+                ...(renewConference ? { conferenceData: { createRequest: {
+                  requestId: googleEventId(`${codigo}:${request?.requestId || ""}:retry`),
+                  conferenceSolutionKey: { type: "hangoutsMeet" },
+                } } } : {}),
+              },
+            }, { timeout: CALENDAR_TIMEOUT_MS });
           });
 
         const createdEvent = calendarResponse.data;
-        const officialMeetLink =
-          createdEvent.hangoutLink ||
-          createdEvent.conferenceData?.entryPoints?.find(
-            (e) => e.entryPointType === "video",
-          )?.uri ||
-          defaultMeetLink;
+        const officialMeetLink = eventMeetLink(createdEvent);
 
         return {
           ok: true,
@@ -222,7 +256,7 @@ export async function createGoogleAppointmentEvent(params: {
           eventId: createdEvent.id || null,
           meetLink: officialMeetLink,
           doctorName,
-          status: officialMeetLink ? "Sincronizado" : "Pendiente_Reintento",
+          status: createdEvent.id && officialMeetLink ? "Sincronizado" : "Pendiente_Reintento",
         };
       }
     } catch (apiError: unknown) {
@@ -292,17 +326,22 @@ export async function rescheduleGoogleAppointmentEvent(params: {
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
     const { startIso, endIso } = formatChileDateTime(nuevaFecha, nuevaHora);
 
-    await calendar.events.patch({
+    const response = await calendar.events.patch({
       calendarId: "primary",
       eventId,
+      conferenceDataVersion: 1,
       sendUpdates: "all",
       requestBody: {
         start: { dateTime: startIso, timeZone: "America/Santiago" },
         end: { dateTime: endIso, timeZone: "America/Santiago" },
       },
-    });
+    }, { timeout: CALENDAR_TIMEOUT_MS });
 
-    return { ok: true };
+    const meetLink = eventMeetLink(response.data);
+    return {
+      ok: true, eventId: response.data.id || eventId, meetLink,
+      status: meetLink && response.data.status !== "cancelled" ? "Sincronizado" : "Pendiente_Reintento",
+    };
   } catch (err) {
     console.warn("[rescheduleGoogleAppointmentEvent] Error:", err);
     return { ok: false, error: String(err) };
@@ -337,7 +376,7 @@ export async function cancelGoogleAppointmentEvent(params: {
       calendarId: "primary",
       eventId,
       sendUpdates: "all", // Notifica la cancelación a paciente y doctor
-    });
+    }, { timeout: CALENDAR_TIMEOUT_MS });
 
     return { ok: true };
   } catch (err) {

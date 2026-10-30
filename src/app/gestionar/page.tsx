@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DentalinkLink } from "@/components/DentalinkLink";
+import { isVideoReady } from "@/lib/appointment-sync-status";
 interface Appointment {
   codigo: string;
   nombre_paciente: string;
@@ -10,6 +11,7 @@ interface Appointment {
   estado_atencion: string;
   estado_derivacion?: string;
   meet_link: string;
+  estado_sync: string;
 }
 interface Slot {
   fecha: string;
@@ -55,6 +57,38 @@ export default function ManageAppointment() {
       active = false;
     };
   }, [token]);
+  useEffect(() => {
+    if (!appointment || appointment.estado_sync !== "Pendiente_Reintento") return;
+    const controller = new AbortController();
+    const deadline = Date.now() + 60_000;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const response = await fetch("/api/orientaciones", {
+          headers: { "x-management-token": token }, cache: "no-store", signal: controller.signal,
+        });
+        const result = await response.json();
+        if (!controller.signal.aborted && response.ok && result.data) {
+          setAppointment(result.data);
+          if (result.data.estado_sync === "Sincronizado") return;
+        }
+      } catch { /* A provider delay must not discard the saved appointment. */ }
+      if (!controller.signal.aborted && Date.now() < deadline) timer = setTimeout(poll, 2000);
+    }
+    timer = setTimeout(poll, 2000);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [appointment?.codigo, appointment?.estado_sync, token]);
+
+  async function refreshStatus() {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/orientaciones", { headers: { "x-management-token": token }, cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || !result.data) throw Error("No se pudo consultar el estado. Tus cambios guardados se conservan.");
+      setAppointment(result.data);
+    } catch (error) { setError(error instanceof Error ? error.message : "No se pudo consultar el estado."); }
+    finally { setBusy(false); }
+  }
   async function loadSlots() {
     setError("");
     try {
@@ -97,7 +131,7 @@ export default function ManageAppointment() {
       setMessage(
         action === "cancelar"
           ? "Tu orientación fue cancelada."
-          : "Tu orientación fue reprogramada.",
+          : "El nuevo horario está guardado. Revisa abajo el estado de la actualización en Google.",
       );
     } catch (e) {
       setError(
@@ -156,9 +190,17 @@ export default function ManageAppointment() {
             {appointment.estado_atencion}
           </p>
           {(appointment.estado_derivacion === "Derivada a Dentalink" || appointment.estado_atencion === "Derivada a Dentalink") && <DentalinkLink />}
+          {appointment.estado_sync === "Pendiente_Reintento" && (
+            <div className="space-y-3 rounded-xl border p-4">
+              <p role="status">{appointment.estado_atencion === "Cancelada"
+                ? "La cancelación está guardada y el cupo liberado. El aviso y la cancelación en Google siguen pendientes."
+                : "Tu horario está guardado. La videollamada y la actualización de la invitación de Google siguen pendientes. No necesitas volver a reservar."}</p>
+              <button type="button" disabled={busy} onClick={() => void refreshStatus()} className="btn-cado-secondary rounded-xl p-3">Consultar estado de Google</button>
+            </div>
+          )}
           {appointment.estado_atencion === "Programada" && (
             <>
-              {appointment.meet_link && (
+              {isVideoReady(appointment.estado_sync, appointment.meet_link) && (
                 <a
                   href={appointment.meet_link}
                   target="_blank"
@@ -170,6 +212,7 @@ export default function ManageAppointment() {
               )}
               <div className="flex flex-wrap gap-4">
                 <button
+                  disabled={!isVideoReady(appointment.estado_sync, appointment.meet_link)}
                   onClick={() => void download()}
                   className="btn-cado-secondary rounded-xl p-3"
                 >
