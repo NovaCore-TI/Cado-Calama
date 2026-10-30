@@ -21,7 +21,7 @@ sustituye aceptación con usuarios ni certifica automáticamente todo el requisi
 | 13 · Cuestionario: 8/10 en ≤3 min | Implementación y validaciones presentes. | Ensayo con 10 personas reales; pendiente para validación, confirmado por el equipo. |
 | 14 · Reserva: 8/10 en ≤5 min | Implementación y validaciones presentes. | Ensayo con 10 personas reales; pendiente para validación. |
 | 15 · Sin RUT; ≤4 datos identificatorios | `rf12_formulario_minimizado.test.mjs`: rechazo de RUT y falta de consentimiento antes de persistir. | Mantener revisión del formulario ante cambios. |
-| 16 · Críticos 100 %; global ≥90 % | 82/82 pruebas de la suite aprobadas; 29/29 del comando específico de Sprint 2; ensayo concurrente separado aprobado; lint, TypeScript y build aprobados. | El porcentaje corresponde a la suite existente, no a cobertura total de código ni a todos los casos humanos de aceptación. |
+| 16 · Críticos 100 %; global ≥90 % | 87/87 pruebas de la suite aprobadas; 27/27 del comando específico de Sprint 1 y 29/29 de Sprint 2; ensayo concurrente separado aprobado; lint, TypeScript y build aprobados. | El porcentaje corresponde a la suite existente, no a cobertura total de código ni a todos los casos humanos de aceptación. |
 | 17 · Calendar/Meet en ≥19/20 | Ensayo autorizado contra Google real: 20/20 reservas sincronizadas con evento y enlace Meet. Prueba adicional con destinatario independiente: evento y Meet verificados, recepción de invitación confirmada por el usuario. Limpieza comprobada; sin citas, pacientes o bloques de prueba restantes. | Se ejercitó el código de integración local contra servicios reales, sin certificar la ejecución periódica del scheduler del hosting. |
 
 ## Correcciones y despliegue
@@ -37,6 +37,31 @@ sustituye aceptación con usuarios ni certifica automáticamente todo el requisi
   registrado en Supabase. La función anterior sigue disponible para compatibilidad.
 - Los cambios de cliente, proxy y CSS deben publicarse para que sustituyan el
   comportamiento del despliegue anterior.
+
+## Revisión de subtareas arrastradas de Sprint 1
+
+Validación técnica completada el 30/10/2026 sobre `test`. La reasociación en Jira
+solicitada por el equipo conserva la fecha real de la revisión; no acredita una
+finalización anterior al cierre del Sprint 1 ni sustituye la QA integral de Sprint 5.
+
+| Subtarea | Verificación y corrección |
+|---|---|
+| CADO-37 · Perfil | Datos de identidad y ubicación definidos en Jira, experiencia visible al desplazarse, enlaces de teléfono, WhatsApp y navegación. No se enviaron mensajes ni efectuaron llamadas. |
+| CADO-38 · Blog frontend | Carga, búsqueda, categorías, ocultación de borradores, estado vacío, error y recuperación. La carga del blog es independiente de fallos de agenda. |
+| CADO-39 · Blog backend | Pruebas existentes de autoría, RLS, contenido seguro y fecha de publicación; lectura individual limitada a artículos publicados. |
+| CADO-40 · Blog QA | Lectura individual con formato, metadatos de publicación, artículo ausente, filtros y recuperación; `article_page.test.mjs` y `blog_loading.test.mjs`. |
+| CADO-43 · FAQ | Catálogo completo cargado una vez, filtro inmediato sin depender de nuevas solicitudes, búsqueda sin tildes, categorías, acordeón por teclado y conteo filtrado correcto; `faq_search.test.mjs`. |
+| CADO-49 · Urgencias | Enlaces de llamada y WhatsApp, dirección y aviso hospitalario; se aclara que un diente de leche no debe reimplantarse. Fuente: [NHS](https://www.nhs.uk/conditions/knocked-out-tooth/). La revisión funcional no certifica la aprobación clínica de todos los textos. |
+| CADO-52 · Cuestionario | Seis pasos, progreso, omisión de respuestas sensibles, consentimiento desmarcado, error de guardado y reintento. Identificadores de percepción unificados para no cambiar el significado entre recorridos. |
+| CADO-55 · Confort | Música/silencio, pausas, acompañante, señal y explicación conservados en la reserva. Casillas que no encogen e indicador de foco en la elección de sonido. |
+| CADO-58 · Validación/privacidad | Sin acceso público a respuestas; sin diagnósticos/presupuestos automáticos; los errores conservan el formulario. Preferencias pendientes en memoria antes de la reserva consentida. |
+| CADO-61 · Consentimiento | Rutas reales y seis migraciones en PGlite: rechazo sin consentimiento, cookie HttpOnly/SameSite, rechazo de recorrido ajeno/vencido, vinculación con paciente y consumo único del cuestionario; `questionnaire_consent.test.mjs`. |
+
+Navegador local con respuestas API simuladas: 65 comprobaciones de estados y
+reflujo en 180/360/768/1024/1440 px, sin desbordamiento horizontal. El ancho 180
+ejercita reflujo estrecho; no es una certificación de zoom nativo. Las pruebas SQL
+de consentimiento ejecutan las funciones reales y adaptan únicamente el transporte.
+No se alteraron las migraciones ni se escribieron datos de prueba en producción.
 
 ## Sprint 2: reserva y reintentos de Google
 
@@ -77,6 +102,6 @@ sustituye aceptación con usuarios ni certifica automáticamente todo el requisi
   versión de `test` exige un paso de publicación autorizado por el equipo. Véase
   [documentación de schedule](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
 
-Comandos de desarrollo: `npm run test:sprint2`, `npm test`, `npm run lint`, `npm run typecheck`,
+Comandos de desarrollo: `npm run test:sprint1`, `npm run test:sprint2`, `npm test`, `npm run lint`, `npm run typecheck`,
 `npm run build` y `npm run test:concurrency` con una base PostgreSQL local vacía.
 Los informes completos y los datos privados de fixtures permanecen fuera de Git.
