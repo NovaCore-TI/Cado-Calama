@@ -140,6 +140,7 @@ export interface CadoContextType {
 
   // Blog Posts
   blogPosts: BlogPost[];
+  blogLoadState: "loading" | "ready" | "error";
   doctorBlogPosts: BlogPost[];
   addBlogPost: (post: Omit<BlogPost, "id" | "date">) => Promise<boolean>;
   updateBlogPost: (id: string, post: Partial<BlogPost>) => Promise<boolean>;
@@ -219,6 +220,7 @@ async function api(url: string, init?: RequestInit) {
 export function CadoProvider({ children }: { children: React.ReactNode }) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [blogLoadState, setBlogLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [doctorBlogPosts, setDoctorBlogPosts] = useState<BlogPost[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
@@ -285,7 +287,8 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     const isAuth = authorized.current;
     const current = () => version === privateVersion.current;
     const started = performance.now();
-    const publicTask = Promise.all([
+    setBlogLoadState(previous => previous === "ready" ? "ready" : "loading");
+    const publicTask = Promise.allSettled([
       api("/api/blog"),
       api(isAuth ? "/api/bloques?admin=1" : "/api/bloques"),
     ]);
@@ -303,11 +306,12 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         ])
       : null;
     try {
-      const [result, blocks] = await publicTask;
+      const [articles, availability] = await publicTask;
       if (!current()) return;
-      setSupabaseStatus({ connected: true, tablesReady: true, latencyMs: Math.round(performance.now() - started), message: "Contenido disponible." });
-      setBlogPosts(
-        result.data.map((r: Record<string, unknown>) => ({
+      const complete = articles.status === "fulfilled" && availability.status === "fulfilled";
+      setSupabaseStatus({ connected: complete, tablesReady: complete, latencyMs: Math.round(performance.now() - started), message: complete ? "Contenido disponible." : "No se pudieron actualizar todos los datos." });
+      if (articles.status === "fulfilled") {
+        setBlogPosts(articles.value.data.map((r: Record<string, unknown>) => ({
           id: String(r.id),
           title: String(r.titulo),
           slug: String(r.slug),
@@ -318,15 +322,17 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
           readTime: String(r.tiempo_lectura || ""),
           date: String(r.published_at || ""),
           published: Boolean(r.publicado),
-        })),
-      );
-      if (authorized.current && blocks.blockedDates)
-        setBlockedDates(blocks.blockedDates);
-      setAvailableSlots(
-        blocks.slots.map((r: { slotKey: string }) => r.slotKey),
-      );
+        })));
+        setBlogLoadState("ready");
+      } else setBlogLoadState("error");
+      if (availability.status === "fulfilled") {
+        const blocks = availability.value;
+        if (authorized.current && blocks.blockedDates) setBlockedDates(blocks.blockedDates);
+        setAvailableSlots(blocks.slots.map((r: { slotKey: string }) => r.slotKey));
+      } else setAvailableSlots([]);
     } catch {
       if (!current()) return;
+      setBlogLoadState("error");
       setAvailableSlots([]);
       setSupabaseStatus({ connected: false, tablesReady: false, latencyMs: Math.round(performance.now() - started), message: "No se pudieron cargar los datos." });
     }
@@ -794,6 +800,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         addBlockedDate,
         removeBlockedDate,
         blogPosts,
+        blogLoadState,
         doctorBlogPosts,
         addBlogPost,
         updateBlogPost,
