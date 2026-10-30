@@ -22,7 +22,6 @@ export default function DoctorLogin() {
       const result = await loginDoctor(email, password);
       if (result.ok) {
         router.replace("/admin");
-        router.refresh();
       } else setError(result.error || "No se pudo iniciar sesión.");
     } finally {
       setPending(false);

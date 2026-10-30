@@ -67,7 +67,10 @@ export function checkSameOrigin(request: NextRequest) {
   if (request.headers.get("sec-fetch-site") === "cross-site")
     throw new AccessError(403, "Solicitud no permitida.");
 }
-export async function verifyDoctorToken(token?: string) {
+export async function verifyDoctorToken(
+  token?: string,
+  authenticatedUser?: { id: string } | null,
+) {
   if (!token) throw new AccessError(401, "Debes iniciar sesión.");
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
@@ -82,14 +85,18 @@ export async function verifyDoctorToken(token?: string) {
       detectSessionInUrl: false,
     },
   });
-  const { data: identity, error } = await db.auth.getUser(token);
-  if (error || !identity.user)
-    throw new AccessError(401, "Sesión inválida o caducada.");
+  let user = authenticatedUser || null;
+  if (!user) {
+    const { data: identity, error } = await db.auth.getUser(token);
+    if (error || !identity.user)
+      throw new AccessError(401, "Sesión inválida o caducada.");
+    user = identity.user;
+  }
   // Membership is provisioned by an administrator, never from user_metadata/email.
   const { data: doctor, error: membershipError } = await db
     .from("doctores")
     .select("id,nombre,email,rol,auth_user_id")
-    .eq("auth_user_id", identity.user.id)
+    .eq("auth_user_id", user.id)
     .eq("activo", true)
     .maybeSingle();
   if (membershipError)
@@ -99,7 +106,7 @@ export async function verifyDoctorToken(token?: string) {
       403,
       "Esta cuenta no tiene acceso profesional autorizado.",
     );
-  return { doctor, db, user: identity.user, token };
+  return { doctor, db, user, token };
 }
 export async function requireDoctor(request: NextRequest) {
   if (!["GET", "HEAD", "OPTIONS"].includes(request.method))
