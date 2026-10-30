@@ -1,6 +1,17 @@
 import "server-only";
 import PDFDocument from "pdfkit";
+import fs from "node:fs";
 import path from "node:path";
+
+const fontCache = new Map<string, Buffer>();
+function loadFont(name: string): Buffer {
+  let buf = fontCache.get(name);
+  if (!buf) {
+    buf = fs.readFileSync(path.join(process.cwd(), "public", "fonts", name));
+    fontCache.set(name, buf);
+  }
+  return buf;
+}
 
 export interface GuideSection { heading: string; points: string[] }
 export interface GuideDocument {
@@ -8,15 +19,16 @@ export interface GuideDocument {
   contenido: GuideSection[]; activo: boolean; revisado_en: string | null;
 }
 export async function generateGuidePdf(guide: GuideDocument): Promise<{ bytes: Buffer; pages: number }> {
-  const font = (name: string) => path.join(process.cwd(), "public", "fonts", name);
+  const regularFont = loadFont("Poppins-Regular.ttf");
+  const boldFont = loadFont("Poppins-SemiBold.ttf");
   const doc = new PDFDocument({ size: "A4", margin: 48, bufferPages: true,
-    font: font("Poppins-Regular.ttf"), tagged: true, lang: "es-CL", displayTitle: true,
+    font: regularFont as unknown as string, tagged: true, lang: "es-CL", displayTitle: true,
     info: { Title: guide.titulo, Author: "CADO Odontología", Subject: guide.categoria,
       CreationDate: new Date(guide.revisado_en || "2026-10-24T00:00:00Z"),
       ModDate: new Date(guide.revisado_en || "2026-10-24T00:00:00Z") },
   });
-  doc.registerFont("Body", font("Poppins-Regular.ttf"));
-  doc.registerFont("Heading", font("Poppins-SemiBold.ttf"));
+  doc.registerFont("Body", regularFont);
+  doc.registerFont("Heading", boldFont);
   const chunks: Buffer[] = [];
   const finished = new Promise<Buffer>((resolve, reject) => {
     doc.on("data", chunk => chunks.push(chunk));
