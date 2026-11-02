@@ -5,6 +5,7 @@ import { Modal } from "@/components/Modal";
 import dynamic from "next/dynamic";
 import { ArticleBody } from "@/components/ArticleBody";
 import { articlePlainText } from "@/lib/article-content";
+const TestimonialManager = dynamic(() => import("@/components/TestimonialManager"));
 const RichTextEditor = dynamic(() => import("@/components/RichTextEditor"), { ssr: false });
 
 import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
@@ -44,8 +45,9 @@ import {
   Zap,
 } from 'lucide-react';
 import { useCado, type Appointment, type BlogPost } from '@/context/CadoContext';
+import { useLiveUpdates } from '@/hooks/useLiveUpdates';
 
-type Section = 'resumen' | 'orientaciones' | 'disponibilidad' | 'derivaciones' | 'contenidos' | 'recursos' | 'integraciones';
+type Section = 'resumen' | 'orientaciones' | 'disponibilidad' | 'derivaciones' | 'contenidos' | 'recursos' | 'testimonios' | 'integraciones';
 
 const navigation = [
   { id: 'resumen', label: 'Resumen', icon: LayoutDashboard },
@@ -54,6 +56,7 @@ const navigation = [
   { id: 'derivaciones', label: 'Derivaciones', icon: ArrowRight },
   { id: 'contenidos', label: 'Contenidos Blog', icon: FileText },
   { id: 'recursos', label: 'Guías para pacientes', icon: FileText },
+  { id: 'testimonios', label: 'Testimonios', icon: MessageCircle },
   { id: 'integraciones', label: 'Integraciones', icon: Video },
 ] as const;
 
@@ -84,6 +87,7 @@ const sectionTitles: Record<Section, { eyebrow: string; title: string; descripti
     description: 'Redacta, edita y publica artículos orientados a resolver dudas sobre fobia dental, bruxismo y postoperatorio.',
   },
   recursos: { eyebrow: 'Biblioteca', title: 'Guías para pacientes', description: 'Revisa el documento completo antes de publicarlo. Puedes retirar una guía de la biblioteca pública en cualquier momento.' },
+  testimonios: { eyebrow: 'Experiencias reales', title: 'Testimonios de pacientes', description: 'Agrega capturas de reseñas de Google, revisa su vista previa y publícalas en la portada.' },
   integraciones: {
     eyebrow: 'Infraestructura',
     title: 'Estado de Integraciones Backend',
@@ -255,6 +259,8 @@ function DoctorDashboard() {
       }
     } catch {}
   };
+
+  useLiveUpdates({ scope: 'doctor', doctorId: doctorUser?.id, authUserId: doctorUser?.auth_user_id, resources: ['profile'] }, fetchGoogleDoctorStatus);
 
   useEffect(() => {
     setQuery('');
@@ -686,7 +692,7 @@ function DoctorDashboard() {
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                 </span>
                 <span>
-                  <strong>Sincronización en vivo:</strong> {lastRealtimeEvent}
+                  <strong>Última actualización:</strong> {new Date(lastRealtimeEvent).toLocaleTimeString('es-CL', { timeZone: 'America/Santiago', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
               </div>
               <span className="rounded-full bg-emerald-200/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800">
@@ -1451,7 +1457,7 @@ function DoctorDashboard() {
                     Seguimiento hacia consulta presencial
                   </h2>
                   <p className="mt-1 text-xs text-[#766C75]">
-                    Pacientes orientados virtualmente que cuentan con derivación hacia la agenda Dentalink o presencial en Vivar #1580, Calama.
+                    Pacientes orientados virtualmente que cuentan con derivación hacia la agenda Dentalink o presencial en Vivar #1500, Calama.
                   </p>
                 </div>
                 <DentalinkLink />
@@ -1495,6 +1501,7 @@ function DoctorDashboard() {
           {/* =============================================================== */}
           {/* SECCIÓN 5: GESTOR DE CONTENIDOS DEL BLOG                        */}
           {/* =============================================================== */}
+          {section === 'testimonios' && <TestimonialManager key={doctorUser?.id} />}
           {section === 'recursos' && <section className="clay-card rounded-3xl p-6 sm:p-8"><GuideLibrary admin /></section>}
           {section === 'contenidos' && (
             <div className="grid gap-8 xl:grid-cols-[1.3fr_1fr]">
