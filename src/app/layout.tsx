@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { SITE_URL } from '@/lib/site';
+import { SITE_URL, serializeStructuredData } from '@/lib/site';
+import { CLINIC } from '@/lib/clinic';
 import './globals.css';
 import { SiteShell } from '@/components/SiteShell';
 import { CadoBoundary } from '@/context/CadoBoundary';
@@ -8,11 +9,11 @@ import { Footer } from '@/components/Footer';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'CADO Odontología Calama | Dr. Javier Beiza — Atención cercana',
+    default: 'CADO | Centro Avanzado de Dolor Orofacial en Calama',
     template: '%s | CADO Odontología Calama',
   },
   description:
-    'Conoce CADO Odontología en Calama y el enfoque cercano del Dr. Javier Beiza. Información sobre servicios, cuidado oral y orientación inicial sin juicios. Vivar #1580 of. 203.',
+    'Centro Avanzado de Dolor Orofacial en Calama. Urgencias dentales, endodoncia, TTM y atención humana. Vivar #1500, Oficina 205, Edificio Espacio Parque.',
   keywords: [
     'Dentista Calama',
     'Clínica dental Calama',
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
     'Fobia dental Calama',
     'Dr. Javier Beiza',
     'Urgencias dentales Calama',
-    'Teleodontología Calama',
+    'Dolor orofacial Calama',
+    'Endodoncia Calama',
+    'Tratamiento de conducto Calama',
+    'TTM y bruxismo Calama',
     'Edificio Espacio Parque Calama',
     'Bruxismo turnos mineros Calama',
     'CADO Odontología',
@@ -36,15 +40,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'es_CL',
-    url: 'https://www.cadoodontologia.cl',
+    url: SITE_URL,
     siteName: 'CADO Odontología Calama',
-    title: 'CADO Odontología Calama | Atención cercana y sin juicios',
+    title: 'CADO | Centro Avanzado de Dolor Orofacial en Calama',
     description:
-      'Un primer contacto claro y respetuoso con CADO Odontología en Calama.',
+      'Atención del dolor orofacial, endodoncia, urgencias y TTM con un trato cercano y humano en Calama.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'CADO Odontología Calama | Dr. Javier Beiza',
+    title: 'CADO | Centro Avanzado de Dolor Orofacial en Calama',
     description:
       'Información y orientación inicial para cuidar tu salud oral a tu ritmo en Calama.',
   },
@@ -80,20 +84,26 @@ export default function RootLayout({
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': ['Dentist', 'MedicalClinic', 'LocalBusiness'],
-    name: 'CADO Odontología — Dr. Javier Beiza',
-    image: 'https://www.cadoodontologia.cl/brand/image2.png',
+    '@id': `${SITE_URL}/#clinica`,
+    name: 'CADO - Centro Avanzado de Dolor Orofacial',
+    alternateName: 'CADO Odontología',
+    sameAs: [CLINIC.mapsUrl],
+    hasMap: CLINIC.mapsUrl,
+    image: `${SITE_URL}/brand/clinica-cado-calama.webp`,
+    logo: `${SITE_URL}/brand/image2.png`,
     telephone: '+56944657815',
     email: 'javierbeizaayala@gmail.com',
-    url: 'https://www.cadoodontologia.cl',
+    url: SITE_URL,
     address: {
       '@type': 'PostalAddress',
-      streetAddress: 'Vivar #1580, Oficina 203, Edificio Espacio Parque',
+      streetAddress: 'Vivar #1500, Oficina 205, Edificio Espacio Parque',
       addressLocality: 'Calama',
       addressRegion: 'Antofagasta',
       postalCode: '1390000',
       addressCountry: 'CL',
     },
     medicalSpecialty: 'Dentistry',
+    contactPoint: CLINIC.phones.map(phone => ({ '@type': 'ContactPoint', telephone: `+${phone.number}`, contactType: 'Atención al paciente', availableLanguage: 'Spanish' })),
     founder: {
       '@type': 'Person',
       name: 'Dr. Javier Beiza Ayala',
@@ -104,7 +114,7 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="es">
+    <html lang="es" data-scroll-behavior="smooth">
       <head>
         <link rel="preload" href="/fonts/montserrat-normal-100-900.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -113,7 +123,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon.png" />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeStructuredData(jsonLd) }}
         />
       </head>
       <body className="min-h-screen flex flex-col bg-cado-light text-cado-text antialiased selection:bg-cado-purple/20 selection:text-cado-dark">

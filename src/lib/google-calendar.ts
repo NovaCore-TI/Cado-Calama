@@ -165,7 +165,7 @@ export async function createGoogleAppointmentEvent(params: {
                   : null,
                 ``,
                 `Enlace de autogestión/cancelación: ${APP_URL}/gestionar#token=${managementToken || ""}`,
-                `Vivar #1580 Of. 203, Calama`,
+                `Vivar #1500 Of. 205, Calama`,
               ]
                 .filter(Boolean)
                 .join("\n"),
@@ -392,7 +392,7 @@ export function generateDirectGoogleCalendarUrl(params: {
       `Sala Google Meet: ${meetLink}\n` +
       (comfortNotes ? `Preferencias de confort: ${comfortNotes}\n` : "") +
       `Gestión de cita: ${APP_URL}/gestionar\n\n` +
-      `Vivar #1580 Of. 203, Calama · Tel/WhatsApp: +56 9 4465 7815`,
+      `Vivar #1500 Of. 205, Calama · Tel/WhatsApp: +56 9 4465 7815`,
   );
   const location = encodeURIComponent(meetLink);
 

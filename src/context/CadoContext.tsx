@@ -1,4 +1,5 @@
 "use client";
+import { useLiveUpdates } from '@/hooks/useLiveUpdates';
 
 import React, {
   createContext,
@@ -243,10 +244,11 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     latencyMs: 0,
     message: "Comprobando conexión…",
   });
-  const [realtimeConnected, setRealtimeConnected] = useState(false);
-  const [lastRealtimeEvent] = useState<string | null>(null);
+  const [lastRealtimeEvent, setLastRealtimeEvent] = useState<string | null>(null);
   const authorized = useRef(false);
   const privateVersion = useRef(0);
+  const refreshSequence = useRef(0);
+  const availabilitySequence = useRef(0);
   const activeDoctor = useRef<string | null>(null);
   const activeAuthUser = useRef<string | null>(null);
   const clearPrivate = useCallback(() => {
@@ -263,7 +265,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     setDoctorUser(null);
     setIsDoctorLoggedIn(false);
     setAuthMethod(null);
-    setRealtimeConnected(false);
+    setLastRealtimeEvent(null);
     setPatientDraftInfo({ name: "", email: "", phone: "" });
     setActiveComfortProfile(defaultComfort);
   }, []);
@@ -282,8 +284,10 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
   );
   const refreshSupabaseData = useCallback(async () => {
     const version = privateVersion.current;
+    const request = ++refreshSequence.current;
+    const availabilityRequest = ++availabilitySequence.current;
     const isAuth = authorized.current;
-    const current = () => version === privateVersion.current;
+    const current = () => version === privateVersion.current && request === refreshSequence.current;
     const started = performance.now();
     const publicTask = Promise.all([
       api("/api/blog"),
@@ -320,14 +324,13 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
           published: Boolean(r.publicado),
         })),
       );
-      if (authorized.current && blocks.blockedDates)
-        setBlockedDates(blocks.blockedDates);
-      setAvailableSlots(
-        blocks.slots.map((r: { slotKey: string }) => r.slotKey),
-      );
+      if (availabilityRequest === availabilitySequence.current) {
+        if (authorized.current && blocks.blockedDates) setBlockedDates(blocks.blockedDates);
+        setAvailableSlots(blocks.slots.map((r: { slotKey: string }) => r.slotKey));
+      }
     } catch {
       if (!current()) return;
-      setAvailableSlots([]);
+      if (availabilityRequest === availabilitySequence.current) setAvailableSlots([]);
       setSupabaseStatus({ connected: false, tablesReady: false, latencyMs: Math.round(performance.now() - started), message: "No se pudieron cargar los datos." });
     }
     if (!privateTask || !authorized.current) {
@@ -415,6 +418,31 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         })),
       );
   }, [clearPrivate]);
+  const refreshAvailability = useCallback(async () => {
+    const version = privateVersion.current;
+    const request = ++availabilitySequence.current;
+    try {
+      const result = await api(authorized.current ? '/api/bloques?admin=1' : '/api/bloques');
+      if (version !== privateVersion.current || request !== availabilitySequence.current) return;
+      setAvailableSlots(result.slots.map((slot: { slotKey: string }) => slot.slotKey));
+      if (authorized.current) setBlockedDates(result.blockedDates || []);
+    } catch {
+      if (version === privateVersion.current && request === availabilitySequence.current) setAvailableSlots([]);
+    }
+  }, []);
+  const publicRealtime = useLiveUpdates({ resources: ['availability', 'blog'], pollMs: 15_000 }, async (resource, reason) => {
+    if (reason === 'change') setLastRealtimeEvent(new Date().toISOString());
+    if (resource === 'availability' || (reason === 'poll' && authorized.current)) await refreshAvailability();
+    else await refreshSupabaseData();
+  });
+  const privateRealtime = useLiveUpdates({
+    scope: 'doctor', doctorId: doctorUser?.id, authUserId: doctorUser?.auth_user_id,
+    resources: ['appointments', 'availability', 'blog', 'profile'], enabled: isDoctorLoggedIn,
+  }, async (_resource, reason) => {
+    if (reason === 'change') setLastRealtimeEvent(new Date().toISOString());
+    await refreshSupabaseData();
+  });
+  const realtimeConnected = publicRealtime && (!isDoctorLoggedIn || privateRealtime);
   useEffect(() => {
     for (const key of [
       "cado_demo_appointments_v3",
@@ -464,28 +492,6 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, [refreshSupabaseData, acceptDoctor]);
-  useEffect(() => {
-    const refresh = () => {
-      const version = privateVersion.current;
-      void api(authorized.current ? "/api/bloques?admin=1" : "/api/bloques")
-        .then((r) => {
-          if (version !== privateVersion.current) return;
-          setAvailableSlots(
-            r.slots.map((slot: { slotKey: string }) => slot.slotKey),
-          );
-          if (authorized.current) setBlockedDates(r.blockedDates || []);
-        })
-        .catch(() => {
-          if (version === privateVersion.current) setAvailableSlots([]);
-        });
-    };
-    const timer = setInterval(refresh, 15000);
-    window.addEventListener("focus", refresh);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-    };
-  }, []);
   const logoutDoctor = useCallback(async () => {
     clearPrivate();
     await Promise.allSettled([
@@ -554,13 +560,6 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       events.forEach((e) => window.removeEventListener(e, reset));
     };
   }, [isDoctorLoggedIn, logoutDoctor]);
-  useEffect(() => {
-    if (!isDoctorLoggedIn) return;
-    const timer = setInterval(() => {
-      void refreshSupabaseData().catch(() => {});
-    }, 30_000);
-    return () => clearInterval(timer);
-  }, [isDoctorLoggedIn, refreshSupabaseData]);
   const loginDoctor: CadoContextType["loginDoctor"] = async (email, pass) => {
     clearPrivate();
     try {

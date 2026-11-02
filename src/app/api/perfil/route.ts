@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const PERFIL_INSTITUCIONAL = {
-  clinica: "CADO Odontología",
+  clinica: "CADO · Centro Avanzado de Dolor Orofacial",
   doctor: {
     nombre: "Dr. Javier Beiza Ayala",
     especialidad:
@@ -10,17 +10,17 @@ const PERFIL_INSTITUCIONAL = {
     ciudad: "Calama, Región de Antofagasta, Chile",
   },
   ubicacion: {
-    direccion: "Vivar #1580, Oficina 203, Edificio Espacio Parque",
+    direccion: "Vivar #1500, Oficina 205, Edificio Espacio Parque",
     comuna: "Calama",
     referencia: "Sector céntrico, frente a Parque El Loa",
-    coordenadas: { lat: -22.4542, lng: -68.9293 },
+    googleMaps: "https://share.google/Af4IcUf6FfpfVmbTX",
   },
   canalesContacto: {
     telefono: "+56944657815",
     whatsappUrl: "https://wa.me/56944657815",
     email: "contacto@cado.cl",
     horarioPresencialReferencia:
-      "Bloques vespertinos 19:00 y 20:00 hrs previa coordinación",
+      "Consultas presenciales coordinadas y urgencias.",
   },
   serviciosAutorizados: [
     {
@@ -45,7 +45,7 @@ const PERFIL_INSTITUCIONAL = {
     },
     {
       id: "srv-ori",
-      nombre: "Orientación Telemática Inicial (15 min)",
+      nombre: "Sesión de Acercamiento Virtual (SAV, 15 min)",
       modalidad: "Videollamada Google Meet",
     },
   ],

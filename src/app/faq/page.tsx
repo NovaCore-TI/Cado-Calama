@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useLiveUpdates } from '@/hooks/useLiveUpdates';
 import { 
   Search, 
   X, 
@@ -36,6 +37,8 @@ export default function FaqPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('todas');
   const [openIds, setOpenIds] = useState<number[]>([1, 2]);
   const [backendFaqs, setBackendFaqs] = useState<FAQItem[]>(FAQS_DATA);
+  const [revision, setRevision] = useState(0);
+  useLiveUpdates({ resources: ['faq'], pollMs: 60_000 }, () => setRevision(value => value + 1));
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -46,14 +49,14 @@ export default function FaqPage() {
     fetch(`/api/faq?${params.toString()}`, { signal: controller.signal })
       .then((res) => res.json())
       .then((json) => {
-        if (json.ok && Array.isArray(json.data)) {
+        if (!controller.signal.aborted && json.ok && Array.isArray(json.data)) {
           setBackendFaqs(json.data);
         }
       })
       .catch(() => {});
 
     return () => controller.abort();
-  }, [searchTerm, selectedCategory]);
+  }, [searchTerm, selectedCategory, revision]);
 
   const toggleAccordion = (id: number) => {
     setOpenIds((prev) =>

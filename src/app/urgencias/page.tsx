@@ -187,7 +187,7 @@ export default function UrgenciasPage() {
                 CADO Odontología en Calama
               </strong>
               <p className="mt-0.5 text-xs text-[#665D66]">
-                Vivar #1580, Edificio Espacio Parque, oficina 203. Coordinación previa de box por llamada o WhatsApp.
+                Vivar #1500, Edificio Espacio Parque, oficina 205. Coordinación previa de box por llamada o WhatsApp.
               </p>
             </div>
           </div>

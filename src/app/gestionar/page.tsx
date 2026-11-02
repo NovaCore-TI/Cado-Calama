@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DentalinkLink } from "@/components/DentalinkLink";
+import { useLiveUpdates } from '@/hooks/useLiveUpdates';
 interface Appointment {
   codigo: string;
   nombre_paciente: string;
@@ -25,6 +26,22 @@ export default function ManageAppointment() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [showSlots, setShowSlots] = useState(false);
+  const revision = useRef(0);
+  const slotRevision = useRef(0);
+  useLiveUpdates({ resources: ['availability'], enabled: Boolean(appointment) && /^[a-f0-9]{32,64}$/.test(token), pollMs: 15_000 }, async () => {
+    if (busy) return;
+    const request = ++revision.current;
+    const response = await fetch('/api/orientaciones', { headers: { 'x-management-token': token }, cache: 'no-store' });
+    const result = await response.json();
+    if (request !== revision.current) return;
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 404) setAppointment(null);
+      return;
+    }
+    setAppointment(result.data);
+    if (showSlots) await loadSlots(true);
+  });
   useEffect(() => {
     const secret = new URLSearchParams(window.location.hash.slice(1)).get(
       "token",
@@ -53,16 +70,21 @@ export default function ManageAppointment() {
       });
     return () => {
       active = false;
+      revision.current++;
+      slotRevision.current++;
     };
   }, [token]);
-  async function loadSlots() {
+  async function loadSlots(preserveSelection = false) {
+    const request = ++slotRevision.current;
     setError("");
     try {
       const r = await fetch("/api/bloques", { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw Error(j.error);
+      if (request !== slotRevision.current) return;
       setSlots(j.slots);
-      setSelection("");
+      setShowSlots(true);
+      setSelection(previous => preserveSelection && j.slots.some((slot: Slot) => slot.slotKey === previous) ? previous : '');
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "No se pudo cargar la disponibilidad.",
@@ -71,6 +93,8 @@ export default function ManageAppointment() {
   }
   async function change(action: "cancelar" | "reprogramar") {
     if (!appointment) return;
+    revision.current++;
+    slotRevision.current++;
     setBusy(true);
     setError("");
     setMessage("");
@@ -94,6 +118,7 @@ export default function ManageAppointment() {
       setAppointment(j.data);
       setCancelConfirm(false);
       setSlots([]);
+      setShowSlots(false);
       setMessage(
         action === "cancelar"
           ? "Tu orientación fue cancelada."

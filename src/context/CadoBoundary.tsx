@@ -6,7 +6,7 @@ const Provider = lazy(() => import("./CadoContext").then(module => ({ default: m
 export function CadoBoundary({ children }: { children: ReactNode }) {
   const path = usePathname();
   const required = path === "/admin" || path.startsWith("/admin/") ||
-    ["/agendar", "/cuestionario", "/test-confort", "/blog"].includes(path);
+    ["/agendar", "/cuestionario", "/test-confort"].includes(path);
   const [activated, setActivated] = useState(required);
   // Once a care journey starts, retain its in-memory draft across navigation.
   useEffect(() => { if (required) setActivated(true); }, [required]);

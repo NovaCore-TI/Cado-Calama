@@ -11,7 +11,7 @@ export async function GET() {
       telHref: 'tel:+56944657815',
       whatsappPrioritario:
         'https://wa.me/56944657815?text=Hola%20Dr.%20Beiza,%20tengo%20una%20urgencia%20dental%20en%20Calama%20y%20necesito%20consultar%20disponibilidad.',
-      direccionClinica: 'Vivar #1580, Oficina 203, Edificio Espacio Parque, Calama',
+      direccionClinica: 'Vivar #1500, Oficina 205, Edificio Espacio Parque, Calama',
     },
     protocoloTriaje: [
       {
