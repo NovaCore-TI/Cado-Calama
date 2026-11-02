@@ -35,7 +35,13 @@ test('RF-11: twenty overlapping HTTP reservations yield one booking and nineteen
     CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY);
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     GRANT USAGE ON SCHEMA auth TO anon,authenticated;
-    GRANT EXECUTE ON FUNCTION auth.uid() TO anon,authenticated;`);
+    GRANT EXECUTE ON FUNCTION auth.uid() TO anon,authenticated;
+    -- Supabase Storage supplies this catalogue in production; CI runs plain PostgreSQL.
+    CREATE SCHEMA storage;
+    CREATE TABLE storage.buckets (
+      id text PRIMARY KEY, name text, public boolean,
+      file_size_limit bigint, allowed_mime_types text[]
+    );`);
     const migrationFiles = (await fs.readdir('supabase/migrations')).filter(f => f.endsWith('.sql')).sort();
     for (const file of migrationFiles) await monitor.query(await fs.readFile('supabase/migrations/' + file, 'utf8'));
     const doctor = '11111111-1111-4111-8111-111111111111';
