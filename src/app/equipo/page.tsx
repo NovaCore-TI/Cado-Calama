@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Clock,
   Cpu,
+  Facebook,
   HeartHandshake,
   MapPin,
   MessageCircle,
@@ -96,6 +97,15 @@ export default function EquipoPage() {
               >
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />
                 <span>Escribir al WhatsApp de la clínica</span>
+              </a>
+              <a
+                href="https://web.facebook.com/profile.php?id=61576124521775"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-cado-secondary inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold hover:border-[#A14B92]"
+              >
+                <Facebook className="h-4 w-4" aria-hidden="true" />
+                Facebook<span className="sr-only"> del Dr. Javier Beiza (abre otra pestaña)</span>
               </a>
             </div>
 
