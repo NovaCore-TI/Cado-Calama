@@ -21,7 +21,7 @@ export default function RecursosPage() {
 
         <div className="mt-12"><GuideLibrary /></div>
 
-        <div className="glass-panel mt-12 flex flex-col items-start justify-between gap-5 rounded-3xl p-7 sm:flex-row sm:items-center">
+        <div className="material-card-tonal mt-12 flex flex-col items-start justify-between gap-5 rounded-3xl p-7 sm:flex-row sm:items-center">
           <div className="flex items-start gap-3">
             <BookOpen className="mt-1 h-6 w-6 shrink-0 text-[#A14B92]" />
             <div>

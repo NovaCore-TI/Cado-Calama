@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useLiveUpdates } from '@/hooks/useLiveUpdates';
 import { 
@@ -36,6 +36,7 @@ export default function FaqPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('todas');
   const [openIds, setOpenIds] = useState<number[]>([1, 2]);
+  const searchInput = useRef<HTMLInputElement>(null);
   const [backendFaqs, setBackendFaqs] = useState<FAQItem[]>(FAQS_DATA);
   const [revision, setRevision] = useState(0);
   useLiveUpdates({ resources: ['faq'], pollMs: 60_000 }, () => setRevision(value => value + 1));
@@ -105,6 +106,7 @@ export default function FaqPage() {
         <div className="relative">
           <Search className="w-5 h-5 text-gray-400 absolute left-4 top-4" />
           <input
+            ref={searchInput}
             type="text"
             aria-label="Buscar preguntas frecuentes"
             value={searchTerm}
@@ -115,9 +117,12 @@ export default function FaqPage() {
           {searchTerm && (
             <button
               type="button"
-              onClick={() => setSearchTerm('')}
+              onClick={() => {
+                setSearchTerm('');
+                searchInput.current?.focus();
+              }}
               aria-label="Limpiar búsqueda"
-              className="absolute right-3.5 top-3.5 p-1 rounded-full text-gray-400 hover:text-[#513D49]"
+              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-[#766C75] hover:bg-[var(--md-surface-container)]"
             >
               <X className="w-4 h-4" />
             </button>
@@ -137,12 +142,9 @@ export default function FaqPage() {
           <button
             key={cat.id}
             type="button"
+            aria-pressed={selectedCategory === cat.id}
             onClick={() => setSelectedCategory(cat.id)}
-            className={`px-3.5 py-1.5 rounded-full font-medium transition-all ${
-              selectedCategory === cat.id
-                ? 'bg-[#A14B92] text-white shadow-2xs font-bold'
-                : 'bg-white text-gray-600 border border-[#B3BFBF] hover:bg-[#F8FAFA]'
-            }`}
+            className="material-option font-medium"
           >
             {cat.label}
           </button>
@@ -150,6 +152,7 @@ export default function FaqPage() {
       </div>
 
       {/* 4. LISTA DE ACORDEONES */}
+      <p role="status" className="sr-only">{filteredFaqs.length} preguntas encontradas.</p>
       <div className="space-y-3 font-sans">
         {filteredFaqs.length === 0 ? (
           <div className="p-8 text-center bg-[#F8FAFA] rounded-2xl border border-[#E2E7E7] space-y-4">
@@ -160,7 +163,7 @@ export default function FaqPage() {
               href="https://wa.me/56944657815?text=Hola%20Dr.%20Beiza,%20tengo%20una%20pregunta%20espec%C3%ADfica%20sobre..."
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition-colors shadow-2xs"
+              className="material-button bg-emerald-800 text-xs font-bold text-white hover:bg-emerald-900"
             >
               <MessageCircle className="w-4 h-4" />
               <span>Preguntarle directamente al Dr. Beiza por WhatsApp (+56 9 4465 7815)</span>
@@ -172,30 +175,29 @@ export default function FaqPage() {
             return (
               <div
                 key={faq.id}
-                className="bg-white rounded-2xl border border-[#E2E7E7] overflow-hidden shadow-2xs transition-all"
+                className="material-card rounded-2xl overflow-hidden"
               >
                 <button
                   type="button"
                   onClick={() => toggleAccordion(faq.id)}
                   aria-expanded={isOpen}
                   aria-controls={`faq-answer-${faq.id}`}
-                  className="w-full p-5 text-left flex items-center justify-between gap-4 hover:bg-[#F6F8F8]/50 transition-colors"
+                  className="w-full p-5 text-left flex items-center justify-between gap-4 hover:bg-[var(--md-surface-container)] focus-visible:-outline-offset-4"
                 >
                   <span className="font-title font-bold text-base sm:text-lg text-[#513D49]">
                     {faq.q}
                   </span>
                   <ChevronDown
+                    aria-hidden="true"
                     className={`w-4 h-4 text-[#A14B92] shrink-0 transition-transform duration-200 ${
                       isOpen ? 'rotate-180' : ''
                     }`}
                   />
                 </button>
 
-                {isOpen && (
-                  <div id={`faq-answer-${faq.id}`} className="px-5 pb-5 pt-1 text-xs sm:text-[13px] text-gray-600 leading-relaxed border-t border-gray-100 bg-[#F6F8F8]/30">
-                    <p>{faq.a}</p>
-                  </div>
-                )}
+                <div id={`faq-answer-${faq.id}`} hidden={!isOpen} className="material-card-tonal px-5 pb-5 pt-3 text-sm leading-relaxed">
+                  <p>{faq.a}</p>
+                </div>
               </div>
             );
           })

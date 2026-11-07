@@ -5,9 +5,12 @@ import { Modal } from "@/components/Modal";
 import dynamic from "next/dynamic";
 import { ArticleBody } from "@/components/ArticleBody";
 import { articlePlainText } from "@/lib/article-content";
+import { articleVersion, clearSyncedArticle, clearSyncedDerivation, readDoctorOffline, saveDoctorOffline, type DerivationStatus, type OfflineArticle, type OfflineChanges } from "@/lib/doctor-offline";
+import { syncOfflineArticle, syncOfflineDerivation } from "@/lib/doctor-offline-sync";
 const TestimonialManager = dynamic(() => import("@/components/TestimonialManager"));
 const RichTextEditor = dynamic(() => import("@/components/RichTextEditor"), { ssr: false });
 
+import { TesSummary } from '@/components/TesPreferences';
 import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
 import Image from 'next/image';
 import DoctorLogin from './login/page';
@@ -155,7 +158,67 @@ function DoctorDashboard() {
 
   const currentDoctorId = useRef(doctorUser?.id);
   currentDoctorId.current = doctorUser?.id;
+  const offlineKey = `cado:doctor-offline:v1:${doctorUser?.id}`;
+  const [offlineChanges, setOfflineChanges] = useState(() => readDoctorOffline(offlineKey));
+  const [browserOnline, setBrowserOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine);
+  const [offlineMessage, setOfflineMessage] = useState('');
+  const [syncingDerivation, setSyncingDerivation] = useState<string | null>(null);
+  const online = browserOnline && supabaseStatus.connected;
+
+  useEffect(() => {
+    const connection = () => setBrowserOnline(navigator.onLine);
+    const storage = (event: StorageEvent) => {
+      if (event.key === offlineKey) setOfflineChanges(readDoctorOffline(offlineKey));
+    };
+    window.addEventListener('online', connection);
+    window.addEventListener('offline', connection);
+    window.addEventListener('storage', storage);
+    return () => {
+      window.removeEventListener('online', connection);
+      window.removeEventListener('offline', connection);
+      window.removeEventListener('storage', storage);
+    };
+  }, [offlineKey]);
+
+  function keepOffline(update: (current: OfflineChanges) => OfflineChanges) {
+    const saved = saveDoctorOffline(offlineKey, update);
+    if (!saved) return false;
+    setOfflineChanges(saved);
+    return true;
+  }
+
+  function changeDerivation(app: Appointment, next: DerivationStatus) {
+    if (online && !offlineChanges.derivations?.[app.id]) {
+      void updateDerivationStatus(app.id, next);
+      return;
+    }
+    const saved = keepOffline(current => ({
+      ...current,
+      derivations: {
+        ...current.derivations,
+        [app.id]: { previous: current.derivations?.[app.id]?.previous ?? app.derivationStatus ?? 'Sin derivación', next },
+      },
+    }));
+    setOfflineMessage(saved ? 'Derivación guardada en este dispositivo. Pendiente de sincronizar.' : 'Este dispositivo no pudo guardar la derivación.');
+  }
+
+  function removePendingDerivation(id: string) {
+    return keepOffline(current => {
+      const derivations = { ...current.derivations };
+      delete derivations[id];
+      return { ...current, derivations };
+    });
+  }
+
   const [section, setSection] = useState<Section>('resumen');
+  const sectionHeading = useRef<HTMLHeadingElement>(null);
+  const focusNextSection = useRef(false);
+  useEffect(() => {
+    if (!focusNextSection.current) return;
+    focusNextSection.current = false;
+    sectionHeading.current?.focus({ preventScroll: true });
+    sectionHeading.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }, [section]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filtros de orientaciones
@@ -183,7 +246,104 @@ function DoctorDashboard() {
   const [postContent, setPostContent] = useState('');
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
+  const [restoredArticle, setRestoredArticle] = useState<OfflineArticle | null>(null);
+  const editingBaseline = useRef<string | null>(null);
   const hasUnsavedChanges = postDirty && (Boolean(editingPostId) || Boolean(postTitle || postSlug || postExcerpt || articlePlainText(postContent).trim()) || postCategory !== 'Cuidados');
+  const hasPendingOffline = Boolean(offlineChanges.article || Object.keys(offlineChanges.derivations ?? {}).length);
+  const editor = useRef({ hasUnsavedChanges, restoredArticle });
+  editor.current = { hasUnsavedChanges, restoredArticle };
+  const offlineSyncRunning = useRef(false);
+
+  useEffect(() => {
+    const doctorId = doctorUser?.id;
+    if (!online || !doctorId || !hasPendingOffline) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    const review = new Set<string>();
+    const headers = { 'Content-Type': 'application/json', 'x-cado-offline-owner': doctorId };
+
+    function confirm(update: (current: OfflineChanges) => OfflineChanges) {
+      const saved = saveDoctorOffline(offlineKey, update);
+      if (saved) setOfflineChanges(saved);
+      setOfflineMessage(saved
+        ? 'Cambio sincronizado con el servidor.'
+        : 'El servidor confirmó el cambio. El navegador no pudo borrar la copia local.');
+    }
+
+    async function flush() {
+      if (signal.aborted || offlineSyncRunning.current) return;
+      offlineSyncRunning.current = true;
+      let confirmed = false;
+      try {
+        const pending = readDoctorOffline(offlineKey);
+        for (const [id, derivation] of Object.entries(pending.derivations ?? {})) {
+          if (signal.aborted) return;
+          const signature = JSON.stringify([id, derivation]);
+          if (review.has(signature)) continue;
+          setSyncingDerivation(id);
+          try {
+            const result = await syncOfflineDerivation(id, derivation, headers, signal, () =>
+              JSON.stringify(readDoctorOffline(offlineKey).derivations?.[id]) === JSON.stringify(derivation));
+            if (signal.aborted) return;
+            if (result === 'confirmed') {
+              confirm(current => clearSyncedDerivation(current, id, derivation));
+              confirmed = true;
+            } else if (result === 'review') {
+              review.add(signature);
+              setOfflineMessage('Una derivación pendiente requiere revisión. Comprueba su estado en el servidor.');
+            }
+          } finally {
+            setSyncingDerivation(null);
+          }
+        }
+
+        const draft = pending.article;
+        const signature = JSON.stringify(draft);
+        if (!draft || review.has(signature) || signal.aborted || postSaving.current || editor.current.hasUnsavedChanges) return;
+        postSaving.current = true;
+        setPostBusy(true);
+        try {
+          const result = await syncOfflineArticle(draft, headers, signal, () =>
+            JSON.stringify(readDoctorOffline(offlineKey).article) === signature);
+          if (signal.aborted) return;
+          if (result === 'confirmed') {
+            confirm(current => clearSyncedArticle(current, draft));
+            confirmed = true;
+            if (JSON.stringify(editor.current.restoredArticle) === signature) {
+              editingBaseline.current = null;
+              setRestoredArticle(null);
+              setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent('');
+              setPostCategory('Cuidados'); setPostDirty(false); setPostMessage('Borrador sincronizado con el servidor.');
+            }
+          } else if (result === 'review') {
+            review.add(signature);
+            setPostMessage('El borrador requiere revisión antes de enviarse. Puedes recuperarlo desde este dispositivo.');
+            setOfflineMessage('Un borrador pendiente requiere revisión en Contenidos Blog.');
+          }
+        } finally {
+          postSaving.current = false;
+          setPostBusy(false);
+        }
+      } catch {
+        if (!signal.aborted) setOfflineMessage('La sincronización sigue pendiente. Se reintentará al recuperar la conexión.');
+      } finally {
+        offlineSyncRunning.current = false;
+        if (confirmed && !signal.aborted) void refreshSupabaseData();
+      }
+    }
+
+    function retry() {
+      if (navigator.locks) {
+        void navigator.locks.request(offlineKey, { ifAvailable: true }, async lock => {
+          if (lock) await flush();
+        }).catch(() => { void flush(); });
+      } else void flush();
+    }
+
+    retry();
+    const timer = window.setInterval(retry, 15000);
+    return () => { controller.abort(); window.clearInterval(timer); };
+  }, [doctorUser?.id, hasPendingOffline, offlineKey, online, refreshSupabaseData]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -200,11 +360,14 @@ function DoctorDashboard() {
   function discardPost() {
     if (postSaving.current) return false;
     if (hasUnsavedChanges && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return false;
-    setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage('');
+    editingBaseline.current = null;
+    setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage(''); setRestoredArticle(null);
     return true;
   }
   function navigateSection(next: Section) {
-    if (section === 'contenidos' && next !== section && !discardPost()) return;
+    if (next === section) return;
+    if (section === 'contenidos' && !discardPost()) return;
+    focusNextSection.current = true;
     setSection(next);
   }
 
@@ -319,19 +482,85 @@ function DoctorDashboard() {
   async function handleSavePost(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (postSaving.current) return;
+    if (!online) { saveLocalArticle(); return; }
     const text = articlePlainText(postContent).trim();
     if (!postTitle.trim() || !text) { setPostMessage('Completa el título y contenido del artículo.'); return; }
+    const submitted = articleDraft();
+    const stored = readDoctorOffline(offlineKey).article;
+    const syncedCopy = restoredArticle ?? (JSON.stringify(stored) === JSON.stringify(submitted) ? stored : undefined);
     postSaving.current = true; setPostBusy(true); setPostMessage('Guardando…');
     try {
+      if (restoredArticle && editingPostId) {
+        const response = await fetch('/api/blog?admin=1', { cache: 'no-store' });
+        if (!response.ok) throw Error();
+        const { data } = await response.json();
+        const row = Array.isArray(data) ? data.find(item => item.id === editingPostId) : null;
+        const latest = row && articleVersion({
+          title: row.titulo, slug: row.slug, excerpt: row.resumen, content: row.cuerpo, category: row.categoria, published: row.publicado,
+        });
+        if (!row || row.publicado || latest !== restoredArticle.baseline) {
+          setPostMessage('El artículo cambió en el servidor. Recupera el borrador como uno nuevo para conservar ambos textos.');
+          return;
+        }
+      }
       const slug = postSlug.trim() || postTitle.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const content = { title: postTitle.trim(), slug, category: postCategory, excerpt: postExcerpt.trim() || text.slice(0, 140), content: postContent };
       const saved = editingPostId ? await updateBlogPost(editingPostId, content) : await addBlogPost({ ...content, author: doctorUser?.nombre || 'Profesional CADO', readTime: '2 min de lectura', published: false });
       if (!saved) { setPostMessage('No se pudo guardar. Tu texto continúa en el editor.'); return; }
-      setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage('Artículo guardado.');
-    } finally { postSaving.current = false; setPostBusy(false); }
+      const cleaned = !syncedCopy || keepOffline(current => clearSyncedArticle(current, syncedCopy));
+      editingBaseline.current = null;
+      setRestoredArticle(null);
+      setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false);
+      setPostMessage(cleaned ? 'Artículo guardado.' : 'Artículo guardado en el servidor. El navegador no pudo borrar la copia local.');
+    } catch { setPostMessage('No se pudo verificar el artículo. Tu borrador sigue disponible.'); }
+    finally { postSaving.current = false; setPostBusy(false); }
+  }
+
+  function articleDraft(): OfflineArticle {
+    return {
+      id: editingPostId,
+      baseline: editingBaseline.current,
+      title: postTitle, slug: postSlug, excerpt: postExcerpt, content: postContent, category: postCategory,
+    };
+  }
+
+  function saveLocalArticle() {
+    const existing = blogPosts.find(post => post.id === editingPostId);
+    if (editingPostId && (!existing || existing.published)) {
+      setPostMessage('El guardado local está disponible para artículos nuevos o sin publicar.');
+      return;
+    }
+    const stored = readDoctorOffline(offlineKey).article;
+    if (stored && JSON.stringify(stored) !== JSON.stringify(restoredArticle) &&
+      !window.confirm('Ya hay un borrador en este dispositivo. ¿Quieres reemplazarlo?')) return;
+    const article = articleDraft();
+    if (!keepOffline(current => ({ ...current, article }))) {
+      setPostMessage('El dispositivo no pudo guardar el borrador. El texto sigue en el editor.');
+      return;
+    }
+    setRestoredArticle(article);
+    setPostDirty(false);
+    setPostMessage('Borrador guardado en este dispositivo. Pendiente de sincronizar.');
+  }
+
+  function restoreLocalArticle(asNew = false) {
+    const article = offlineChanges.article;
+    if (!article || !discardPost()) return;
+    const current = blogPosts.find(post => post.id === article.id);
+    if (!asNew && online && article.id && (!current || articleVersion(current) !== article.baseline)) {
+      setPostMessage('El artículo cambió en el servidor. Puedes recuperar el texto como un borrador nuevo.');
+      return;
+    }
+    setEditingPostId(asNew ? null : article.id);
+    editingBaseline.current = asNew ? null : article.baseline;
+    setPostTitle(article.title); setPostSlug(asNew ? '' : article.slug);
+    setPostExcerpt(article.excerpt); setPostContent(article.content); setPostCategory(article.category);
+    setRestoredArticle(article); setPostDirty(false);
+    setPostMessage('Borrador recuperado. Puedes revisarlo antes de enviarlo.');
   }
   function editPost(post: BlogPost) {
     if (!discardPost()) return;
+    editingBaseline.current = articleVersion(post);
     setEditingPostId(post.id); setPostTitle(post.title); setPostSlug(post.slug); setPostCategory(post.category); setPostExcerpt(post.excerpt); setPostContent(post.content); setPostDirty(false);
     window.scrollTo({ top: 300, behavior: 'smooth' });
   }
@@ -540,7 +769,7 @@ function DoctorDashboard() {
         {/* MENÚ DE SECCIONES */}
         <nav
           aria-label="Secciones del panel clínico"
-          className="-mx-2 mt-6 flex gap-1.5 overflow-x-auto pb-2 lg:mt-8 lg:flex-col lg:overflow-visible"
+          className="mt-6 flex flex-wrap gap-1.5 pb-2 lg:mt-8 lg:flex-col"
         >
           {navigation.map(({ id, label, icon: Icon }) => {
             const isCurrent = section === id;
@@ -550,7 +779,7 @@ function DoctorDashboard() {
                 type="button"
                 onClick={() => navigateSection(id)}
                 aria-current={isCurrent ? 'page' : undefined}
-                className={`flex shrink-0 items-center gap-3 rounded-2xl px-4 py-3 text-left text-xs font-semibold transition lg:w-full ${
+                className={`flex min-h-11 items-center gap-3 rounded-full px-4 py-3 text-left text-xs font-semibold transition lg:w-full ${
                   isCurrent
                     ? 'bg-[#A14B92] text-white shadow-sm'
                     : 'text-[#665D66] hover:bg-[#F6F8F8] hover:text-[#513D49]'
@@ -577,11 +806,11 @@ function DoctorDashboard() {
           <div className="flex items-center gap-2 text-xs text-[#766C75]">
             <span
               className={`h-2.5 w-2.5 rounded-full ${
-                supabaseStatus.connected ? 'bg-[#10B981] animate-pulse' : 'bg-amber-400'
+                online ? 'bg-[#10B981] animate-pulse' : 'bg-amber-400'
               }`}
             />
             <span className="truncate">
-              {realtimeConnected ? 'En vivo (Automático)' : supabaseStatus.connected ? 'Base de datos en línea' : 'Sin conexión'}
+              {!online ? 'Sin conexión' : realtimeConnected ? 'En vivo (Automático)' : 'Base de datos en línea'}
             </span>
           </div>
 
@@ -639,13 +868,14 @@ function DoctorDashboard() {
               type="button"
               onClick={handleRefreshBackend}
               disabled={isRefreshing}
+              aria-label="Actualizar vista del panel"
               className="inline-flex items-center gap-1.5 rounded-xl border border-[#B3BFBF] bg-white px-3 py-1.5 text-xs font-semibold text-[#513D49] hover:bg-[#F6F8F8] disabled:opacity-50"
             >
               <RefreshCw
                 className={`h-3.5 w-3.5 text-[#A14B92] ${isRefreshing ? 'animate-spin' : ''}`}
                 aria-hidden="true"
               />
-              <span className="hidden sm:inline">Sincronizar Datos</span>
+              <span className="hidden sm:inline">Actualizar vista</span>
             </button>
 
             <button
@@ -660,7 +890,7 @@ function DoctorDashboard() {
         </header>
 
         {/* CUERPO PRINCIPAL SEGÚN SECCIÓN */}
-        <main className="mx-auto max-w-7xl space-y-8 px-6 py-8 sm:px-9 sm:py-10">
+        <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-9 sm:py-10">
           {googleNotification && (
             <aside
               aria-label="Notificación de Google Calendar"
@@ -703,9 +933,16 @@ function DoctorDashboard() {
 
           <div>
             <span className="section-eyebrow">{title.eyebrow}</span>
-            <h1 className="mt-2 font-title text-3xl font-semibold text-[#513D49] sm:text-4xl">
+            <h1 ref={sectionHeading} tabIndex={-1} className="mt-2 font-title text-3xl font-semibold text-[#513D49] sm:text-4xl">
               {title.title}
             </h1>
+            <p role="status" className="text-sm text-[#513D49]">
+              {!online && 'Sin conexión. Puedes guardar borradores y derivaciones en este dispositivo. '}
+              {offlineChanges.article && 'Un borrador local pendiente. '}
+              {Object.keys(offlineChanges.derivations ?? {}).length > 0 &&
+                `${Object.keys(offlineChanges.derivations ?? {}).length} derivaciones pendientes. `}
+              {offlineMessage}
+            </p>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#766C75]">
               {title.description}
             </p>
@@ -745,7 +982,7 @@ function DoctorDashboard() {
 
               <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
                 {/* PRÓXIMAS ORIENTACIONES */}
-                <section className="clay-card rounded-3xl p-6 sm:p-7 space-y-5">
+                <section className="material-card-tonal rounded-3xl p-6 sm:p-7 space-y-5">
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="font-title text-2xl font-semibold text-[#513D49]">
@@ -795,7 +1032,7 @@ function DoctorDashboard() {
                               <p className="text-xs text-[#766C75]">
                                 {a.date} · {a.time} hrs ·{' '}
                                 <span className="font-medium text-[#A14B92]">
-                                  {a.comfortProfile.soundPreference === 'silencio'
+                                  {a.comfortProfile.tes ? (a.comfortProfile.tes.music || 'Sin preferencia musical') : a.comfortProfile.soundPreference === 'silencio'
                                     ? 'Silencio'
                                     : 'Música suave'}
                                 </span>
@@ -809,7 +1046,7 @@ function DoctorDashboard() {
                 </section>
 
                 {/* ESTADO DEL BACKEND */}
-                <section className="clay-card rounded-3xl p-6 sm:p-7 space-y-4">
+                <section className="material-card-tonal rounded-3xl p-6 sm:p-7 space-y-4">
                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#A14B92]/10 text-[#A14B92]">
                     <Zap className="h-5 w-5" aria-hidden="true" />
                   </span>
@@ -823,7 +1060,7 @@ function DoctorDashboard() {
                     <p className="font-semibold text-[#513D49]">
                       Estado:{' '}
                       <span className="text-[#10B981]">
-                        {supabaseStatus.connected ? 'Conectado a la nube' : 'Sin conexión'}
+                        {online ? 'Conectado a la nube' : 'Sin conexión'}
                       </span>
                     </p>
                     <p className="text-[#766C75]">
@@ -850,7 +1087,7 @@ function DoctorDashboard() {
             <div className="space-y-6">
               {/* FILTROS Y BÚSQUEDA */}
               <div className="flex flex-wrap gap-3">
-                <div className="relative min-w-[260px] flex-1">
+                <div className="relative min-w-0 flex-1 basis-56">
                   <Search className="absolute left-4 top-3.5 h-4 w-4 text-[#766C75]" />
                   <input
                     type="text"
@@ -892,7 +1129,7 @@ function DoctorDashboard() {
                   {filteredAppointments.map((app) => (
                     <article
                       key={app.id}
-                      className="clay-card rounded-3xl p-6 transition hover:shadow-md"
+                      className="material-card-tonal rounded-3xl p-6 transition hover:shadow-md"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="space-y-1">
@@ -985,13 +1222,9 @@ function DoctorDashboard() {
                           <label className="text-xs font-semibold text-[#766C75]">
                             Derivación:
                             <select
-                              value={app.derivationStatus ?? 'Sin derivación'}
-                              onChange={(e) =>
-                                updateDerivationStatus(
-                                  app.id,
-                                  e.target.value as NonNullable<Appointment['derivationStatus']>
-                                )
-                              }
+                              value={offlineChanges.derivations?.[app.id]?.next ?? app.derivationStatus ?? 'Sin derivación'}
+                              disabled={Boolean(syncingDerivation)}
+                              onChange={(e) => changeDerivation(app, e.target.value as DerivationStatus)}
                               className="ml-2 rounded-xl border border-[#B3BFBF] bg-white px-3 py-1.5 text-xs font-semibold text-[#513D49]"
                             >
                               <option value="Sin derivación">Sin derivación</option>
@@ -999,6 +1232,14 @@ function DoctorDashboard() {
                               <option value="Derivada a Dentalink">Derivada a Dentalink</option>
                             </select>
                           </label>
+                          {offlineChanges.derivations?.[app.id] && <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <span>Pendiente · Estado del servidor: {app.derivationStatus ?? 'Sin derivación'}</span>
+                            {syncingDerivation === app.id && <span role="status">Sincronizando…</span>}
+                            <button type="button" className="btn-cado-secondary px-3 text-xs" disabled={Boolean(syncingDerivation)}
+                              onClick={() => {
+                                if (removePendingDerivation(app.id)) setOfflineMessage('Derivación local descartada.');
+                              }}>Descartar cambio local</button>
+                          </div>}
                         </div>
                       </div>
                     </article>
@@ -1049,7 +1290,7 @@ function DoctorDashboard() {
               {/* PANELES DE ENTRADA Y BLOQUEO DE DÍAS */}
               <div className="grid gap-6 xl:grid-cols-2">
                 {/* AGREGAR BLOQUE ESPECÍFICO */}
-                <section className="clay-card rounded-3xl p-6 sm:p-7 space-y-4">
+                <section className="material-card-tonal rounded-3xl p-6 sm:p-7 space-y-4">
                   <div className="flex items-center gap-2.5">
                     <Plus className="h-5 w-5 text-[#A14B92]" />
                     <h2 className="font-title text-2xl font-semibold text-[#513D49]">
@@ -1111,7 +1352,7 @@ function DoctorDashboard() {
                 </section>
 
                 {/* FECHAS BLOQUEADAS */}
-                <section className="clay-card rounded-3xl p-6 sm:p-7 space-y-4">
+                <section className="material-card-tonal rounded-3xl p-6 sm:p-7 space-y-4">
                   <div className="flex items-center gap-2.5">
                     <CalendarDays className="h-5 w-5 text-[#A14B92]" />
                     <h2 className="font-title text-2xl font-semibold text-[#513D49]">
@@ -1125,6 +1366,7 @@ function DoctorDashboard() {
                   <div className="flex gap-2 pt-1">
                     <input
                       type="date"
+                      aria-label="Fecha que deseas bloquear"
                       min={today}
                       value={newBlockedDate}
                       onChange={(e) => setNewBlockedDate(e.target.value)}
@@ -1177,7 +1419,7 @@ function DoctorDashboard() {
               {/* =========================================================== */}
               {/* TABLERO DE DISPONIBILIDAD ACTIVA AGRUPADO POR FECHA         */}
               {/* =========================================================== */}
-              <section className="clay-card rounded-3xl p-6 sm:p-8 space-y-6">
+              <section className="material-card-tonal rounded-3xl p-6 sm:p-8 space-y-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-[#E2E7E7] pb-5">
                   <div className="space-y-1">
                     <h2 className="font-title text-2xl font-semibold text-[#513D49]">
@@ -1364,9 +1606,11 @@ function DoctorDashboard() {
                                         {bookedApp.patientName}
                                       </strong>
                                       <span className="text-[10px] text-emerald-800">
-                                        {bookedApp.comfortProfile.soundPreference === 'silencio'
+                                        {bookedApp.comfortProfile.tes
+                                          ? (bookedApp.comfortProfile.tes.music || 'Sin preferencia musical')
+                                          : <>{bookedApp.comfortProfile.soundPreference === 'silencio'
                                           ? 'Silencio'
-                                          : 'Música'} · {bookedApp.comfortProfile.jawBreaks ? 'Pausas 5m' : 'Sin pausas'}
+                                          : 'Música'} · {bookedApp.comfortProfile.jawBreaks ? 'Pausas 5m' : 'Sin pausas'}</>}
                                       </span>
                                     </div>
                                     <button
@@ -1418,6 +1662,7 @@ function DoctorDashboard() {
                               </span>
                               <input
                                 type="time"
+                                aria-label="Hora personalizada"
                                 value={slotTimeInputByDate[dayItem.date] || ''}
                                 onChange={(e) =>
                                   setSlotTimeInputByDate((prev) => ({
@@ -1450,14 +1695,14 @@ function DoctorDashboard() {
           {/* SECCIÓN 4: DERIVACIONES A DENTALINK                             */}
           {/* =============================================================== */}
           {section === 'derivaciones' && (
-            <section className="clay-card rounded-3xl p-6 sm:p-8 space-y-6">
+            <section className="material-card-tonal rounded-3xl p-6 sm:p-8 space-y-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h2 className="font-title text-2xl font-semibold text-[#513D49]">
                     Seguimiento hacia consulta presencial
                   </h2>
                   <p className="mt-1 text-xs text-[#766C75]">
-                    Pacientes orientados virtualmente que cuentan con derivación hacia la agenda Dentalink o presencial en Vivar #1500, Calama.
+                    Pacientes orientados virtualmente que cuentan con derivación hacia la agenda Dentalink o presencial en Vivar #1580, Calama.
                   </p>
                 </div>
                 <DentalinkLink />
@@ -1502,13 +1747,13 @@ function DoctorDashboard() {
           {/* SECCIÓN 5: GESTOR DE CONTENIDOS DEL BLOG                        */}
           {/* =============================================================== */}
           {section === 'testimonios' && <TestimonialManager key={doctorUser?.id} />}
-          {section === 'recursos' && <section className="clay-card rounded-3xl p-6 sm:p-8"><GuideLibrary admin /></section>}
+          {section === 'recursos' && <section className="material-card-tonal rounded-3xl p-6 sm:p-8"><GuideLibrary admin /></section>}
           {section === 'contenidos' && (
             <div className="grid gap-8 xl:grid-cols-[1.3fr_1fr]">
               {/* FORMULARIO EDITAR / CREAR */}
               <form
                 onSubmit={handleSavePost}
-                className="clay-card rounded-3xl p-6 sm:p-8 space-y-5"
+                className="material-card-tonal rounded-3xl p-6 sm:p-8 space-y-5"
               >
                 <div>
                   <h2 className="font-title text-2xl font-semibold text-[#513D49]">
@@ -1565,7 +1810,24 @@ function DoctorDashboard() {
                   <RichTextEditor value={postContent} onChange={(value) => { setPostContent(value); setPostDirty(true); }} disabled={postBusy} />
                 </div>
                 <p role="status" aria-live="polite" className="text-sm text-[#665D66]">{postMessage}</p>
+                {offlineChanges.article && <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span>Borrador local: {offlineChanges.article.title || 'Sin título'}</span>
+                  <button type="button" disabled={postBusy} className="btn-cado-secondary px-3 text-xs"
+                    onClick={() => restoreLocalArticle()}>Recuperar borrador</button>
+                  {offlineChanges.article.id && <button type="button" disabled={postBusy} className="btn-cado-secondary px-3 text-xs"
+                    onClick={() => restoreLocalArticle(true)}>Recuperar como nuevo</button>}
+                  <button type="button" disabled={postBusy} className="btn-cado-secondary px-3 text-xs"
+                    onClick={() => {
+                      if (window.confirm('¿Quieres eliminar el borrador guardado en este dispositivo?') &&
+                        keepOffline(current => ({ ...current, article: undefined }))) {
+                        if (restoredArticle) setPostDirty(true);
+                        setPostMessage('Borrador local eliminado.');
+                      }
+                    }}>Eliminar borrador local</button>
+                </div>}
                 <div className="flex flex-wrap justify-end gap-3 pt-2">
+                  {hasUnsavedChanges && <button type="button" disabled={postBusy} className="btn-cado-secondary px-4 text-xs"
+                    onClick={saveLocalArticle}>Guardar en este dispositivo</button>}
                   <button type="button" disabled={postBusy || !postTitle.trim()} onClick={() => setPreviewPost({ id: editingPostId || 'preview', title: postTitle, slug: postSlug, category: postCategory, excerpt: postExcerpt, content: postContent, author: doctorUser?.nombre || '', readTime: '', date: '', published: false })} className="btn-cado-secondary rounded-xl px-4 py-2.5 text-xs font-semibold disabled:opacity-60">Previsualizar cambios</button>
                   {(editingPostId || hasUnsavedChanges) && (
                     <button
@@ -1582,14 +1844,14 @@ function DoctorDashboard() {
                     disabled={postBusy}
                     className="btn-cado-primary rounded-xl px-6 py-2.5 text-xs font-semibold shadow-md disabled:opacity-60"
                   >
-                    {postBusy ? 'Guardando…' : editingPostId ? 'Guardar cambios' : 'Crear artículo borrador'}
+                    {postBusy ? 'Guardando…' : !online ? 'Guardar borrador en este dispositivo' : editingPostId ? 'Guardar cambios' : 'Crear artículo borrador'}
                   </button>
                 </div>
                 </fieldset>
               </form>
 
               {/* LISTA DE ARTÍCULOS */}
-              <section className="clay-card rounded-3xl p-6 sm:p-8 space-y-4">
+              <section className="material-card-tonal rounded-3xl p-6 sm:p-8 space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="font-title text-2xl font-semibold text-[#513D49]">
                     Artículos registrados
@@ -1675,7 +1937,7 @@ function DoctorDashboard() {
           {section === 'integraciones' && (
             <div className="space-y-6">
               <div className="grid gap-6 md:grid-cols-3">
-                <article className="clay-card rounded-3xl p-6 space-y-3">
+                <article className="material-card-tonal rounded-3xl p-6 space-y-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#A14B92]/10 text-[#A14B92]">
                     <ShieldCheck className="h-6 w-6" aria-hidden="true" />
                   </span>
@@ -1687,12 +1949,12 @@ function DoctorDashboard() {
                   </p>
                   <div className="pt-2">
                     <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
-                      {supabaseStatus.connected ? `Activo · ${supabaseStatus.latencyMs}ms` : 'Sin conexión'}
+                      {online ? `Activo · ${supabaseStatus.latencyMs}ms` : 'Sin conexión'}
                     </span>
                   </div>
                 </article>
 
-                <article className="clay-card rounded-3xl p-6 space-y-3">
+                <article className="material-card-tonal rounded-3xl p-6 space-y-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#A14B92]/10 text-[#A14B92]">
                     <Video className="h-6 w-6" aria-hidden="true" />
                   </span>
@@ -1710,7 +1972,7 @@ function DoctorDashboard() {
                   </div>
                 </article>
 
-                <article className="clay-card rounded-3xl p-6 space-y-3">
+                <article className="material-card-tonal rounded-3xl p-6 space-y-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#A14B92]/10 text-[#A14B92]">
                     <FileText className="h-6 w-6" aria-hidden="true" />
                   </span>
@@ -1810,7 +2072,7 @@ function DoctorDashboard() {
               </section>
             </div>
           )}
-        </main>
+        </div>
       </div>
 
       {/* =================================================================== */}
@@ -1868,8 +2130,9 @@ function DoctorDashboard() {
                 {/* PREFERENCIAS DE CONFORT AMBIENTAL */}
                 <div className="rounded-2xl border border-[#E2E7E7] bg-white p-5 space-y-3">
                   <h3 className="font-title text-xl font-semibold text-[#513D49]">
-                    Preferencias de Confort Ambiental del Box
+                    Preferencias de atención
                   </h3>
+                  {app.comfortProfile.tes ? <TesSummary answers={app.comfortProfile.tes} /> : <>
                   <div className="grid gap-2 sm:grid-cols-2 text-xs text-[#513D49]">
                     <div className="flex items-center gap-2">
                       {app.comfortProfile.soundPreference === 'silencio' ? (
@@ -1917,6 +2180,7 @@ function DoctorDashboard() {
                       <strong>Nota del paciente:</strong> «{app.comfortProfile.notes}»
                     </div>
                   )}
+                  </>}
                 </div>
 
                 {/* CUESTIONARIO DE PERFILAMIENTO */}

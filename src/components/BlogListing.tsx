@@ -102,23 +102,20 @@ export default function BlogListing({ initialPosts }: { initialPosts: BlogPost[]
           <button
             key={cat}
             type="button"
+            aria-pressed={selectedCategory === cat}
             onClick={() => setSelectedCategory(cat)}
-            className={`px-4 py-2 rounded-full font-semibold transition-all ${
-              selectedCategory === cat
-                ? 'bg-[#A14B92] text-white shadow-xs font-bold'
-                : 'bg-white border border-[#B3BFBF] text-gray-700 hover:bg-[#F8FAFA]'
-            }`}
+            className="material-option font-semibold"
           >
             {cat}
           </button>
         ))}
       </div>
 
-      {error && <p role="status" className="text-sm text-[#665D66]">{error}</p>}
+      <p role="status" className={error ? 'text-sm text-[#665D66]' : 'sr-only'}>{error || `${filteredPosts.length} artículos encontrados.`}</p>
       {/* 3. GRID DE ARTÍCULOS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {filteredPosts.length === 0 ? (
-          <div className="col-span-3 p-12 text-center bg-[#F8FAFA] rounded-3xl border border-[#E2E7E7] space-y-2">
+          <div className="material-card-tonal col-span-full space-y-2 rounded-3xl p-6 text-center sm:p-12">
             <p className="text-sm text-gray-600 font-medium font-sans">
               {blogPosts.some(post => post.published) ? 'No se encontraron artículos en esta categoría o búsqueda.' : 'Los artículos educativos estarán disponibles después de su revisión profesional.'}
             </p>
@@ -134,7 +131,7 @@ export default function BlogListing({ initialPosts }: { initialPosts: BlogPost[]
           filteredPosts.map((post) => (
             <article
               key={post.id}
-              className="bg-white rounded-3xl border border-[#E2E7E7] p-6 space-y-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
+              className="material-card flex min-w-0 flex-col justify-between space-y-4 rounded-3xl p-6"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-[11px] font-sans">

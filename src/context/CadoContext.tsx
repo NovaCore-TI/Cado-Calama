@@ -1,4 +1,6 @@
 "use client";
+
+import type { TesPreferences } from '@/lib/tes-preferences';
 import { useLiveUpdates } from '@/hooks/useLiveUpdates';
 
 import React, {
@@ -12,6 +14,7 @@ import React, {
 const authClient = () => import("@/lib/supabase").then((module) => module.supabase);
 
 export interface ComfortProfile {
+  tes?: TesPreferences;
   anxietyLevel: "tranquilo" | "nervioso" | "fobia" | "no_responde";
   soundPreference: "musica_suave" | "silencio" | "explicacion_paso_a_paso";
   jawBreaks: boolean;
@@ -110,7 +113,7 @@ export interface CadoContextType {
   updateDerivationStatus: (
     id: string,
     status: NonNullable<Appointment["derivationStatus"]>,
-  ) => void;
+  ) => Promise<boolean>;
   cancelAppointment: (id: string) => void;
   rescheduleAppointment: (
     id: string,

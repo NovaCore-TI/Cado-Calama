@@ -10,7 +10,7 @@ const PERFIL_INSTITUCIONAL = {
     ciudad: "Calama, Región de Antofagasta, Chile",
   },
   ubicacion: {
-    direccion: "Vivar #1500, Oficina 205, Edificio Espacio Parque",
+    direccion: "Vivar #1580, Oficina 203, Edificio Espacio Parque",
     comuna: "Calama",
     referencia: "Sector céntrico, frente a Parque El Loa",
     googleMaps: "https://share.google/Af4IcUf6FfpfVmbTX",

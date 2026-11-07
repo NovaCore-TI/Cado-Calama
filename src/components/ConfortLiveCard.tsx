@@ -38,7 +38,7 @@ export function ConfortLiveCard({
   ].reduce((a, b) => a + b, 0);
 
   return (
-    <div className="clay-card relative overflow-hidden rounded-[2rem] border border-white/80 p-6 sm:p-7 shadow-[0_20px_50px_rgba(81,61,73,.1)] transition-all duration-300">
+    <div className="material-card-tonal relative overflow-hidden rounded-[2rem] border border-white/80 p-6 sm:p-7 shadow-[0_20px_50px_rgba(81,61,73,.1)] transition-all duration-300">
       {/* Resplandor sutil decorativo en la esquina */}
       <div 
         className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#A14B92]/10 blur-2xl" 
@@ -79,7 +79,7 @@ export function ConfortLiveCard({
       </div>
 
       {/* Selector de pestañas interactivas */}
-      <div className="mt-4 flex gap-1 rounded-xl bg-[#F6F8F8] p-1 text-xs">
+      <div className="mt-4 flex flex-wrap gap-1 rounded-xl bg-[#F6F8F8] p-1 text-xs">
         {[
           { id: 'pacto', label: 'Señal de parada', icon: Hand },
           { id: 'ambiente', label: 'Ambiente Box', icon: soundPreference === 'silencio' ? VolumeX : Volume2 },
@@ -91,14 +91,15 @@ export function ConfortLiveCard({
             <button
               key={tab.id}
               type="button"
+              aria-pressed={isActive}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 font-medium transition-all duration-200 ${
+              className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-2 font-medium transition-all duration-200 ${
                 isActive
                   ? 'bg-white text-[#513D49] shadow-sm'
                   : 'text-[#766C75] hover:text-[#513D49]'
               }`}
             >
-              <Icon className="h-3.5 w-3.5 text-[#A14B92]" />
+              <Icon className="h-3.5 w-3.5 shrink-0 text-[#A14B92]" aria-hidden="true" />
               <span>{tab.label}</span>
             </button>
           );

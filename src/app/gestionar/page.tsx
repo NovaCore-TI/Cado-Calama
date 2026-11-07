@@ -174,7 +174,7 @@ export default function ManageAppointment() {
       )}
       {busy && <p role="status">Procesando…</p>}
       {appointment && (
-        <div className="clay-card space-y-5 rounded-3xl p-7">
+        <div className="material-card-tonal space-y-5 rounded-3xl p-7">
           <h2 className="font-title text-2xl">{appointment.nombre_paciente}</h2>
           <p>
             {appointment.fecha} · {appointment.hora} ·{" "}

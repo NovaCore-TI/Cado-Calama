@@ -18,13 +18,14 @@ test('sitemap retains real public pages when the article database is unavailable
   const db = database(() => ({ data: null, error: { code: '08006' } }));
   const { default: sitemap } = loadTs('src/app/sitemap.ts', { '@/lib/supabase': { supabase: db } });
   const entries = await sitemap();
-  assert.ok(entries.some(entry => entry.url === 'https://www.cadoodontologia.cl/equipo/oscar'));
+  assert.ok(entries.some(entry => entry.url === 'https://www.cadoodontologia.cl/equipo/dr-oscar-albanes-hidalgo'));
   assert.ok(entries.some(entry => entry.url === 'https://www.cadoodontologia.cl/endodoncia-calama'));
   assert.ok(entries.every(entry => !entry.url.includes('localhost') && !entry.url.includes('/cuestionario')));
 });
 
 test('SAV never exposes an unsafe or unpriced checkout link', () => {
   const { savPaymentConfiguration: config } = loadTs('src/lib/sav-payment.ts');
+  assert.equal(config({}).priceClp, 15000);
   for (const env of [
     {},
     { CADO_SAV_PAYMENT_URL: 'https://checkout.example' },

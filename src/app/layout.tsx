@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     template: '%s | CADO Odontología Calama',
   },
   description:
-    'Centro Avanzado de Dolor Orofacial en Calama. Urgencias dentales, endodoncia, TTM y atención humana. Vivar #1500, Oficina 205, Edificio Espacio Parque.',
+    'Centro Avanzado de Dolor Orofacial en Calama. Urgencias dentales, endodoncia, TTM y atención humana. Vivar #1580, Oficina 203, Edificio Espacio Parque.',
   keywords: [
     'Dentista Calama',
     'Clínica dental Calama',
@@ -88,7 +88,7 @@ export default function RootLayout({
     name: 'CADO - Centro Avanzado de Dolor Orofacial',
     alternateName: 'CADO Odontología',
     sameAs: [CLINIC.mapsUrl],
-    hasMap: CLINIC.mapsUrl,
+    hasMap: CLINIC.directionsUrl,
     image: `${SITE_URL}/brand/clinica-cado-calama.webp`,
     logo: `${SITE_URL}/brand/image2.png`,
     telephone: '+56944657815',
@@ -96,7 +96,7 @@ export default function RootLayout({
     url: SITE_URL,
     address: {
       '@type': 'PostalAddress',
-      streetAddress: 'Vivar #1500, Oficina 205, Edificio Espacio Parque',
+      streetAddress: 'Vivar #1580, Oficina 203, Edificio Espacio Parque',
       addressLocality: 'Calama',
       addressRegion: 'Antofagasta',
       postalCode: '1390000',

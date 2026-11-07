@@ -1,8 +1,5 @@
-import type { Metadata } from 'next';
-import Link from 'next/link';
-import { CLINIC, whatsappUrl } from '@/lib/clinic';
-import { WhatsAppIcon } from '@/components/WhatsAppIcon';
-export const metadata: Metadata = { title: 'Dr. Juan · Equipo CADO Calama', description: 'Coordina tu atención con el Dr. Juan, odontólogo del equipo de CADO en Calama.', alternates: { canonical: '/equipo/juan' } };
+import { permanentRedirect } from 'next/navigation';
+
 export default function Page() {
-  return <section className="bg-[#F6F8F8] px-6 py-20 text-[#513D49]"><div className="mx-auto max-w-4xl rounded-[2rem] bg-white p-7 shadow-sm sm:p-12"><p className="section-eyebrow">Nuestro equipo · Calama</p><h1 className="mt-5 font-title text-5xl font-semibold">Dr. Juan</h1><p className="mt-3 font-semibold text-[#8A3D7D]">Odontólogo · Equipo CADO</p><p className="mt-6 max-w-2xl leading-8">El Dr. Juan forma parte del equipo de CADO, Centro Avanzado de Dolor Orofacial en Calama. Para conocer su disponibilidad y coordinar una evaluación, conversa con nuestro equipo.</p><a href={CLINIC.mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-6 block text-sm text-[#8A3D7D] underline">{CLINIC.address}</a><div className="mt-8 flex flex-wrap gap-3"><a href={whatsappUrl('Hola CADO, quisiera consultar la disponibilidad del Dr. Juan.')} target="_blank" rel="noopener noreferrer" className="btn-cado-primary inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold"><WhatsAppIcon className="h-4 w-4" />Consultar por el Dr. Juan</a><Link href="/equipo" className="btn-cado-secondary rounded-xl px-5 py-3 text-sm font-semibold">Volver al equipo</Link></div></div></section>;
+  permanentRedirect('/equipo/dr-juan-cruz-mandiola');
 }
