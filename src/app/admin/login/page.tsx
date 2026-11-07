@@ -106,7 +106,6 @@ export default function DoctorLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm outline-none focus:border-[#A14B92]"
-                placeholder="ej: doctor@cado.cl"
               />
             </label>
 

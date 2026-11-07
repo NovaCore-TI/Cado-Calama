@@ -15,7 +15,7 @@ export const OFFICIAL_CADO_DOCTORS: Doctor[] = [
     id: 'e03d11e6-6409-4149-af0d-c01de4222fa8',
     nombre: 'Dr. Javier Beiza Ayala',
     email: 'contacto@cado.cl',
-    rol: 'Cirujano Dentista · Director Clínico CADO',
+    rol: 'Cirujano Dentista · Más de 13 años de experiencia',
     google_conectado: false,
     google_calendar_id: 'primary',
   },

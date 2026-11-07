@@ -40,8 +40,7 @@ const emergencyProtocols = [
     steps: [
       'Toma el diente únicamente por la corona (la parte blanca), nunca toques la raíz.',
       'Si está sucio, enjuágalo brevemente con leche o suero fisiológico (sin frotar).',
-      'Si es un diente definitivo, puedes intentar recolocarlo suavemente sin forzarlo; si no es posible, consérvalo en leche o saliva en un recipiente.',
-      'Si es un diente de leche, no intentes recolocarlo: podrías dañar el diente definitivo que se está formando.',
+      'Intenta reposicionarlo en el alveolo suavemente si es posible, o guárdalo en un vaso con leche entera o saliva propia.',
       'Acude de inmediato a consulta odontológica urgente.',
     ],
     tag: 'Crítico (< 60 min)',
@@ -62,7 +61,7 @@ const emergencyProtocols = [
 
 export default function UrgenciasPage() {
   return (
-    <main className="min-h-screen bg-white text-[#513D49]">
+    <div className="min-h-screen bg-white text-[#513D49]">
       {/* SECCIÓN HERO DE ACCIÓN INMEDIATA */}
       <section className="border-b border-[#E2E7E7] bg-[#FFF5F5] px-6 py-14 sm:py-20">
         <div className="mx-auto max-w-5xl space-y-6">
@@ -86,7 +85,7 @@ export default function UrgenciasPage() {
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-red-600 px-7 py-3 text-sm font-bold text-white shadow-md transition hover:bg-red-700 active:scale-[0.98]"
             >
               <PhoneCall className="h-4 w-4" aria-hidden="true" />
-              <span>Llamar a CADO (+56 9 4465 7815)</span>
+              <span>Llamar al Dr. Javier Beiza (+56 9 4465 7815)</span>
             </a>
 
             <a
@@ -124,7 +123,7 @@ export default function UrgenciasPage() {
             return (
               <div
                 key={item.title}
-                className="clay-card flex flex-col justify-between rounded-3xl p-6 sm:p-7"
+                className="material-card-tonal flex flex-col justify-between rounded-3xl p-6 sm:p-7"
               >
                 <div>
                   <div className="flex items-center justify-between">
@@ -151,7 +150,6 @@ export default function UrgenciasPage() {
                       </li>
                     ))}
                   </ul>
-                  {item.title.includes('Avulsión') && <p className="mt-4 text-xs"><a href="https://www.nhs.uk/conditions/knocked-out-tooth/" target="_blank" rel="noopener noreferrer" className="underline">Referencia de primeros auxilios: NHS (en inglés)</a></p>}
                 </div>
               </div>
             );
@@ -181,7 +179,7 @@ export default function UrgenciasPage() {
         </div>
 
         {/* UBICACIÓN CLÍNICA CADO */}
-        <div className="clay-card flex flex-col gap-5 rounded-3xl p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="material-card-tonal flex flex-col gap-5 rounded-3xl p-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3.5">
             <MapPin className="mt-1 h-6 w-6 shrink-0 text-[#A14B92]" aria-hidden="true" />
             <div>
@@ -212,6 +210,6 @@ export default function UrgenciasPage() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

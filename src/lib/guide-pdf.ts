@@ -57,7 +57,7 @@ export async function generateGuidePdf(guide: GuideDocument): Promise<{ bytes: B
     text("H2", section.heading, 12, true);
     for (const point of section.points) text("P", point, 10);
   }
-  text("P", "Contacto CADO: +56 9 4465 7815. Vivar #1580, oficina 203, Calama.", 10, true);
+  text("P", "Contacto CADO · Dr. Javier Beiza: +56 9 4465 7815. Vivar #1580, oficina 203, Calama.", 10, true);
   text("P", "Material educativo. No sustituye la evaluación presencial ni las indicaciones individuales de tu profesional.", 9);
   root.end();
   const range = doc.bufferedPageRange();

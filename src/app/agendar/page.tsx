@@ -1,6 +1,7 @@
 'use client';
 
-import { Suspense, useMemo, useState, useEffect, useCallback } from 'react';
+import { Suspense, useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { formatChileanPhone, validContactEmail, validContactName, validContactPhone } from '@/lib/booking-validation';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import {
@@ -10,22 +11,17 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
-  Hand,
-  HeartHandshake,
   MessageCircle,
-  PauseCircle,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  Users,
   Video,
-  Volume2,
-  VolumeX,
 } from 'lucide-react';
 import { useCado, type Appointment, type ComfortProfile, type QuestionnaireSubmission } from '@/context/CadoContext';
-import { ConfortLiveCard } from '@/components/ConfortLiveCard';
-import { isVideoReady } from '@/lib/appointment-sync-status';
-import { normalizeFeeling } from '@/lib/questionnaire-feeling';
+import { SavPayment } from '@/components/SavPayment';
+import { TesQuestions, TesSummary } from '@/components/TesPreferences';
+import type { TesPreferences } from '@/lib/tes-preferences';
+import { useLiveUpdates } from '@/hooks/useLiveUpdates';
 
 function endTime(time: string) {
   const [hour, minute] = time.split(':').map(Number);
@@ -57,18 +53,14 @@ const pastExperienceOptions = [
   'Prefiero no responder',
 ];
 
-const soundOptions = [
-  { id: 'musica_suave', label: 'Música suave relajante', desc: 'Música ambiental tranquila en el box durante la atención.', icon: Volume2 },
-  { id: 'silencio', label: 'Silencio y calma total', desc: 'Sin música de fondo, ambiente silencioso y despejado.', icon: VolumeX },
-] as const;
-
 function BookingWizard() {
   const searchParams = useSearchParams();
   const stepParam = searchParams.get('step');
-  const initialStep: 1 | 2 | 3 | 4 = stepParam === '2' ? 2 : stepParam === '3' ? 3 : 1;
+  const initialStep: 1 | 2 | 3 | 4 = stepParam === '3' ? 3 : 2;
 
   const {
     availableSlots,
+    supabaseStatus,
     blockedDates,
     addAppointment,
     activeComfortProfile,
@@ -88,23 +80,29 @@ function BookingWizard() {
 
   // Estados del Paso 1: Cuestionario
   const [reason, setReason] = useState(activeQuestionnaire?.reason || '');
-  const [feeling, setFeeling] = useState<string>(normalizeFeeling(activeQuestionnaire?.feeling) || 'nervioso');
+  const [feeling, setFeeling] = useState<string>(activeQuestionnaire?.feeling || 'nervioso');
   const [previousExp, setPreviousExp] = useState(activeQuestionnaire?.previousExperience || 'Prefiero no responder');
   const [sensitivity, setSensitivity] = useState(activeQuestionnaire?.painSensitivity || 'Alta sensibilidad; avisar antes de cada paso');
   const [communication, setCommunication] = useState(activeQuestionnaire?.communicationPreference || 'Explicación paso a paso con lenguaje sencillo');
   const [questionnaireConsent, setQuestionnaireConsent] = useState(false);
-  const [isSkippingQuestionnaire, setIsSkippingQuestionnaire] = useState(false);
+  const [isSkippingQuestionnaire, setIsSkippingQuestionnaire] = useState(!activeQuestionnaire);
   const [savedQuestionnaire, setSavedQuestionnaire] = useState<QuestionnaireSubmission | null>(null);
 
-  // Estados del Paso 2: Confort
-  const [sound, setSound] = useState<'musica_suave' | 'silencio'>(
-    activeComfortProfile.soundPreference === 'silencio' ? 'silencio' : 'musica_suave'
-  );
-  const [breaks, setBreaks] = useState(activeComfortProfile.jawBreaks ?? true);
-  const [companion, setCompanion] = useState(activeComfortProfile.companionAllowed ?? false);
-  const [stopSignal, setStopSignal] = useState(activeComfortProfile.handSignalPledge ?? true);
-  const [explanation, setExplanation] = useState(activeComfortProfile.explanationStepByStep ?? true);
-  const [comfortNotes, setComfortNotes] = useState(activeComfortProfile.notes || '');
+  const [tes, setTes] = useState<TesPreferences>(activeComfortProfile.tes ?? {});
+  function updateTes(key: keyof TesPreferences, value: string) {
+    setTes(previous => ({ ...previous, [key]: value }));
+  }
+
+  const comfortProfile: ComfortProfile = {
+    anxietyLevel: isSkippingQuestionnaire ? 'no_responde' : feeling as ComfortProfile['anxietyLevel'],
+    soundPreference: tes.music === 'Silencio y calma total' ? 'silencio' : 'musica_suave',
+    jawBreaks: false,
+    companionAllowed: false,
+    handSignalPledge: false,
+    notes: '',
+    explanationStepByStep: false,
+    tes,
+  };
 
   // Estados del Paso 3: Agendamiento de Fecha y Hora
   const today = useMemo(
@@ -122,36 +120,39 @@ function BookingWizard() {
   const [googleCalendarUrl, setGoogleCalendarUrl] = useState<string>('');
   const [managementSecret, setManagementSecret] = useState('');
   const [calendarStatus, setCalendarStatus] = useState('Pendiente_Reintento');
-  const [checkingCalendar, setCheckingCalendar] = useState(false);
-  const videoReady = isVideoReady(calendarStatus, createdAppointment?.meetLink);
-
-  const refreshCalendarStatus = useCallback(async (signal?: AbortSignal) => {
-    const response = await fetch('/api/orientaciones', {
-      headers: { 'x-management-token': managementSecret }, cache: 'no-store', signal,
-    });
+  const confirmationSequence = useRef(0);
+  const refreshConfirmation = useCallback(async () => {
+    const request = ++confirmationSequence.current;
+    const response = await fetch('/api/orientaciones', { headers: { 'x-management-token': managementSecret }, cache: 'no-store' });
     const result = await response.json();
-    if (!response.ok || !result.data) throw Error('No se pudo consultar la videollamada. Tu reserva sigue guardada.');
-    if (signal?.aborted) return false;
+    if (!response.ok || !result.data || request !== confirmationSequence.current) return false;
     setCalendarStatus(result.data.estado_sync);
     setCreatedAppointment(previous => previous ? {
-      ...previous, meetLink: result.data.meet_link || '', status: result.data.estado_atencion,
+      ...previous, date: result.data.fecha, time: String(result.data.hora).slice(0, 5),
+      meetLink: result.data.meet_link || '', status: result.data.estado_atencion,
     } : previous);
-    return isVideoReady(result.data.estado_sync, result.data.meet_link);
+    return result.data.estado_sync === 'Sincronizado';
   }, [managementSecret]);
+  useLiveUpdates({ resources: ['availability'], enabled: currentStep === 4 && Boolean(managementSecret), pollMs: 15_000 }, async () => { await refreshConfirmation(); });
 
   useEffect(() => {
     if (!managementSecret || currentStep !== 4) return;
-    const controller = new AbortController();
-    const deadline = Date.now() + 60_000;
-    let timer: ReturnType<typeof setTimeout>;
-    async function poll() {
-      let ready = false;
-      try { ready = await refreshCalendarStatus(controller.signal); } catch { /* Keep the saved reservation visible. */ }
-      if (!ready && !controller.signal.aborted && Date.now() < deadline) timer = setTimeout(poll, 2000);
-    }
-    void poll();
-    return () => { controller.abort(); clearTimeout(timer); };
-  }, [managementSecret, currentStep, refreshCalendarStatus]);
+    let active = true;
+    const timer = setInterval(async () => {
+      try { if (active && await refreshConfirmation()) clearInterval(timer); } catch {}
+    },2000);
+    const timeout=setTimeout(()=>clearInterval(timer),60000);
+    return()=>{active=false;clearInterval(timer);clearTimeout(timeout);};
+  },[managementSecret,currentStep,refreshConfirmation]);
+
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const previousStep = useRef(currentStep);
+  useEffect(() => {
+    if (previousStep.current === currentStep) return;
+    previousStep.current = currentStep;
+    stepHeading.current?.focus({ preventScroll: true });
+    stepHeading.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+  }, [currentStep]);
 
   const validDate = date >= today && !blockedDates.includes(date);
   const slots = availableSlots
@@ -164,11 +165,16 @@ function BookingWizard() {
   const canAdvanceQuestionnaire = reason.trim().length >= 3 && questionnaireConsent;
 
   // Validación de Paso 3
+  const [touchedContact, setTouchedContact] = useState({ name: false, email: false, phone: false });
+  const validName = validContactName(patientDraftInfo.name.trim());
+  const validEmail = validContactEmail(patientDraftInfo.email.trim());
+  const validPhone = validContactPhone(patientDraftInfo.phone.trim());
+  const showNameError = touchedContact.name && !validName;
+  const showEmailError = touchedContact.email && !validEmail;
+  const showPhoneError = touchedContact.phone && !validPhone;
   const canConfirmBooking =
-    patientDraftInfo.name.trim().length >= 3 &&
-    patientDraftInfo.email.includes('@') &&
-    patientDraftInfo.phone.trim().length >= 8 &&
-    slot.length > 0 &&
+    validName && validEmail && validPhone &&
+    validDate && slots.includes(slot) &&
     finalConsent;
 
   // Manejo de paso 1 -> paso 2
@@ -177,7 +183,6 @@ function BookingWizard() {
     if (skip) {
       setIsSkippingQuestionnaire(true);
       setCurrentStep(2);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -199,10 +204,9 @@ function BookingWizard() {
       setSavedQuestionnaire(savedQ);
       setIsSkippingQuestionnaire(false);
       setCurrentStep(2);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       setErrorMsg('No se pudo guardar el cuestionario. Intenta nuevamente.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'instant' });
     } finally {
       setIsSubmitting(false);
     }
@@ -211,24 +215,12 @@ function BookingWizard() {
   // Manejo de paso 2 -> paso 3
   async function handleCompleteComfort() {
     setErrorMsg('');
-    const profile: ComfortProfile = {
-      anxietyLevel: (feeling as ComfortProfile['anxietyLevel']) || 'nervioso',
-      soundPreference: sound,
-      jawBreaks: breaks,
-      companionAllowed: companion,
-      handSignalPledge: stopSignal,
-      notes: comfortNotes.trim(),
-      explanationStepByStep: explanation,
-    };
-
     setIsSubmitting(true);
     try {
-      await saveComfortPreferences(profile);
+      await saveComfortPreferences(comfortProfile);
       setCurrentStep(3);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       setCurrentStep(3);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
@@ -240,16 +232,6 @@ function BookingWizard() {
     setErrorMsg('');
     setIsSubmitting(true);
 
-    const comfortPayload: ComfortProfile = {
-      anxietyLevel: isSkippingQuestionnaire ? 'tranquilo' : ((feeling as ComfortProfile['anxietyLevel']) || 'nervioso'),
-      soundPreference: sound,
-      jawBreaks: breaks,
-      companionAllowed: companion,
-      handSignalPledge: stopSignal,
-      notes: comfortNotes.trim(),
-      explanationStepByStep: explanation,
-    };
-
     try {
       const res = await fetch('/api/orientaciones', {
         method: 'POST',
@@ -257,12 +239,12 @@ function BookingWizard() {
         body: JSON.stringify({
           patientName: patientDraftInfo.name.trim(),
           email: patientDraftInfo.email.trim(),
-          phone: patientDraftInfo.phone.trim(),
+          phone: formatChileanPhone(patientDraftInfo.phone),
           date,
           time: slot,
           consent: finalConsent,
           cuestionarioId: isSkippingQuestionnaire ? null : ((savedQuestionnaire?.id || activeQuestionnaire?.id) || null),
-          comfortProfile: comfortPayload,
+          comfortProfile,
         }),
       });
 
@@ -286,7 +268,7 @@ function BookingWizard() {
         phone: patientDraftInfo.phone.trim(),
         date,
         time: slot,
-        comfortProfile: comfortPayload,
+        comfortProfile,
         questionnaire: isSkippingQuestionnaire ? undefined : (savedQuestionnaire || activeQuestionnaire || undefined),
         meetLink: json.data?.meet_link || '',
         derivationStatus: 'Sin derivación',
@@ -295,7 +277,6 @@ function BookingWizard() {
 
       setCreatedAppointment(app);
       setCurrentStep(4);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       setErrorMsg('No se pudo confirmar la reserva. Intenta nuevamente.');
     } finally {
@@ -310,23 +291,23 @@ function BookingWizard() {
         <div className="mx-auto max-w-5xl">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#B3BFBF] bg-white px-3.5 py-1 text-xs font-semibold text-[#513D49]">
             <Clock3 className="h-3.5 w-3.5 text-[#A14B92]" aria-hidden="true" />
-            <span>Orientación Virtual de 15 Minutos · Calama</span>
+            <span>Encuesta TES + SAV de 15 minutos · Calama</span>
           </div>
 
           <h1 className="mt-4 font-title text-4xl font-semibold leading-tight text-[#513D49] sm:text-5xl">
-            {currentStep === 1 && 'Paso 1: Tu historia y nivel de confort'}
-            {currentStep === 2 && 'Paso 2: Personalización del box clínico'}
-            {currentStep === 3 && 'Paso 3: Reserva tu horario y datos'}
-            {currentStep === 4 && (videoReady ? '¡Orientación virtual confirmada!' : 'Reserva guardada; videollamada pendiente')}
+            {currentStep === 1 && 'Tu historia (opcional)'}
+            {currentStep === 2 && '1. Encuesta TES · Tu Espacio Seguro'}
+            {currentStep === 3 && '2. Reserva tu SAV de 15 minutos'}
+            {currentStep === 4 && '¡Tu SAV está reservada!'}
           </h1>
 
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#513D49] sm:text-base">
             {currentStep === 1 &&
               'Para que el Dr. Javier Beiza pueda ofrecerte una atención humana y respetuosa, personalizamos cada detalle antes de la videollamada.'}
             {currentStep === 2 &&
-              'Elige las condiciones en que te gustaría que esté el box clínico en Edificio Espacio Parque: ambiente sonoro, pausas y señal de parada.'}
+              'Cuéntanos qué ambiente prefieres, a qué ritmo quieres avanzar y cómo te gustaría que nos comuniquemos contigo. Después podrás reservar tu Sesión de Acercamiento Virtual en esta misma página.'}
             {currentStep === 3 &&
-              'Selecciona el día y bloque horario vespertino que mejor se acomode a tus turnos o jornada laboral.'}
+              'Una videollamada de 15 minutos en Google Meet para conocernos y resolver tus dudas desde casa, sin sillón dental. Elige tu horario y revisa el valor antes de confirmar.'}
             {currentStep === 4 &&
               'Tu cita ha quedado registrada y vinculada a tus respuestas de confort.'}
           </p>
@@ -334,13 +315,12 @@ function BookingWizard() {
           {/* Stepper visual con accesibilidad */}
           {currentStep < 4 && (
             <nav aria-label="Progreso del agendamiento" className="mt-8">
-              <ol className="grid grid-cols-3 gap-2 sm:gap-4">
+              <ol className="grid grid-cols-2 gap-2 sm:gap-4">
                 {[
-                  { step: 1, title: '1. Cuestionario', sub: 'Tu sensibilidad' },
-                  { step: 2, title: '2. Confort', sub: 'Ambiente y pausas' },
-                  { step: 3, title: '3. Horario', sub: 'Reserva final' },
+                  { step: 2, title: '1. Encuesta TES', sub: 'Tu Espacio Seguro' },
+                  { step: 3, title: '2. Reservar SAV', sub: 'Sesión de Acercamiento Virtual' },
                 ].map((item) => {
-                  const isCurrent = currentStep === item.step;
+                  const isCurrent = currentStep === item.step || (currentStep === 1 && item.step === 2);
                   const isCompleted = currentStep > item.step;
                   return (
                     <li
@@ -370,13 +350,13 @@ function BookingWizard() {
       </section>
 
       {/* CONTENIDO DEL FLUJO SEGÚN EL PASO ACTIVO */}
-      <div className="mx-auto max-w-5xl px-6 pt-10">
+      <div className="mx-auto max-w-5xl px-4 pt-10 sm:px-6">
         {errorMsg && (
           <div
             role="alert"
-            className="mb-8 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+            className="material-error mb-8 flex items-start gap-3 rounded-2xl p-4 text-sm"
           >
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden="true" />
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -393,27 +373,27 @@ function BookingWizard() {
                   <ShieldCheck className="h-6 w-6" aria-hidden="true" />
                 </span>
                 <div className="space-y-2">
-                  <h2 className="font-title text-2xl font-semibold text-[#513D49]">
+                  <h2 ref={stepHeading} tabIndex={-1} className="font-title text-2xl font-semibold text-[#513D49]">
                     ¿Por qué solicitamos este cuestionario antes de agendar?
                   </h2>
                   <p className="text-sm leading-relaxed text-[#513D49]">
                     El Dr. Javier Beiza lee personalmente tus respuestas antes de la videollamada para comprender tu nivel de sensibilidad, tus temores y adaptar el ritmo de la conversación.
                   </p>
                   <div className="rounded-2xl border border-[#B3BFBF]/40 bg-white/80 p-3.5 text-xs leading-relaxed text-[#513D49]">
-                    <strong className="text-[#A14B92]">Importante para tu experiencia:</strong> Si decides omitir este cuestionario, podrás agendar de todos modos, pero la orientación se realizará con el <em>protocolo clínico estándar sin personalización de pausas ni adaptación a tus sensibilidades</em>.
+                    <strong className="text-[#A14B92]">Importante para tu experiencia:</strong> Puedes omitir tu historia y completar igualmente la encuesta TES para compartir tus preferencias de atención.
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Formulario de preguntas ágiles */}
-            <div className="clay-card rounded-[2rem] p-6 sm:p-9 space-y-7">
+            <div className="material-card rounded-[2rem] p-6 sm:p-9 space-y-7">
               {/* Pregunta 1: Motivo de consulta */}
               <div className="space-y-3">
-                <label className="block font-title text-2xl font-semibold text-[#513D49]">
+                <label htmlFor="sav-reason" className="block font-title text-2xl font-semibold text-[#513D49]">
                   1. ¿Cuál es el principal motivo que te hace consultar hoy?
                 </label>
-                <p className="text-xs text-[#513D49]">
+                <p id="sav-reason-help" className="text-xs text-[#513D49]">
                   Puedes seleccionar una opción rápida o escribir con tus propias palabras:
                 </p>
 
@@ -423,25 +403,24 @@ function BookingWizard() {
                     <button
                       key={item}
                       type="button"
+                      aria-pressed={reason === item}
                       onClick={() => setReason(item)}
-                      className={`rounded-xl border px-3.5 py-2 text-xs font-medium transition-all ${
-                        reason === item
-                          ? 'border-[#A14B92] bg-[#A14B92] text-white shadow-sm'
-                          : 'border-[#B3BFBF] bg-white text-[#513D49] hover:bg-[#F6F8F8]'
-                      }`}
+                      className="material-option text-xs font-medium"
                     >
+                      {reason === item && <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />}
                       {item}
                     </button>
                   ))}
                 </div>
 
                 <textarea
-                  aria-label="Detalles del motivo de consulta"
+                  id="sav-reason"
+                  aria-describedby="sav-reason-help"
                   rows={2}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="Escribe aquí los detalles que quieras que el doctor conozca..."
-                  className="mt-2 w-full rounded-2xl border border-[#B3BFBF] bg-white p-3.5 text-sm outline-none focus:border-[#A14B92]"
+                  className="mt-2 material-field text-sm"
                 />
               </div>
 
@@ -527,10 +506,10 @@ function BookingWizard() {
                   type="button"
                   onClick={() => handleCompleteQuestionnaire(false)}
                   disabled={!canAdvanceQuestionnaire || isSubmitting}
-                  className="btn-cado-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-7 py-3 text-sm font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-40"
+                  className="btn-cado-primary material-button text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <span>
-                    {isSubmitting ? 'Guardando respuestas...' : 'Guardar y avanzar a Test de Confort'}
+                    {isSubmitting ? 'Guardando respuestas...' : 'Guardar historia y volver a Encuesta TES'}
                   </span>
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -541,7 +520,7 @@ function BookingWizard() {
                   className="inline-flex items-center justify-center gap-1.5 py-2 text-xs font-semibold text-[#766C75] hover:text-[#513D49] hover:underline"
                 >
                   <ShieldAlert className="h-4 w-4" aria-hidden="true" />
-                  <span>Omitir cuestionario (Continuar con atención estándar)</span>
+                  <span>Continuar a TES sin compartir mi historia</span>
                 </button>
               </div>
             </div>
@@ -552,145 +531,28 @@ function BookingWizard() {
         {/* PASO 2: TEST DE CONFORT AMBIENTAL (BOX CLÍNICO)                  */}
         {/* ================================================================= */}
         {currentStep === 2 && (
-          <div className="grid gap-8 lg:grid-cols-[1.3fr_1fr]">
-            <div className="space-y-6">
-              {isSkippingQuestionnaire && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
-                  ⚠️ Has elegido omitir el cuestionario previo. Aún puedes configurar tus preferencias de confort ambiental para el box si lo deseas.
-                </div>
-              )}
+          <div id="tes" className="grid scroll-mt-40 gap-8 lg:grid-cols-[1.3fr_1fr]">
+            <div className="min-w-0 space-y-6">
+              <h2 ref={stepHeading} tabIndex={-1} className="font-title text-2xl font-semibold">Encuesta de confort</h2>
+              <div className="rounded-2xl border border-[#A14B92]/25 bg-[#F8EFF6] p-5 text-sm leading-7">
+                Tus preferencias se enviarán con tu reserva. Puedes responder a tu ritmo y añadir tu historia si te ayuda a preparar la conversación.
+              </div>
 
-              {/* Preferencia de sonido */}
-              <fieldset className="clay-card rounded-[2rem] p-6 sm:p-7">
-                <legend className="font-title text-2xl font-semibold text-[#513D49]">
-                  1. Ambiente sonoro del box
-                </legend>
-                <p className="mt-1 text-xs text-[#513D49]">
-                  ¿Cómo te gustaría que esté el espacio clínico antes de tu ingreso?
-                </p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {soundOptions.map((opt) => {
-                    const Icon = opt.icon;
-                    return (
-                      <label
-                        key={opt.id}
-                        className={`flex cursor-pointer flex-col rounded-2xl border p-4 transition ${
-                          sound === opt.id
-                            ? 'border-[#A14B92] bg-[#F8EFF6] shadow-sm'
-                            : 'border-[#E2E7E7] bg-white hover:bg-[#F6F8F8]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <Icon className="h-5 w-5 text-[#A14B92]" aria-hidden="true" />
-                          <input
-                            type="radio"
-                            name="sound_opt"
-                            value={opt.id}
-                            checked={sound === opt.id}
-                            onChange={() => setSound(opt.id)}
-                            className="accent-[#A14B92]"
-                          />
-                        </div>
-                        <strong className="mt-2 text-sm font-semibold text-[#513D49]">{opt.label}</strong>
-                        <span className="mt-1 text-xs leading-relaxed text-[#513D49]">{opt.desc}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </fieldset>
-
-              {/* Pausas, acompañante y pacto de mano */}
-              <fieldset className="clay-card rounded-[2rem] p-6 sm:p-7 space-y-4">
-                <legend className="font-title text-2xl font-semibold text-[#513D49]">
-                  2. Control, pausas y acompañamiento
-                </legend>
-
-                <div className="space-y-3">
-                  {[
-                    {
-                      label: 'Solicitar pausas periódicas para descansar la mandíbula',
-                      desc: 'Hacemos detenciones conscientes cada 5-7 minutos.',
-                      checked: breaks,
-                      onChange: setBreaks,
-                      icon: PauseCircle,
-                    },
-                    {
-                      label: 'Acordar señal con la mano (Stop Signal) para detenernos de inmediato',
-                      desc: 'Si levantas la mano, el doctor detiene cualquier procedimiento al instante.',
-                      checked: stopSignal,
-                      onChange: setStopSignal,
-                      icon: Hand,
-                    },
-                    {
-                      label: 'Asistir con un acompañante de confianza al box',
-                      desc: 'Permitido para darte tranquilidad durante toda la sesión.',
-                      checked: companion,
-                      onChange: setCompanion,
-                      icon: Users,
-                    },
-                    {
-                      label: 'Explicación tranquila paso a paso antes de cada acción',
-                      desc: 'Te contamos qué se siente antes de aplicar cualquier instrumento.',
-                      checked: explanation,
-                      onChange: setExplanation,
-                      icon: HeartHandshake,
-                    },
-                  ].map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <label
-                        key={item.label}
-                        className="flex cursor-pointer items-start gap-3.5 rounded-2xl border border-[#E2E7E7] bg-white p-4 transition hover:bg-[#F6F8F8]"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          onChange={(e) => item.onChange(e.target.checked)}
-                          className="mt-1 accent-[#A14B92]"
-                        />
-                        <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#A14B92]" aria-hidden="true" />
-                        <div>
-                          <strong className="block text-sm font-semibold text-[#513D49]">
-                            {item.label}
-                          </strong>
-                          <span className="text-xs text-[#513D49]">{item.desc}</span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-
-                <div className="pt-2">
-                  <label className="block text-xs font-semibold text-[#513D49]">
-                    Comentario adicional o necesidad específica (opcional)
-                    <input
-                      type="text"
-                      value={comfortNotes}
-                      onChange={(e) => setComfortNotes(e.target.value)}
-                      placeholder="Ej: Tengo dolor en el cuello si el sillón baja demasiado..."
-                      className="mt-1.5 w-full rounded-xl border border-[#B3BFBF] bg-white px-3.5 py-2.5 text-xs outline-none focus:border-[#A14B92]"
-                    />
-                  </label>
-                </div>
-              </fieldset>
+              <button type="button" onClick={() => setCurrentStep(1)}
+                className="btn-cado-secondary material-button text-sm font-semibold">
+                Agregar mi historia (opcional)
+              </button>
+              <TesQuestions answers={tes} onChange={updateTes} />
 
               {/* Botones de navegación del paso 2 */}
               <div className="flex flex-wrap gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(1)}
-                  className="btn-cado-secondary inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold"
-                >
-                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                  <span>Volver al cuestionario</span>
-                </button>
-                <button
-                  type="button"
                   onClick={handleCompleteComfort}
                   disabled={isSubmitting}
-                  className="btn-cado-primary inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold shadow-md"
+                  className="btn-cado-primary material-button text-sm font-semibold"
                 >
-                  <span>Elegir horario y confirmar cita</span>
+                  <span>Continuar a reservar mi SAV</span>
                   <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
@@ -698,15 +560,14 @@ function BookingWizard() {
 
             {/* Tarjeta interactiva en vivo a la derecha */}
             <aside className="lg:sticky lg:top-32 lg:self-start space-y-4">
-              <ConfortLiveCard
-                soundPreference={sound}
-                jawBreaks={breaks}
-                companionAllowed={companion}
-                handSignalPledge={stopSignal}
-              />
-              <p className="text-center text-xs text-[#766C75]">
-                Esta configuración se enviará a la bandeja clínica del Dr. Javier Beiza.
-              </p>
+              <section className="material-card rounded-2xl p-5" aria-labelledby="tes-summary">
+                <h3 id="tes-summary" className="mb-4 font-title text-2xl font-semibold">Tu resumen TES</h3>
+                <TesSummary answers={tes} />
+              </section>
+              <section className="material-card-tonal space-y-2 rounded-2xl p-4 text-sm" aria-labelledby="tes-hand-signal">
+                <h3 id="tes-hand-signal" className="font-semibold">Pacto de la Mano Levantada</h3>
+                <p>Durante la atención, puedes levantar la mano para que nos detengamos. Si prefieres acordar pausas o venir con un acompañante, podemos conversarlo en la SAV.</p>
+              </section>
             </aside>
           </div>
         )}
@@ -715,10 +576,10 @@ function BookingWizard() {
         {/* PASO 3: SELECCIÓN DE HORARIO Y DATOS DE CONTACTO                 */}
         {/* ================================================================= */}
         {currentStep === 3 && (
-          <div className="clay-card rounded-[2rem] p-6 sm:p-9 space-y-8">
+          <div id="sav" className="material-card scroll-mt-40 rounded-[2rem] p-6 sm:p-9 space-y-8">
             <div>
-              <h2 className="font-title text-2xl font-semibold text-[#513D49]">
-                Selecciona tu fecha y bloque de orientación virtual
+              <h2 ref={stepHeading} tabIndex={-1} className="font-title text-2xl font-semibold text-[#513D49]">
+                Selecciona tu horario de SAV
               </h2>
               <p className="mt-1 text-xs text-[#513D49]">
                 Horarios vespertinos adaptados a jornadas laborales y turnos de Calama.
@@ -736,7 +597,7 @@ function BookingWizard() {
                       setDate(e.target.value);
                       setSlot('');
                     }}
-                    className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
+                    className="mt-1.5 material-field text-sm font-normal"
                   />
                 </label>
 
@@ -745,39 +606,42 @@ function BookingWizard() {
                   <CalendarDays className="h-5 w-5 text-[#A14B92]" aria-hidden="true" />
                   <div>
                     <strong className="block font-semibold text-[#513D49]">Fecha: {date}</strong>
-                    <span>{validDate ? 'Bloques disponibles abajo' : 'Día no disponible'}</span>
+                    <span>{!supabaseStatus.connected ? 'Consultando disponibilidad de agenda' : validDate ? 'Bloques disponibles abajo' : 'Día no disponible'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Botones de bloques horarios disponibles */}
-              <div className="mt-5 space-y-2">
-                <span className="block text-xs font-semibold text-[#513D49]">
-                  Bloques horarios disponibles (15 minutos):
-                </span>
-                {slots.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-[#B3BFBF] p-4 text-center text-xs text-[#766C75]">
-                    No hay bloques disponibles para esta fecha. Selecciona otro día en el calendario.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <fieldset className="mt-5 min-w-0 space-y-2">
+                <legend className="text-sm font-semibold">
+                  Bloques horarios disponibles (15 minutos)
+                </legend>
+                <p role="status" className={slots.length ? 'sr-only' : 'material-card-tonal rounded-xl p-4 text-sm'}>
+                  {slots.length
+                    ? slots.length + ' horarios disponibles para la fecha seleccionada.'
+                    : supabaseStatus.latencyMs === 0
+                      ? 'Consultando disponibilidad…'
+                      : supabaseStatus.connected === false
+                        ? 'No pudimos consultar la agenda. Intenta nuevamente más tarde o coordina tu SAV por WhatsApp.'
+                        : 'No hay bloques disponibles para esta fecha. Selecciona otro día en el calendario.'}
+                </p>
+                {slots.length > 0 && (
+                  <div className="grid gap-2.5 sm:grid-cols-2 md:grid-cols-3">
                     {slots.map((time) => (
-                      <button
-                        key={time}
-                        type="button"
-                        onClick={() => setSlot(time)}
-                        className={`rounded-xl border px-3.5 py-3 text-xs font-semibold transition ${
-                          slot === time
-                            ? 'border-[#A14B92] bg-[#A14B92] text-white shadow-sm'
-                            : 'border-[#B3BFBF] bg-white text-[#513D49] hover:border-[#A14B92]'
-                        }`}
-                      >
-                        {time}–{endTime(time)}
-                      </button>
+                      <label key={time} className="material-option text-sm font-semibold">
+                        <input
+                          type="radio"
+                          name="sav-time"
+                          value={time}
+                          checked={slot === time}
+                          onChange={() => setSlot(time)}
+                          className="h-4 w-4 shrink-0 accent-cado-purple"
+                        />
+                        <span>{time}–{endTime(time)}</span>
+                      </label>
                     ))}
                   </div>
                 )}
-              </div>
+              </fieldset>
             </div>
 
             {/* Datos de contacto del paciente */}
@@ -785,52 +649,83 @@ function BookingWizard() {
               <h2 className="font-title text-2xl font-semibold text-[#513D49]">
                 Tus datos de contacto
               </h2>
+              <p className="text-sm">
+                Los campos marcados con asterisco son obligatorios. Para confirmar, selecciona un horario, completa tus datos y acepta el consentimiento.
+              </p>
 
               <label className="block text-xs font-semibold text-[#513D49]">
-                Nombre completo <span className="text-[#A14B92]">*</span>
-                <input
-                  type="text"
-                  required
-                  autoComplete="name"
-                  value={patientDraftInfo.name}
-                  onChange={(e) =>
-                    setPatientDraftInfo((prev) => ({ ...prev, name: e.target.value }))
-                  }
-                  placeholder="Ej: Javiera Morales"
-                  className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
-                />
+                <span className="material-labeled-field">
+                  <input
+                    type="text"
+                    required
+                    autoComplete="name"
+                    placeholder=" "
+                    aria-labelledby="sav-name-label"
+                    aria-invalid={showNameError || undefined}
+                    aria-describedby={showNameError ? 'sav-name-error' : undefined}
+                    onBlur={() => setTouchedContact(previous => ({ ...previous, name: true }))}
+                    value={patientDraftInfo.name}
+                    onChange={(e) =>
+                      setPatientDraftInfo((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    className="material-field text-sm font-normal"
+                  />
+                  <span id="sav-name-label">Nombre Completo <span className="text-[#A14B92]" aria-hidden="true">*</span></span>
+                </span>
+                {showNameError && <span id="sav-name-error" className="mt-1 block text-[var(--md-error)]" role="alert">Ingresa un nombre de 3 a 120 caracteres.</span>}
               </label>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block text-xs font-semibold text-[#513D49]">
-                  Correo electrónico (para enviarte el Meet) <span className="text-[#A14B92]">*</span>
-                  <input
-                    type="email"
-                    required
-                    autoComplete="email"
-                    spellCheck={false}
-                    value={patientDraftInfo.email}
-                    onChange={(e) =>
-                      setPatientDraftInfo((prev) => ({ ...prev, email: e.target.value }))
-                    }
-                    placeholder="javiera@correo.cl"
-                    className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
-                  />
+                  <span className="material-labeled-field">
+                    <input
+                      type="email"
+                      required
+                      autoComplete="email"
+                      placeholder=" "
+                      aria-labelledby="sav-email-label"
+                      aria-invalid={showEmailError || undefined}
+                      aria-describedby={showEmailError ? 'sav-email-error sav-email-help' : 'sav-email-help'}
+                      onBlur={() => setTouchedContact(previous => ({ ...previous, email: true }))}
+                      spellCheck={false}
+                      value={patientDraftInfo.email}
+                      onChange={(e) =>
+                        setPatientDraftInfo((prev) => ({ ...prev, email: e.target.value }))
+                      }
+                      className="material-field text-sm font-normal"
+                    />
+                    <span id="sav-email-label">Correo Electrónico <span className="text-[#A14B92]" aria-hidden="true">*</span></span>
+                  </span>
+                  <span id="sav-email-help" className="mt-1 block font-normal">Te enviaremos el enlace de Google Meet a este correo.</span>
+                  {showEmailError && <span id="sav-email-error" className="mt-1 block text-[var(--md-error)]" role="alert">Ingresa una dirección de correo electrónico válida.</span>}
                 </label>
 
                 <label className="block text-xs font-semibold text-[#513D49]">
-                  Teléfono / WhatsApp <span className="text-[#A14B92]">*</span>
-                  <input
-                    type="tel"
-                    required
-                    autoComplete="tel"
-                    value={patientDraftInfo.phone}
-                    onChange={(e) =>
-                      setPatientDraftInfo((prev) => ({ ...prev, phone: e.target.value }))
-                    }
-                    placeholder="+56 9 8765 4321"
-                    className="mt-1.5 w-full rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-sm font-normal outline-none focus:border-[#A14B92]"
-                  />
+                  <span className="material-labeled-field">
+                    <input
+                      type="tel"
+                      required
+                      autoComplete="tel"
+                      aria-labelledby="sav-phone-label"
+                      aria-invalid={showPhoneError || undefined}
+                      aria-describedby={showPhoneError ? 'sav-phone-error' : undefined}
+                      onBlur={() => {
+                        setTouchedContact(previous => ({ ...previous, phone: true }));
+                        setPatientDraftInfo(previous => ({
+                          ...previous,
+                          phone: formatChileanPhone(previous.phone),
+                        }));
+                      }}
+                      value={patientDraftInfo.phone}
+                      onChange={(e) =>
+                        setPatientDraftInfo((prev) => ({ ...prev, phone: e.target.value }))
+                      }
+                      placeholder=" "
+                      className="material-field text-sm font-normal"
+                    />
+                    <span id="sav-phone-label">Teléfono / WhatsApp <span className="text-[#A14B92]" aria-hidden="true">*</span></span>
+                  </span>
+                  {showPhoneError && <span id="sav-phone-error" className="mt-1 block text-[var(--md-error)]" role="alert">Ingresa un teléfono de 8 a 25 caracteres, por ejemplo +56 9 8765 4321.</span>}
                 </label>
               </div>
             </div>
@@ -843,14 +738,14 @@ function BookingWizard() {
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-[#513D49]">
                 <span>
                   {isSkippingQuestionnaire
-                    ? '• Cuestionario previo: Omitido (Protocolo estándar)'
-                    : '• Cuestionario previo: Respuestas vinculadas'}
+                    ? '• Historia adicional: No compartida'
+                    : '• Historia adicional: Respuestas vinculadas'}
                 </span>
-                <span>• Ambiente sonoro: {sound === 'silencio' ? 'Silencio' : 'Música suave'}</span>
-                <span>• Pausas mandibulares: {breaks ? 'Activadas' : 'A demanda'}</span>
-                <span>• Señal de mano (Stop): {stopSignal ? 'Acordada' : 'No'}</span>
               </div>
+              <TesSummary answers={tes} />
             </div>
+
+            <SavPayment />
 
             {/* Checkbox de consentimiento de agendamiento */}
             <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-[#E2E7E7] bg-[#F6F8F8] p-4 text-xs leading-relaxed text-[#513D49]">
@@ -870,21 +765,21 @@ function BookingWizard() {
               <button
                 type="button"
                 onClick={() => setCurrentStep(2)}
-                className="btn-cado-secondary inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold"
+                className="btn-cado-secondary material-button text-sm font-semibold"
               >
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                <span>Volver a confort</span>
+                <span>Volver a Encuesta TES</span>
               </button>
 
               <button
                 type="button"
                 disabled={!canConfirmBooking || isSubmitting}
                 onClick={handleFinalBooking}
-                className="btn-cado-primary inline-flex items-center gap-2 rounded-2xl px-7 py-3 text-sm font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn-cado-primary material-button text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                 <span>
-                  {isSubmitting ? 'Registrando reserva...' : 'Confirmar Reserva de Orientación'}
+                  {isSubmitting ? 'Registrando reserva...' : 'Confirmar reserva de SAV'}
                 </span>
               </button>
             </div>
@@ -895,7 +790,7 @@ function BookingWizard() {
         {/* PASO 4: CONFIRMACIÓN FINAL CON ENLACE DE GOOGLE MEET              */}
         {/* ================================================================= */}
         {currentStep === 4 && createdAppointment && (
-          <div className="clay-card rounded-[2rem] p-7 sm:p-10 space-y-6 text-center max-w-2xl mx-auto">
+          <div className="material-card rounded-[2rem] p-7 sm:p-10 space-y-6 text-center max-w-2xl mx-auto">
             <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#10B981]/15 text-[#10B981] shadow-inner">
               <CheckCircle2 className="h-9 w-9" aria-hidden="true" />
             </span>
@@ -904,24 +799,17 @@ function BookingWizard() {
               <span className="text-xs font-bold uppercase tracking-wider text-[#A14B92]">
                 Código de Cita: {createdAppointment.id}
               </span>
-              <h2 className="font-title text-4xl font-semibold text-[#513D49]">
-                {videoReady ? '¡Tu orientación virtual está confirmada!' : 'Tu horario está reservado'}
+              <h2 ref={stepHeading} tabIndex={-1} className="font-title text-4xl font-semibold text-[#513D49]">
+                {createdAppointment.status === 'Cancelada' ? 'Tu SAV fue cancelada' : createdAppointment.status === 'Programada' ? '¡Tu SAV está reservada!' : 'Estado de tu SAV'}
               </h2>
-              <p role="status" className="text-sm text-[#513D49] max-w-md mx-auto">
-                {videoReady ? 'Tu videollamada está lista y se solicitó el envío de la invitación a' : 'La videollamada y su invitación siguen pendientes para'}{' '}
-                <strong className="text-[#A14B92]">{createdAppointment.email}</strong>.
-              </p>
-              {!videoReady && <>
-                <p className="text-sm text-[#513D49]">Conserva tu enlace privado de gestión. No necesitas volver a reservar.</p>
-                <button type="button" disabled={checkingCalendar} className="btn-cado-secondary rounded-xl px-4 py-3 text-xs" onClick={async () => {
-                  setCheckingCalendar(true); setErrorMsg('');
-                  try { await refreshCalendarStatus(); } catch (error) { setErrorMsg(error instanceof Error ? error.message : 'No se pudo consultar el estado.'); }
-                  finally { setCheckingCalendar(false); }
-                }}>{checkingCalendar ? 'Consultando…' : 'Consultar estado de la videollamada'}</button>
-              </>}
+              {createdAppointment.status === 'Programada' && <p className="text-sm text-[#513D49] max-w-md mx-auto">
+                {calendarStatus === 'Sincronizado' ? 'Tu evento de Google está sincronizado para' : 'La reserva está guardada. La videollamada y la notificación están pendientes para'}{' '}
+                <strong className="break-all text-[#A14B92]">{createdAppointment.email}</strong>.
+              </p>}
             </div>
 
             {/* Tarjeta de horario y enlace Meet */}
+            <p className="text-sm font-semibold">Estado de la sesión: {createdAppointment.status}</p>
             <div className="rounded-2xl border border-[#E2E7E7] bg-[#F8EFF6] p-5 text-left space-y-3">
               <div className="flex items-center justify-between text-xs border-b border-[#E2E7E7] pb-2">
                 <span className="font-semibold text-[#513D49]">Fecha y hora:</span>
@@ -933,17 +821,16 @@ function BookingWizard() {
                 <span className="font-semibold text-[#513D49]">Paciente:</span>
                 <span>{createdAppointment.patientName}</span>
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-[#513D49]">Pacto de confort:</span>
-                <span className="text-[#10B981] font-semibold">
-                  ✓ {createdAppointment.comfortProfile.soundPreference === 'silencio' ? 'Silencio' : 'Música'} · {createdAppointment.comfortProfile.handSignalPledge ? 'Señal de pausa solicitada' : 'Preferencias registradas'}
-                </span>
-              </div>
+              {Object.values(tes).some(Boolean) && <p className="text-xs font-semibold text-emerald-800">
+                Tus preferencias quedaron registradas con la reserva.
+              </p>}
             </div>
 
+            {createdAppointment.status === 'Programada' && <SavPayment bookingCode={createdAppointment.id} />}
+
             {/* Botones de Calendario: Google Calendar y Descarga .ics (RF-13 & RF-16) */}
-            <div className="grid gap-2.5 sm:grid-cols-2 pt-2">
-              {videoReady && googleCalendarUrl && (
+            {createdAppointment.status === 'Programada' && <div className="grid gap-2.5 sm:grid-cols-2 pt-2">
+              {googleCalendarUrl && (
                 <a
                   href={googleCalendarUrl}
                   target="_blank"
@@ -954,10 +841,10 @@ function BookingWizard() {
                   <span>Añadir a Google Calendar</span>
                 </a>
               )}
-              <button type="button" disabled={!videoReady} onClick={async () => {
+              <button type="button" onClick={async () => {
                 try { const response=await fetch('/api/orientaciones/calendar',{headers:{'x-management-token':managementSecret}});if(!response.ok)throw Error();const url=URL.createObjectURL(await response.blob());const link=document.createElement('a');link.href=url;link.download='CADO_Orientacion.ics';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000); } catch {setErrorMsg('No se pudo descargar el calendario.');}
               }} className="btn-cado-secondary rounded-xl px-4 py-3 text-xs font-semibold">Descargar calendario .ics</button>
-            </div>
+            </div>}
 
             {/* Acceso a autogestión */}
             <div className="pt-2 text-xs text-[#766C75]">
@@ -971,7 +858,7 @@ function BookingWizard() {
             </div>
 
             {/* Botón directo a Google Meet */}
-            {videoReady && (
+            {createdAppointment.status === 'Programada' && createdAppointment.meetLink && (
               <a
                 href={createdAppointment.meetLink}
                 target="_blank"
@@ -1020,7 +907,7 @@ export default function UnifiedBookingPage() {
         <div className="flex min-h-screen items-center justify-center bg-white p-12 text-[#513D49]">
           <div className="flex items-center gap-3 text-sm font-semibold">
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#A14B92] border-t-transparent" />
-            <span>Cargando flujo de reserva personalizada...</span>
+            <span>Cargando Encuesta TES y reserva de SAV...</span>
           </div>
         </div>
       }

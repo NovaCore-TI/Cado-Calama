@@ -9,7 +9,16 @@ import {
   requireDoctor,
 } from "@/lib/doctor-auth";
 import { DRAFT_COOKIE, newSecret } from "@/lib/patient-access";
-import { normalizeFeeling } from "@/lib/questionnaire-feeling";
+const feelings = [
+  "tranquilo",
+  "nervioso",
+  "fobia",
+  "no_responde",
+  "Me siento tranquilo/a",
+  "Tengo algunas inquietudes",
+  "Me cuesta dar este paso",
+  "Prefiero no responder",
+];
 export async function GET(request: NextRequest) {
   try {
     const { doctor } = await requireDoctor(request);
@@ -23,7 +32,6 @@ export async function POST(request: NextRequest) {
   try {
     checkSameOrigin(request);
     const body = await request.json();
-    const feeling = normalizeFeeling(body.feeling);
     if (body.consent !== true)
       throw new AccessError(
         400,
@@ -33,7 +41,7 @@ export async function POST(request: NextRequest) {
       typeof body.reason !== "string" ||
       body.reason.trim().length < 3 ||
       body.reason.length > 500 ||
-      !feeling
+      !feelings.includes(body.feeling)
     )
       throw new AccessError(400, "Revisa el motivo y la opción de percepción.");
     const extras: Record<string, string> = {};
@@ -51,7 +59,7 @@ export async function POST(request: NextRequest) {
       .from("cuestionarios_perfilamiento")
       .insert({
         motivo_consulta: body.reason.trim(),
-        nivel_temor: feeling,
+        nivel_temor: body.feeling,
         respuestas_adicionales: extras,
         consentimiento_privacidad: true,
         draft_access_token: secret,

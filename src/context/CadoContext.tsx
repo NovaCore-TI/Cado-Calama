@@ -1,5 +1,8 @@
 "use client";
 
+import type { TesPreferences } from '@/lib/tes-preferences';
+import { useLiveUpdates } from '@/hooks/useLiveUpdates';
+
 import React, {
   createContext,
   useContext,
@@ -11,6 +14,7 @@ import React, {
 const authClient = () => import("@/lib/supabase").then((module) => module.supabase);
 
 export interface ComfortProfile {
+  tes?: TesPreferences;
   anxietyLevel: "tranquilo" | "nervioso" | "fobia" | "no_responde";
   soundPreference: "musica_suave" | "silencio" | "explicacion_paso_a_paso";
   jawBreaks: boolean;
@@ -109,7 +113,7 @@ export interface CadoContextType {
   updateDerivationStatus: (
     id: string,
     status: NonNullable<Appointment["derivationStatus"]>,
-  ) => void;
+  ) => Promise<boolean>;
   cancelAppointment: (id: string) => void;
   rescheduleAppointment: (
     id: string,
@@ -133,14 +137,13 @@ export interface CadoContextType {
 
   // Doctor Availability & Blocked Days
   availableSlots: string[];
-  toggleSlotAvailability: (slot: string) => Promise<boolean>;
+  toggleSlotAvailability: (slot: string) => void;
   blockedDates: string[];
   addBlockedDate: (date: string, reason?: string) => void;
   removeBlockedDate: (date: string) => void;
 
   // Blog Posts
   blogPosts: BlogPost[];
-  blogLoadState: "loading" | "ready" | "error";
   doctorBlogPosts: BlogPost[];
   addBlogPost: (post: Omit<BlogPost, "id" | "date">) => Promise<boolean>;
   updateBlogPost: (id: string, post: Partial<BlogPost>) => Promise<boolean>;
@@ -220,7 +223,6 @@ async function api(url: string, init?: RequestInit) {
 export function CadoProvider({ children }: { children: React.ReactNode }) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
-  const [blogLoadState, setBlogLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [doctorBlogPosts, setDoctorBlogPosts] = useState<BlogPost[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
@@ -245,10 +247,11 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     latencyMs: 0,
     message: "Comprobando conexión…",
   });
-  const [realtimeConnected, setRealtimeConnected] = useState(false);
-  const [lastRealtimeEvent] = useState<string | null>(null);
+  const [lastRealtimeEvent, setLastRealtimeEvent] = useState<string | null>(null);
   const authorized = useRef(false);
   const privateVersion = useRef(0);
+  const refreshSequence = useRef(0);
+  const availabilitySequence = useRef(0);
   const activeDoctor = useRef<string | null>(null);
   const activeAuthUser = useRef<string | null>(null);
   const clearPrivate = useCallback(() => {
@@ -265,7 +268,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     setDoctorUser(null);
     setIsDoctorLoggedIn(false);
     setAuthMethod(null);
-    setRealtimeConnected(false);
+    setLastRealtimeEvent(null);
     setPatientDraftInfo({ name: "", email: "", phone: "" });
     setActiveComfortProfile(defaultComfort);
   }, []);
@@ -284,11 +287,12 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
   );
   const refreshSupabaseData = useCallback(async () => {
     const version = privateVersion.current;
+    const request = ++refreshSequence.current;
+    const availabilityRequest = ++availabilitySequence.current;
     const isAuth = authorized.current;
-    const current = () => version === privateVersion.current;
+    const current = () => version === privateVersion.current && request === refreshSequence.current;
     const started = performance.now();
-    setBlogLoadState(previous => previous === "ready" ? "ready" : "loading");
-    const publicTask = Promise.allSettled([
+    const publicTask = Promise.all([
       api("/api/blog"),
       api(isAuth ? "/api/bloques?admin=1" : "/api/bloques"),
     ]);
@@ -306,12 +310,11 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         ])
       : null;
     try {
-      const [articles, availability] = await publicTask;
+      const [result, blocks] = await publicTask;
       if (!current()) return;
-      const complete = articles.status === "fulfilled" && availability.status === "fulfilled";
-      setSupabaseStatus({ connected: complete, tablesReady: complete, latencyMs: Math.round(performance.now() - started), message: complete ? "Contenido disponible." : "No se pudieron actualizar todos los datos." });
-      if (articles.status === "fulfilled") {
-        setBlogPosts(articles.value.data.map((r: Record<string, unknown>) => ({
+      setSupabaseStatus({ connected: true, tablesReady: true, latencyMs: Math.round(performance.now() - started), message: "Contenido disponible." });
+      setBlogPosts(
+        result.data.map((r: Record<string, unknown>) => ({
           id: String(r.id),
           title: String(r.titulo),
           slug: String(r.slug),
@@ -322,18 +325,15 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
           readTime: String(r.tiempo_lectura || ""),
           date: String(r.published_at || ""),
           published: Boolean(r.publicado),
-        })));
-        setBlogLoadState("ready");
-      } else setBlogLoadState("error");
-      if (availability.status === "fulfilled") {
-        const blocks = availability.value;
+        })),
+      );
+      if (availabilityRequest === availabilitySequence.current) {
         if (authorized.current && blocks.blockedDates) setBlockedDates(blocks.blockedDates);
         setAvailableSlots(blocks.slots.map((r: { slotKey: string }) => r.slotKey));
-      } else setAvailableSlots([]);
+      }
     } catch {
       if (!current()) return;
-      setBlogLoadState("error");
-      setAvailableSlots([]);
+      if (availabilityRequest === availabilitySequence.current) setAvailableSlots([]);
       setSupabaseStatus({ connected: false, tablesReady: false, latencyMs: Math.round(performance.now() - started), message: "No se pudieron cargar los datos." });
     }
     if (!privateTask || !authorized.current) {
@@ -421,6 +421,31 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         })),
       );
   }, [clearPrivate]);
+  const refreshAvailability = useCallback(async () => {
+    const version = privateVersion.current;
+    const request = ++availabilitySequence.current;
+    try {
+      const result = await api(authorized.current ? '/api/bloques?admin=1' : '/api/bloques');
+      if (version !== privateVersion.current || request !== availabilitySequence.current) return;
+      setAvailableSlots(result.slots.map((slot: { slotKey: string }) => slot.slotKey));
+      if (authorized.current) setBlockedDates(result.blockedDates || []);
+    } catch {
+      if (version === privateVersion.current && request === availabilitySequence.current) setAvailableSlots([]);
+    }
+  }, []);
+  const publicRealtime = useLiveUpdates({ resources: ['availability', 'blog'], pollMs: 15_000 }, async (resource, reason) => {
+    if (reason === 'change') setLastRealtimeEvent(new Date().toISOString());
+    if (resource === 'availability' || (reason === 'poll' && authorized.current)) await refreshAvailability();
+    else await refreshSupabaseData();
+  });
+  const privateRealtime = useLiveUpdates({
+    scope: 'doctor', doctorId: doctorUser?.id, authUserId: doctorUser?.auth_user_id,
+    resources: ['appointments', 'availability', 'blog', 'profile'], enabled: isDoctorLoggedIn,
+  }, async (_resource, reason) => {
+    if (reason === 'change') setLastRealtimeEvent(new Date().toISOString());
+    await refreshSupabaseData();
+  });
+  const realtimeConnected = publicRealtime && (!isDoctorLoggedIn || privateRealtime);
   useEffect(() => {
     for (const key of [
       "cado_demo_appointments_v3",
@@ -470,28 +495,6 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, [refreshSupabaseData, acceptDoctor]);
-  useEffect(() => {
-    const refresh = () => {
-      const version = privateVersion.current;
-      void api(authorized.current ? "/api/bloques?admin=1" : "/api/bloques")
-        .then((r) => {
-          if (version !== privateVersion.current) return;
-          setAvailableSlots(
-            r.slots.map((slot: { slotKey: string }) => slot.slotKey),
-          );
-          if (authorized.current) setBlockedDates(r.blockedDates || []);
-        })
-        .catch(() => {
-          if (version === privateVersion.current) setAvailableSlots([]);
-        });
-    };
-    const timer = setInterval(refresh, 15000);
-    window.addEventListener("focus", refresh);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener("focus", refresh);
-    };
-  }, []);
   const logoutDoctor = useCallback(async () => {
     clearPrivate();
     await Promise.allSettled([
@@ -560,13 +563,6 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       events.forEach((e) => window.removeEventListener(e, reset));
     };
   }, [isDoctorLoggedIn, logoutDoctor]);
-  useEffect(() => {
-    if (!isDoctorLoggedIn) return;
-    const timer = setInterval(() => {
-      void refreshSupabaseData().catch(() => {});
-    }, 30_000);
-    return () => clearInterval(timer);
-  }, [isDoctorLoggedIn, refreshSupabaseData]);
   const loginDoctor: CadoContextType["loginDoctor"] = async (email, pass) => {
     clearPrivate();
     try {
@@ -800,7 +796,6 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         addBlockedDate,
         removeBlockedDate,
         blogPosts,
-        blogLoadState,
         doctorBlogPosts,
         addBlogPost,
         updateBlogPost,
