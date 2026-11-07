@@ -6,7 +6,7 @@ export function SavSteps() {
     <div className="rounded-3xl border border-[#E2E7E7] bg-white p-6">
       <p className="section-eyebrow">Paso 1 · Tu Espacio Seguro</p>
       <h3 className="mt-3 font-title text-2xl font-semibold">Encuesta TES</h3>
-      <p className="mt-3 text-sm leading-7">Seis preguntas para indicarnos cómo prefieres ser atendido: música, pausas, acompañamiento y comunicación. Tus tiempos importan.</p>
+      <p className="mt-3 text-sm leading-7">Cuéntanos qué ambiente prefieres, a qué ritmo quieres avanzar y cómo te gustaría que nos comuniquemos contigo.</p>
       <Link href={TES_URL} className="btn-cado-secondary mt-5 inline-flex rounded-xl px-5 py-3 text-sm font-semibold">Completar Encuesta TES</Link>
     </div>
     <div className="rounded-3xl border border-[#A14B92]/20 bg-[#F8EFF6] p-6">

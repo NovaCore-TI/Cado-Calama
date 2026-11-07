@@ -54,6 +54,34 @@ test("RF-12: unavailable database never confirms a booking", async () => {
   assert.equal(response.status, 503);
   assert.equal((await response.json()).ok, false);
 });
+
+test("TES preserves validated preferences through the booking RPC", async () => {
+  const { TES_QUESTIONS } = loadTs("src/lib/tes-preferences.ts");
+  const answers = Object.fromEntries(TES_QUESTIONS.map(({ key, options }) => [key, options[0]]));
+  answers.music = "Elección musical propia";
+  answers.artists = "  Artista de prueba  ";
+  answers.message = "  Mensaje personal de prueba  ";
+  let persisted;
+  const api = loadTs("src/app/api/orientaciones/route.ts", {
+    "next/server": { NextResponse, after: () => {} },
+    "@/lib/server-db": {
+      getServerDatabase: () => ({
+        rpc: async (_name, args) => {
+          persisted = args.p_comfort;
+          return { data: { id: "fixture", codigo: "fixture" }, error: null };
+        },
+      }),
+    },
+  });
+  const response = await api.POST(request({
+    ...payload,
+    comfortProfile: { tes: { ...answers, unexpected: "discarded" } },
+  }));
+  assert.equal(response.status, 201);
+  assert.deepEqual(structuredClone(persisted.tes), {
+    ...answers, artists: answers.artists.trim(), message: answers.message.trim(),
+  });
+});
 test("RF-16: confirmation is returned before any external calendar work", async () => {
   const jobs = [];
   let calendarCalls = 0;

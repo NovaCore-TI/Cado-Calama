@@ -1,15 +1,16 @@
 export const CLINIC = {
   name: 'CADO',
   fullName: 'CADO · Centro Avanzado de Dolor Orofacial',
-  address: 'Vivar #1500, Oficina 205, Edificio Espacio Parque, Calama',
-  streetAddress: 'Vivar #1500, Oficina 205, Edificio Espacio Parque',
+  address: 'Vivar #1580, Oficina 203, Edificio Espacio Parque, Calama',
+  streetAddress: 'Vivar #1580, Oficina 203, Edificio Espacio Parque',
   mapsUrl: 'https://share.google/Af4IcUf6FfpfVmbTX',
-  mapEmbedUrl: 'https://maps.google.com/maps?q=Vivar%201500%2C%20Calama%2C%20Chile&output=embed',
+  directionsUrl: 'https://www.google.com/maps/search/?api=1&query=Vivar%201580%2C%20Calama%2C%20Chile',
+  mapEmbedUrl: 'https://maps.google.com/maps?q=Vivar%201580%2C%20Calama%2C%20Chile&output=embed',
   email: 'javierbeizaayala@gmail.com',
   phones: [
-    { display: '+56 9 4465 7815', number: '56944657815' },
-    { display: '+56 9 9229 5910', number: '56992295910' },
-    { display: '+56 9 8444 8523', number: '56984448523' },
+    { name: 'Dr. Javier Beiza', display: '+56 9 4465 7815', number: '56944657815' },
+    { name: 'Dr. Juan Cruz Mandiola', display: '+56 9 9229 5910', number: '56992295910' },
+    { name: 'Dr. Óscar Albanés Hidalgo', display: '+56 9 8444 8523', number: '56984448523' },
   ],
 } as const;
 

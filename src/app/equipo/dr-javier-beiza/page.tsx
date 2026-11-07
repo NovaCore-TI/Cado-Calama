@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { CLINIC, TES_URL, SAV_URL, whatsappUrl } from '@/lib/clinic';
 import { SavSteps } from '@/components/SavSteps';
+import { WhatsAppIcon } from '@/components/WhatsAppIcon';
 import { SITE_URL, serializeStructuredData } from '@/lib/site';
 import Link from 'next/link';
 import {
@@ -10,9 +11,11 @@ import {
   CheckCircle2,
   Clock,
   Cpu,
+  Facebook,
   HeartHandshake,
+  Instagram,
+  Mail,
   MapPin,
-  MessageCircle,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
@@ -102,14 +105,31 @@ export default function JavierPage() {
               </Link>
 
               <Link href={SAV_URL} className="btn-cado-primary inline-flex min-h-12 items-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold">2. Agendar SAV (Videollamada de 15 min)</Link>
-              <a
-                href={whatsappUrl('Hola Dr. Javier Beiza, me gustaría hacerle una consulta directa.')}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-cado-secondary inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-semibold hover:border-[#A14B92]"
-              >
-                <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                <span>Escribir al WhatsApp del Doctor</span>
+            </div>
+
+            <div className="space-y-3">
+              <h2 className="text-sm font-semibold">Contacto y redes del Dr. Beiza</h2>
+              <div className="flex flex-wrap gap-2">
+                <a href={whatsappUrl('Hola Dr. Javier Beiza, me gustaría hacerle una consulta directa.')}
+                  target="_blank" rel="noopener noreferrer"
+                  className="btn-cado-secondary material-button text-sm font-semibold">
+                  <WhatsAppIcon className="h-4 w-4 shrink-0" />
+                  WhatsApp<span className="sr-only"> del Dr. Javier Beiza (abre otra pestaña)</span>
+                </a>
+                <a href="https://instagram.com/drjavierbeiza" target="_blank" rel="noopener noreferrer"
+                  className="btn-cado-secondary material-button text-sm font-semibold">
+                  <Instagram className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  Instagram<span className="sr-only"> del Dr. Javier Beiza (abre otra pestaña)</span>
+                </a>
+                <a href="https://web.facebook.com/profile.php?id=61576124521775" target="_blank" rel="noopener noreferrer"
+                  className="btn-cado-secondary material-button text-sm font-semibold">
+                  <Facebook className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  Facebook<span className="sr-only"> del Dr. Javier Beiza (abre otra pestaña)</span>
+                </a>
+              </div>
+              <a href={`mailto:${CLINIC.email}`} className="inline-flex min-h-6 items-center gap-2 break-all text-sm text-[#8A3D7D] underline underline-offset-4">
+                <Mail className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {CLINIC.email}
               </a>
             </div>
 
@@ -130,12 +150,12 @@ export default function JavierPage() {
                 className="aspect-[4/3] w-full object-cover transition-transform duration-500 hover:scale-[1.02]"
               />
             </div>
-            <div className="glass-panel absolute -bottom-6 left-6 right-6 rounded-2xl p-4 shadow-lg sm:left-auto sm:right-6 sm:max-w-xs">
+            <div className="material-card-tonal absolute -bottom-6 left-6 right-6 rounded-2xl p-4 shadow-lg sm:left-auto sm:right-6 sm:max-w-xs">
               <strong className="block text-sm font-semibold text-[#513D49]">
                 Dr. Javier Beiza Ayala
               </strong>
               <p className="mt-0.5 text-xs text-[#665D66]">
-                Cirujano Dentista · Más de 13 años de experiencia
+                Cirujano dentista · Urgencias, exodoncias y fobia al dentista
               </p>
               <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#10B981]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#047857]">
                 <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
@@ -164,7 +184,7 @@ export default function JavierPage() {
             return (
               <div
                 key={pillar.title}
-                className="clay-card rounded-[2rem] p-7 transition hover:shadow-lg sm:p-8"
+                className="material-card-tonal rounded-[2rem] p-7 transition hover:shadow-lg sm:p-8"
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#A14B92]/10 text-[#A14B92]">
                   <Icon className="h-6 w-6" aria-hidden="true" />
@@ -220,7 +240,7 @@ export default function JavierPage() {
 
       {/* UBICACIÓN Y HORARIOS */}
       <section className="mx-auto max-w-6xl px-6 py-20">
-        <div className="clay-card rounded-[2.5rem] p-8 sm:p-12">
+        <div className="material-card-tonal rounded-[2.5rem] p-8 sm:p-12">
           <div className="grid gap-8 md:grid-cols-[1.2fr_1fr] md:items-center">
             <div className="space-y-4">
               <span className="section-eyebrow">Visítanos en Calama</span>
@@ -228,12 +248,12 @@ export default function JavierPage() {
                 Edificio Espacio Parque, Calama
               </h2>
               <p className="text-sm leading-relaxed text-[#665D66]">
-                Nuestra consulta presencial se ubica en <strong>Vivar #1500, oficina 205</strong>, en pleno centro de Calama con estacionamiento y locomoción cercana.
+                Nuestra consulta presencial se ubica en <strong>Vivar #1580, oficina 203</strong>, en pleno centro de Calama con estacionamiento y locomoción cercana.
               </p>
               <div className="flex flex-col gap-2 pt-2 text-xs text-[#513D49]">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-[#A14B92]" aria-hidden="true" />
-                  <a href={CLINIC.mapsUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{CLINIC.address} · Ver en Google Maps</a>
+                  <a href={CLINIC.directionsUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{CLINIC.address} · Ver en Google Maps</a>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-[#A14B92]" aria-hidden="true" />

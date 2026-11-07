@@ -11,9 +11,9 @@ import {
 
 export default function NotFound() {
   return (
-    <main className="min-h-[75vh] flex items-center justify-center bg-[#F6F8F8] px-6 py-20 text-[#513D49]">
+    <div className="min-h-[75vh] flex items-center justify-center bg-[#F6F8F8] px-6 py-20 text-[#513D49]">
       <div className="mx-auto max-w-2xl text-center space-y-8">
-        <span className="clay-icon mx-auto flex h-20 w-20 items-center justify-center rounded-3xl text-[#A14B92] shadow-inner">
+        <span className="bg-[var(--md-primary-container)] mx-auto flex h-20 w-20 items-center justify-center rounded-3xl text-[#A14B92] shadow-inner">
           <Compass className="h-10 w-10" aria-hidden="true" />
         </span>
 
@@ -98,6 +98,6 @@ export default function NotFound() {
           </Link>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
