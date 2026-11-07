@@ -2,388 +2,64 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { preload } from 'react-dom';
-import {
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  HeartHandshake,
-  MapPin,
-  MessageCircle,
-  Quote,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
-
-const services = [
-  {
-    title: 'Atención respetuosa para quienes sienten temor',
-    description:
-      'Una conversación previa y pausas acordadas permiten avanzar a tu propio ritmo, sin juicios.',
-    image: '/brand/photo_doctor_listening.png',
-    alt: 'El Dr. Javier Beiza escucha con atención las dudas de una persona en CADO',
-    badge: 'Acompañamiento cercano',
-  },
-  {
-    title: 'Exodoncias y urgencias dentales',
-    description:
-      'Información clara para comprender los tiempos de recuperación y recibir orientación oportuna.',
-    image: '/brand/photo_doctor_talking.png',
-    alt: 'Profesional odontológico conversa con un paciente en un box clínico tranquilo',
-    badge: 'Orientación clara',
-  },
-  {
-    title: 'Planificación digital con tecnología CAD/CAM',
-    description:
-      'Herramientas modernas que permiten planificar procedimientos con mayor precisión y comodidad.',
-    image: '/brand/photo_cad_cam.png',
-    alt: 'Equipo de odontología digital CAD/CAM de alta precisión',
-    badge: 'Precisión clínica',
-  },
-  {
-    title: 'Trastornos temporomandibulares y bruxismo',
-    description:
-      'Evaluación de molestias mandibulares y sobrecarga muscular, frecuentes en turnos laborales de Calama.',
-    image: '/brand/photo_doctor_listening.png',
-    alt: 'Consulta sobre molestias mandibulares y bruxismo',
-    badge: 'Diagnóstico integral',
-  },
-];
-
-const patientVoices = [
-  {
-    quote:
-      'Llevaba más de cuatro años sin ir al dentista por una mala experiencia de niña. Poder conversar primero por videollamada con el doctor y saber que podíamos acordar una señal de parada con la mano me devolvió la calma.',
-    author: 'Marcela P.',
-    context: 'Paciente de orientación virtual en Calama',
-  },
-  {
-    quote:
-      'Por mis turnos en faena siempre postergaba las consultas. Poder tener una orientación vespertina de 15 minutos sin tener que pedir permiso laboral me permitió resolver mis dudas antes de ir a la clínica.',
-    author: 'Cristóbal G.',
-    context: 'Atención vespertina en Edificio Espacio Parque',
-  },
-];
+import { Activity, ArrowRight, CheckCircle2, HeartHandshake, MapPin, Quote, ShieldCheck, Users } from 'lucide-react';
+import { CLINIC, JAVIER_PROFILE, TES_URL, whatsappUrl } from '@/lib/clinic';
+import { DentalinkLink } from '@/components/DentalinkLink';
+import { Testimonials } from '@/components/Testimonials';
+import { WhatsAppIcon } from '@/components/WhatsAppIcon';
 
 export const metadata: Metadata = {
+  title: { absolute: 'CADO | Dolor Orofacial y Urgencias Dentales en Calama' },
+  description: 'Centro odontológico en Calama dedicado al dolor orofacial, urgencias dentales, endodoncia y TTM. Atención especializada con un trato cercano y humano.',
   alternates: { canonical: '/' },
+  openGraph: { title: 'CADO · Centro Avanzado de Dolor Orofacial en Calama', description: 'Diagnóstico de precisión, especialidades coordinadas y atención humana en Calama.', url: '/' },
 };
+
+const services = [
+  { badge: 'Alivio oportuno', title: 'Urgencias Dentales y Dolor Severo', description: 'Atención prioritaria para pulpitis agudas, infecciones, inflamación facial o fracturas imprevistas. Cortamos el dolor de raíz con resolución clínica definitiva.', image: '/brand/atencion-dental-cado-calama.webp', alt: 'Conversación entre un profesional y un paciente en CADO', href: '/urgencias', link: 'Ver protocolo de urgencias' },
+  { badge: 'Preservación dental', title: 'Endodoncia y Dolor Dental Complejo', description: 'Tratamiento especializado del tejido pulpar infectado o inflamado para eliminar infecciones internas profundas y preservar tus dientes naturales sin molestias.', image: '/brand/tecnologia-digital-cado-calama.webp', alt: 'Tecnología digital utilizada en la atención odontológica de CADO', href: '/endodoncia-calama', link: 'Conoce el área de Endodoncia' },
+  { badge: 'Función articular y bienestar orofacial', title: 'Trastornos Temporomandibulares (TTM) y Bruxismo', description: 'Diagnóstico y tratamiento del dolor en mandíbula, chasquidos articulares, contracturas de cuello, cefaleas tensionales y desgaste por apretamiento diurno o nocturno.', image: '/brand/escucha-clinica-cado-calama.webp', alt: 'Atención y escucha de las molestias de un paciente en CADO', href: '/trastornos-ttm-bruxismo', link: 'Saber más sobre TTM y articulación' },
+  { badge: 'Acompañamiento emocional', title: 'Atención Especializada a Pacientes con Miedo', description: 'Para quienes postergan su salud por ansiedad o malas experiencias. Citas extendidas, pausas activas, videollamada previa (SAV) y el Pacto de la Mano Levantada.', image: '/brand/atencion-dental-cado-calama.webp', alt: 'El Dr. Javier Beiza conversa con un paciente en un ambiente tranquilo', href: JAVIER_PROFILE, link: 'Conoce al Dr. Javier Beiza y el método sin juicios' },
+];
 
 export default function HomePage() {
   preload('/fonts/cormorant-home-title.woff2', { as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' });
-  return (
-    <div className="home-page overflow-hidden bg-white text-[#513D49]">
-      {/* 1. SECCIÓN HERO */}
-      <section className="relative isolate border-b border-[#E2E7E7] bg-[#F6F8F8]">
-        <div
-          className="pointer-events-none absolute inset-0 -z-20 bg-[radial-gradient(circle_at_7%_8%,rgba(161,75,146,.12),transparent_35%),radial-gradient(circle_at_92%_85%,rgba(179,191,191,.28),transparent_35%)]"
-          aria-hidden="true"
-        />
-
-        <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 pb-20 pt-12 sm:pb-24 sm:pt-16 lg:grid-cols-[1.05fr_.95fr] lg:gap-16 lg:py-24">
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#B3BFBF] bg-white/80 px-4 py-2 text-xs font-semibold text-[#513D49] shadow-sm backdrop-blur-md">
-              <MapPin className="h-4 w-4 text-[#A14B92]" aria-hidden="true" />
-              <span>Vivar #1580, Edificio Espacio Parque · Calama</span>
-            </div>
-
-            <div className="space-y-4">
-              <h1 className="home-hero-title font-title text-5xl font-semibold leading-[1.08] tracking-tight text-[#513D49] text-balance sm:text-6xl lg:text-7xl">
-                Un primer paso hacia tu salud oral, a tu propio ritmo.
-              </h1>
-              <p className="max-w-xl text-base leading-relaxed text-[#513D49] sm:text-lg">
-                Si una experiencia anterior te hizo postergar una consulta, aquí encuentras un espacio de escucha genuina y sin juicios. El Dr. Javier Beiza te acompaña a conversar antes de tomar cualquier decisión clínica.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center">
-              <Link
-                href="/agendar"
-                className="btn-cado-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold shadow-[0_12px_28px_rgba(161,75,146,.22)] transition-all hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A14B92] focus-visible:ring-offset-2"
-              >
-                <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                <span>Conocer la orientación virtual</span>
-              </Link>
-              <Link
-                href="/cuestionario"
-                className="btn-cado-secondary inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold transition-all hover:bg-[#F6F8F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A14B92] focus-visible:ring-offset-2"
-              >
-                <span>Cuestionario previo</span>
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </div>
-
-            {/* Micro-píldora tranquilizadora (Heurística de ansiedad) */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-xs text-[#513D49]">
-              <span className="flex items-center gap-1.5 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-[#10B981]" aria-hidden="true" />
-                15 minutos de videollamada
-              </span>
-              <span className="flex items-center gap-1.5 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-[#10B981]" aria-hidden="true" />
-                Sin instrumental clínico
-              </span>
-              <span className="flex items-center gap-1.5 font-medium">
-                <CheckCircle2 className="h-4 w-4 text-[#10B981]" aria-hidden="true" />
-                Desde tu hogar en Calama
-              </span>
-            </div>
-          </div>
-
-          {/* Fotografía principal con acabado editorial */}
-          <div className="relative mx-auto w-full max-w-[560px] lg:max-w-none">
-            <div
-              className="pointer-events-none absolute -left-6 -top-6 h-40 w-40 rounded-full bg-[#B3BFBF]/40 blur-3xl"
-              aria-hidden="true"
-            />
-            <div className="relative overflow-hidden rounded-[2.4rem] border-[6px] border-white shadow-[0_24px_60px_rgba(81,61,73,.14)]">
-              <Image
-                src="/brand/photo_doctor_talking.png"
-                alt="El Dr. Javier Beiza conversa de forma cercana con un paciente en CADO"
-                width={900}
-                height={700}
-                priority
-                className="aspect-[4/4.2] h-auto w-full object-cover sm:aspect-[5/4] lg:aspect-[4/4.5]"
-              />
-            </div>
-
-            {/* Tarjeta flotante de compromiso */}
-            <div className="glass-panel absolute -bottom-7 left-3 right-3 flex items-center gap-4 rounded-2xl border border-white/80 p-4 shadow-lg backdrop-blur-xl sm:left-auto sm:right-[-1.5rem] sm:max-w-[320px] sm:p-5">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#A14B92] text-white shadow-md">
-                <HeartHandshake className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div>
-                <strong className="block text-sm font-semibold text-[#513D49]">
-                  Atención humana y sin juicios
-                </strong>
-                <span className="text-xs leading-5 text-[#513D49]">
-                  El respeto a tus tiempos es parte esencial de la salud oral.
-                </span>
-              </div>
-            </div>
-          </div>
+  return <div className="home-page bg-white text-[#513D49]">
+    <section className="relative border-b border-[#E2E7E7] bg-[#F6F8F8]">
+      <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 py-14 sm:py-20 lg:grid-cols-[1.05fr_.95fr] lg:gap-16 lg:py-24">
+        <div className="space-y-6">
+          <a href={CLINIC.directionsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-start gap-2 rounded-2xl border border-[#B3BFBF] bg-white px-4 py-3 text-xs font-semibold hover:text-[#8A3D7D]">
+            <MapPin className="h-4 w-4 shrink-0 text-[#A14B92]" aria-hidden="true" />{CLINIC.address}<span className="sr-only"> (ver en Google Maps, abre otra pestaña)</span>
+          </a>
+          <p className="section-eyebrow">Diagnóstico, alivio y cuidado humano en Calama</p>
+          <h1 className="home-hero-title font-title text-4xl font-semibold leading-[1.08] tracking-tight text-balance sm:text-6xl lg:text-7xl">CADO: Centro Avanzado de Dolor Orofacial</h1>
+          <p className="max-w-xl text-base leading-8 sm:text-lg">En CADO entendemos el impacto que el dolor genera en tu calidad de vida. Contamos con un equipo clínico especializado en diagnosticar y tratar el dolor dental, muscular, articular y neurálgico. Un espacio en Calama diseñado para brindarte un alivio seguro, oportuno y con un trato profundamente humano.</p>
+          <ul className="space-y-3 pt-2 text-sm font-medium">{['Enfoque multidisciplinario del dolor', 'Atención sin juicios ni prisas', 'Tecnología diagnóstica y resolución oportuna'].map(text => <li key={text} className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />{text}</li>)}</ul>
         </div>
-      </section>
-
-      {/* 2. PILARES DE ACOMPAÑAMIENTO */}
-      <section className="mx-auto max-w-7xl px-6 py-20 sm:py-24">
-        <div className="mb-12 max-w-2xl space-y-3">
-          <h2 className="font-title text-4xl font-semibold leading-tight text-[#513D49] text-balance sm:text-5xl">
-            Una experiencia tranquila comienza antes de entrar a la clínica.
-          </h2>
-          <p className="text-base leading-relaxed text-[#513D49]">
-            Cada persona tiene inquietudes y tiempos diferentes. Diseñamos un camino estructurado para que retomes el cuidado dental con total sensación de control.
-          </p>
+        <div className="relative mx-auto w-full max-w-[560px]">
+          <Image src="/brand/atencion-dental-cado-calama.webp" alt="Conversación cercana durante una atención en CADO Odontología en Calama" width={900} height={700} priority sizes="(max-width: 1024px) 100vw, 45vw" className="aspect-[5/4] w-full rounded-[2.4rem] border-[6px] border-white object-cover shadow-xl lg:aspect-[4/5]" />
+          <div className="material-card-tonal absolute -bottom-6 left-4 right-4 flex items-center gap-3 rounded-2xl p-4 sm:left-auto sm:max-w-xs"><HeartHandshake className="h-7 w-7 shrink-0 text-[#A14B92]" aria-hidden="true" /><p className="text-sm font-semibold">Más que dientes, cuidamos personas.</p></div>
         </div>
-
-        <div className="grid gap-6 md:grid-cols-3">
-          {[
-            {
-              icon: HeartHandshake,
-              title: 'Escuchamos tu historia',
-              text: 'Puedes compartir tus motivos de consulta y vivencias previas con completa confidencialidad y sin temor a ser reprendido.',
-            },
-            {
-              icon: ShieldCheck,
-              title: 'Tú marcas el ritmo',
-              text: 'Mediante el Test de Confort defines si prefieres música o silencio, pausas periódicas y una señal de mano para detenernos en cualquier momento.',
-            },
-            {
-              icon: Sparkles,
-              title: 'Claridad en el siguiente paso',
-              text: 'La orientación virtual aclara tus dudas desde tu casa antes de coordinar una evaluación presencial en Edificio Espacio Parque.',
-            },
-          ].map(({ icon: Icon, title, text }) => (
-            <div
-              key={title}
-              className="clay-card relative rounded-[2rem] p-7 transition-all duration-300 hover:-translate-y-1 sm:p-8"
-            >
-              <div className="mb-6 flex items-center justify-between">
-                <span className="clay-icon flex h-12 w-12 items-center justify-center rounded-2xl text-[#A14B92]">
-                  <Icon className="h-6 w-6" aria-hidden="true" />
-                </span>
-              </div>
-              <h3 className="mb-3 font-title text-2xl font-semibold text-[#513D49]">{title}</h3>
-              <p className="text-sm leading-relaxed text-[#513D49]">{text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 3. SERVICIOS Y ENFOQUE CLÍNICO */}
-      <section className="border-y border-[#E2E7E7] bg-[#F6F8F8] py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mb-12 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-            <div className="max-w-2xl space-y-2">
-              <h2 className="font-title text-4xl font-semibold text-[#513D49] text-balance sm:text-5xl">
-                Cuidado profesional con vocación humana.
-              </h2>
-              <p className="text-sm leading-relaxed text-[#513D49]">
-                Tecnología digital moderna combinada con un trato paciente y comprensivo.
-              </p>
-            </div>
-            <Link
-              href="/equipo"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-[#8A3D7D] hover:underline"
-            >
-              <span>Conocer trayectoria del doctor</span>
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-            {services.map((service) => (
-              <article
-                key={service.title}
-                className="soft-card group overflow-hidden rounded-3xl bg-white shadow-sm transition-all hover:shadow-md"
-              >
-                <div className="relative h-56 overflow-hidden">
-                  <Image
-                    src={service.image}
-                    alt={service.alt}
-                    fill
-                    sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                  />
-                  <span className="absolute bottom-3.5 left-3.5 rounded-full border border-white/80 bg-white/90 px-3 py-1 text-xs font-semibold text-[#513D49] shadow-sm backdrop-blur-md">
-                    {service.badge}
-                  </span>
-                </div>
-                <div className="space-y-2.5 p-6">
-                  <h3 className="font-title text-xl font-semibold leading-snug text-[#513D49]">
-                    {service.title}
-                  </h3>
-                  <p className="text-xs leading-relaxed text-[#513D49]">{service.description}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 4. EL DOCTOR Y SU PROPÓSITO */}
-      <section className="mx-auto grid max-w-7xl items-center gap-12 px-6 py-20 sm:py-24 lg:grid-cols-2">
-        <div className="relative">
-          <Image
-            src="/brand/photo_doctor_listening.png"
-            alt="El Dr. Javier Beiza conversa con un paciente durante una sesión de orientación"
-            width={900}
-            height={650}
-            className="aspect-[5/4] h-auto w-full rounded-[2.2rem] object-cover shadow-lg"
-          />
-          <blockquote className="glass-panel absolute -bottom-6 left-4 right-4 rounded-2xl border border-white/80 p-5 shadow-md backdrop-blur-md sm:right-auto sm:max-w-sm">
-            <Quote className="h-5 w-5 text-[#A14B92]" aria-hidden="true" />
-            <q className="mt-1 block text-sm font-semibold leading-snug text-[#513D49]">
-              Más que dientes, cuidamos personas.
-            </q>
-            <cite className="mt-1 block text-xs not-italic text-[#513D49]">
-              Dr. Javier Beiza Ayala · Cirujano Dentista
-            </cite>
-          </blockquote>
-        </div>
-
-        <div className="space-y-6 pt-6 lg:pl-8 lg:pt-0">
-          <h2 className="font-title text-4xl font-semibold leading-tight text-[#513D49] text-balance sm:text-5xl">
-            Un espacio en Calama para hablar con total confianza.
-          </h2>
-          <p className="leading-relaxed text-[#513D49]">
-            Con más de 13 años de ejercicio en la ciudad, el Dr. Javier Beiza comprende la realidad y exigencias de los habitantes de Calama y el régimen de turnos. En CADO no existen procedimientos apresurados ni juicios por el estado actual de tu dentadura.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/equipo"
-              className="inline-flex items-center gap-2 rounded-2xl border border-[#B3BFBF] bg-white px-5 py-3 text-sm font-semibold text-[#8A3D7D] shadow-sm transition hover:bg-[#F6F8F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A14B92]"
-            >
-              <span>Conocer formación y enfoque clínico</span>
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. TESTIMONIOS (SOCIAL PROOF - PATRÓN UI/UX PRO MAX) */}
-      <section className="border-t border-[#E2E7E7] bg-[#F6F8F8] py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="mb-12 max-w-2xl space-y-2">
-            <h2 className="font-title text-4xl font-semibold text-[#513D49] text-balance sm:text-5xl">
-              Experiencias de quienes volvieron a confiar.
-            </h2>
-            <p className="text-sm leading-relaxed text-[#513D49]">
-              Testimonios de personas que superaron el temor inicial mediante un trato transparente y gradual.
-            </p>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            {patientVoices.map((item, index) => (
-              <div
-                key={index}
-                className="clay-card relative flex flex-col justify-between rounded-3xl p-7 sm:p-8"
-              >
-                <div className="space-y-4">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#A14B92] shadow-sm">
-                    <Quote className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <p className="font-testimonial text-sm leading-relaxed text-[#513D49] italic">
-                    «{item.quote}»
-                  </p>
-                </div>
-                <div className="mt-6 border-t border-[#E2E7E7] pt-4">
-                  <strong className="block text-sm font-semibold text-[#513D49]">
-                    {item.author}
-                  </strong>
-                  <span className="text-xs text-[#513D49]">{item.context}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 6. LLAMADO A LA ACCIÓN FINAL */}
-      <section className="px-6 py-20 sm:py-24">
-        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2.2rem] bg-[#513D49] px-7 py-12 text-white shadow-xl sm:px-12 sm:py-16">
-          <div
-            className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-[#A14B92]/50 blur-3xl"
-            aria-hidden="true"
-          />
-
-          <div className="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
-            <div className="max-w-2xl space-y-4">
-              <h2 className="font-title text-4xl font-semibold leading-tight text-white text-balance sm:text-5xl">
-                El primer contacto puede ser sencillo y sin presiones.
-              </h2>
-              <p className="leading-relaxed text-white/90">
-                Completa el cuestionario previo para compartir tus inquietudes, explora el test de confort o agenda directamente tus 15 minutos de orientación virtual con el Dr. Javier Beiza.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/agendar"
-                className="rounded-2xl bg-white px-5 py-3.5 text-sm font-semibold text-[#513D49] shadow-md transition-all hover:bg-[#F6F8F8] hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              >
-                Agendar orientación virtual
-              </Link>
-              <Link
-                href="/test-confort"
-                className="rounded-2xl border border-white/40 bg-white/10 px-5 py-3.5 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              >
-                Explorar test de confort
-              </Link>
-              <a
-                href="https://wa.me/56944657815"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="WhatsApp prioritario: contactar a CADO Odontología (abre en una nueva ventana)"
-                className="inline-flex items-center gap-2 rounded-2xl border border-white/40 bg-white/10 px-5 py-3.5 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              >
-                <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                <span>WhatsApp prioritario</span>
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
+      </div>
+    </section>
+    <section className="mx-auto max-w-7xl px-6 py-20 sm:py-24">
+      <div className="mb-12 max-w-3xl space-y-4"><h2 className="font-title text-4xl font-semibold leading-tight sm:text-5xl">Un enfoque integral para aliviar y proteger tu bienestar</h2><p className="leading-8">Cada molestia requiere un origen claro y una solución precisa. Abordamos tu salud desde la raíz del problema con empatía y tecnología.</p></div>
+      <div className="grid gap-6 md:grid-cols-3">{[
+        { icon: Activity, title: 'Identificamos la causa de tu dolor', text: 'Diferenciamos el dolor de origen dental, muscular, articular o neurálgico para aplicar el tratamiento exacto sin improvisaciones ni soluciones temporales.' },
+        { icon: Users, title: 'Tratamientos de alta precisión', text: 'Desde endodoncias y manejo de trastornos temporomandibulares (TTM) hasta urgencias agudas, cubiertos por profesionales dedicados a cada área.' },
+        { icon: ShieldCheck, title: 'Atención a tu propio ritmo', text: 'Si sientes aprensión o llevas tiempo postergando tu visita, te recibimos en un entorno libre de reproches, con tiempos amplios de escucha y contención.' },
+      ].map(({ icon: Icon, title, text }) => <article key={title} className="material-card-tonal rounded-[2rem] p-7 sm:p-8"><span className="bg-[var(--md-primary-container)] mb-6 inline-flex rounded-2xl p-3 text-[#A14B92]"><Icon className="h-6 w-6" aria-hidden="true" /></span><h3 className="font-title text-2xl font-semibold">{title}</h3><p className="mt-3 text-sm leading-7">{text}</p></article>)}</div>
+    </section>
+    <section id="especialidades" className="scroll-mt-36 border-y border-[#E2E7E7] bg-[#F6F8F8] py-20 sm:py-24">
+      <div className="mx-auto max-w-7xl px-6"><div className="mb-12 max-w-3xl space-y-4"><p className="section-eyebrow">Especialidades y servicios clínicos</p><h2 className="font-title text-4xl font-semibold leading-tight sm:text-5xl">Soluciones clínicas avanzadas para cada tipo de dolor</h2><p className="leading-8">Diagnóstico de precisión y tratamientos especializados combinados con calidez humana.</p></div>
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">{services.map(service => <article key={service.href} className="material-card flex flex-col overflow-hidden rounded-3xl bg-white"><div className="relative h-52"><Image src={service.image} alt={service.alt} fill sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw" className="object-cover" /></div><div className="flex flex-1 flex-col p-6"><p className="text-xs font-semibold text-[#8A3D7D]">{service.badge}</p><h3 className="mt-3 font-title text-2xl font-semibold leading-tight">{service.title}</h3><p className="mt-4 flex-1 text-sm leading-7">{service.description}</p><Link href={service.href} className="mt-5 inline-flex items-center gap-2 min-h-6 text-sm font-semibold text-[#8A3D7D] underline underline-offset-4">{service.link}<ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Link></div></article>)}</div>
+      </div>
+    </section>
+    <section className="mx-auto grid max-w-7xl items-center gap-12 px-6 py-20 sm:py-24 lg:grid-cols-2">
+      <div className="relative mb-8"><Image src="/brand/escucha-clinica-cado-calama.webp" alt="Escucha y acompañamiento durante una consulta en CADO" width={900} height={650} sizes="(max-width: 1024px) 100vw, 45vw" className="aspect-[5/4] w-full rounded-[2.2rem] object-cover shadow-lg" /><blockquote className="material-card-tonal absolute -bottom-8 left-4 right-4 rounded-2xl p-5"><Quote className="h-5 w-5 text-[#A14B92]" aria-hidden="true" /><p className="mt-2 text-sm font-semibold">Más que dientes, cuidamos personas. Aliviar tu dolor es devolverte el bienestar.</p></blockquote></div>
+      <div className="space-y-6"><p className="section-eyebrow">Nuestro equipo en Calama</p><h2 className="font-title text-4xl font-semibold leading-tight sm:text-5xl">Un centro especializado en Calama para recuperar tu calidad de vida</h2><p className="leading-8">Vivir con dolor dental, articular o neural no es normal ni debe volverse parte de tu rutina. En CADO combinamos más de una década de experiencia clínica con tecnología digital y un equipo multidisciplinario que comprende las exigencias y ritmos de Calama. Aquí no existen diagnósticos apresurados ni juicios por el estado actual de tu boca: encontramos el origen exacto de tu molestia y te acompañamos paso a paso.</p><Link href="/equipo" className="btn-cado-secondary inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold">Conoce a nuestro equipo<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link></div>
+    </section>
+    <Testimonials />
+    <section className="px-6 py-16"><div className="mx-auto material-card-tonal max-w-7xl rounded-[2rem] px-5 py-12 sm:px-12 sm:py-16"><div className="max-w-3xl space-y-5"><h2 className="font-title text-4xl font-semibold leading-tight sm:text-5xl">Dar el primer paso hacia tu alivio no tiene por qué ser difícil</h2><p className="leading-8">Si necesitas atención de urgencia, resolver un dolor orofacial persistente o deseas conocer cómo trabajamos antes de acudir a la clínica, estamos aquí para ayudarte.</p></div><div className="mt-8 flex flex-wrap items-start gap-4"><DentalinkLink label="Agendar Evaluación Presencial" compact primary /><Link href={TES_URL} className="btn-cado-secondary material-button text-sm font-semibold">Encuesta de Confort y SAV (Pacientes con Temor)</Link><a href={whatsappUrl('Hola CADO, necesito coordinar atención por una urgencia dental.')} target="_blank" rel="noopener noreferrer" className="material-button bg-emerald-800 text-sm font-semibold text-white hover:bg-emerald-900"><WhatsAppIcon className="h-5 w-5" />WhatsApp Urgencias CADO</a></div></div></section>
+  </div>;
 }

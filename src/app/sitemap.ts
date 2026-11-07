@@ -6,9 +6,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const routes = [
     "",
     "/equipo",
+    "/equipo/dr-javier-beiza",
+    "/equipo/dr-juan-cruz-mandiola",
+    "/equipo/dr-oscar-albanes-hidalgo",
+    "/dolor-orofacial",
+    "/endodoncia-calama",
+    "/trastornos-ttm-bruxismo",
+    "/contacto",
     "/urgencias",
-    "/cuestionario",
-    "/test-confort",
     "/agendar",
     "/faq",
     "/recursos",
@@ -18,10 +23,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .from("articulos_blog")
     .select("slug,published_at")
     .eq("publicado", true);
-  if (error) throw new Error("No se pudo generar el sitemap de publicaciones.");
+  if (error) console.warn("Article sitemap unavailable; serving known public pages.");
   return [
     ...routes.map((route) => ({ url: SITE_URL + route })),
-    ...(data || []).map((article) => ({
+    ...(error ? [] : data || []).map((article) => ({
       url: SITE_URL + "/blog/" + article.slug,
       lastModified: article.published_at,
     })),

@@ -12,7 +12,7 @@ export default function RecursosPage() {
             <span>Biblioteca Pública de Guías Clínicas PDF</span>
           </div>
           <h1 className="font-title text-5xl font-semibold leading-tight sm:text-6xl">
-            Información clara para acompañarte.
+            Información adicional para acompañarte.
           </h1>
           <p className="leading-8 text-[#665D66]">
             Descarga gratuitamente nuestras guías clínicas en formato PDF optimizadas para lectura en celular y computador sobre cuidados postoperatorios, manejo de urgencias y preparación sin ansiedad.
@@ -21,13 +21,13 @@ export default function RecursosPage() {
 
         <div className="mt-12"><GuideLibrary /></div>
 
-        <div className="glass-panel mt-12 flex flex-col items-start justify-between gap-5 rounded-3xl p-7 sm:flex-row sm:items-center">
+        <div className="material-card-tonal mt-12 flex flex-col items-start justify-between gap-5 rounded-3xl p-7 sm:flex-row sm:items-center">
           <div className="flex items-start gap-3">
             <BookOpen className="mt-1 h-6 w-6 shrink-0 text-[#A14B92]" />
             <div>
               <h2 className="font-semibold">¿Buscas orientación personalizada ahora?</h2>
               <p className="mt-1 text-sm leading-6 text-[#665D66]">
-                Puedes consultar nuestras preguntas frecuentes interactivas o completar el cuestionario de perfilamiento previo.
+                Puedes consultar nuestras preguntas frecuentes interactivas o completar el Encuesta TES.
               </p>
             </div>
           </div>
@@ -42,7 +42,7 @@ export default function RecursosPage() {
               href="/agendar"
               className="btn-cado-primary inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold"
             >
-              Orientación virtual guiada <ArrowRight className="h-4 w-4" />
+              Encuesta TES y SAV <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>

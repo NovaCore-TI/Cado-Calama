@@ -3,6 +3,11 @@ import { getServerDatabase } from "./server-db";
 import { AccessError } from "./doctor-auth";
 import { generateGuidePdf, type GuideDocument } from "./guide-pdf";
 import { createHash } from "node:crypto";
+import { CLINIC } from "./clinic";
+
+function currentGuideAddress(text: string) {
+  return text.replace(/Vivar #1500, oficina 205(?:, Edificio Espacio Parque)?/gi, CLINIC.streetAddress);
+}
 
 const rendered = new Map<string, Awaited<ReturnType<typeof generateGuidePdf>>>();
 export async function renderGuide(guide: GuideDocument) {
@@ -21,7 +26,14 @@ export async function readGuides(admin = false): Promise<GuideDocument[]> {
   if (error) throw new AccessError(503, "No se pudo cargar la biblioteca. Intenta de nuevo.");
   return (data || []).filter((row): row is GuideDocument =>
     typeof row.slug === "string" && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.slug) && Array.isArray(row.contenido),
-  );
+  ).map(guide => ({
+    ...guide,
+    descripcion: currentGuideAddress(guide.descripcion),
+    contenido: guide.contenido.map(section => ({
+      heading: currentGuideAddress(section.heading),
+      points: section.points.map(currentGuideAddress),
+    })),
+  }));
 }
 export async function findGuide(slug: string, admin = false) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || slug.length > 120)

@@ -1,4 +1,5 @@
 import { ArrowUpRight, MessageCircle } from "lucide-react";
+import { whatsappUrl } from "@/lib/clinic";
 
 function configuredUrl() {
   try {
@@ -7,15 +8,15 @@ function configuredUrl() {
   } catch {}
   return null;
 }
-export function DentalinkLink() {
+export function DentalinkLink({ label, compact = false, primary = false, phone }: { label?: string; compact?: boolean; primary?: boolean; phone?: string }) {
   const url = configuredUrl();
   return <div className="max-w-md space-y-2 text-sm">
-    <p className="text-xs leading-6 text-[#665D66]">{url
+    {!compact && <p className="text-xs leading-6 text-[#665D66]">{url
       ? "La reserva presencial se realiza en Dentalink. El enlace abre su agenda externa en otra pestaña."
-      : "La agenda presencial en línea aún no está habilitada. Coordina tu consulta con CADO por WhatsApp."}</p>
-    <a href={url || "https://wa.me/56944657815?text=Hola%2C%20quisiera%20coordinar%20una%20consulta%20presencial%20en%20CADO."} target="_blank" rel="noopener noreferrer"
-      className="btn-cado-secondary inline-flex items-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold">
-      {url ? <><span>Continuar a Dentalink</span><ArrowUpRight size={16} /></> : <><MessageCircle size={16} /><span>Coordinar por WhatsApp</span></>}
+      : "La agenda presencial en línea aún no está habilitada. Coordina tu consulta con CADO por WhatsApp."}</p>}
+    <a href={url || whatsappUrl("Hola, quisiera coordinar una consulta presencial en CADO.", phone)} target="_blank" rel="noopener noreferrer"
+      className={'material-button text-sm font-semibold ' + (primary ? 'btn-cado-primary' : 'btn-cado-secondary')}>
+      {url ? <><span>{label || 'Continuar a Dentalink'}</span><ArrowUpRight size={16} aria-hidden="true" /></> : <><MessageCircle size={16} aria-hidden="true" /><span>{label || 'Coordinar por WhatsApp'}</span></>}
       <span className="sr-only"> (sitio externo, abre otra pestaña)</span>
     </a>
   </div>;

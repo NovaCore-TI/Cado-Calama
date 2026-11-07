@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DentalinkLink } from "@/components/DentalinkLink";
-import { isVideoReady } from "@/lib/appointment-sync-status";
+import { useLiveUpdates } from '@/hooks/useLiveUpdates';
 interface Appointment {
   codigo: string;
   nombre_paciente: string;
@@ -11,7 +11,6 @@ interface Appointment {
   estado_atencion: string;
   estado_derivacion?: string;
   meet_link: string;
-  estado_sync: string;
 }
 interface Slot {
   fecha: string;
@@ -27,6 +26,22 @@ export default function ManageAppointment() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const [showSlots, setShowSlots] = useState(false);
+  const revision = useRef(0);
+  const slotRevision = useRef(0);
+  useLiveUpdates({ resources: ['availability'], enabled: Boolean(appointment) && /^[a-f0-9]{32,64}$/.test(token), pollMs: 15_000 }, async () => {
+    if (busy) return;
+    const request = ++revision.current;
+    const response = await fetch('/api/orientaciones', { headers: { 'x-management-token': token }, cache: 'no-store' });
+    const result = await response.json();
+    if (request !== revision.current) return;
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 404) setAppointment(null);
+      return;
+    }
+    setAppointment(result.data);
+    if (showSlots) await loadSlots(true);
+  });
   useEffect(() => {
     const secret = new URLSearchParams(window.location.hash.slice(1)).get(
       "token",
@@ -55,48 +70,21 @@ export default function ManageAppointment() {
       });
     return () => {
       active = false;
+      revision.current++;
+      slotRevision.current++;
     };
   }, [token]);
-  useEffect(() => {
-    if (!appointment || appointment.estado_sync !== "Pendiente_Reintento") return;
-    const controller = new AbortController();
-    const deadline = Date.now() + 60_000;
-    let timer: ReturnType<typeof setTimeout>;
-    async function poll() {
-      try {
-        const response = await fetch("/api/orientaciones", {
-          headers: { "x-management-token": token }, cache: "no-store", signal: controller.signal,
-        });
-        const result = await response.json();
-        if (!controller.signal.aborted && response.ok && result.data) {
-          setAppointment(result.data);
-          if (result.data.estado_sync === "Sincronizado") return;
-        }
-      } catch { /* A provider delay must not discard the saved appointment. */ }
-      if (!controller.signal.aborted && Date.now() < deadline) timer = setTimeout(poll, 2000);
-    }
-    timer = setTimeout(poll, 2000);
-    return () => { controller.abort(); clearTimeout(timer); };
-  }, [appointment?.codigo, appointment?.estado_sync, token]);
-
-  async function refreshStatus() {
-    setBusy(true); setError("");
-    try {
-      const response = await fetch("/api/orientaciones", { headers: { "x-management-token": token }, cache: "no-store" });
-      const result = await response.json();
-      if (!response.ok || !result.data) throw Error("No se pudo consultar el estado. Tus cambios guardados se conservan.");
-      setAppointment(result.data);
-    } catch (error) { setError(error instanceof Error ? error.message : "No se pudo consultar el estado."); }
-    finally { setBusy(false); }
-  }
-  async function loadSlots() {
+  async function loadSlots(preserveSelection = false) {
+    const request = ++slotRevision.current;
     setError("");
     try {
       const r = await fetch("/api/bloques", { cache: "no-store" });
       const j = await r.json();
       if (!r.ok) throw Error(j.error);
+      if (request !== slotRevision.current) return;
       setSlots(j.slots);
-      setSelection("");
+      setShowSlots(true);
+      setSelection(previous => preserveSelection && j.slots.some((slot: Slot) => slot.slotKey === previous) ? previous : '');
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "No se pudo cargar la disponibilidad.",
@@ -105,6 +93,8 @@ export default function ManageAppointment() {
   }
   async function change(action: "cancelar" | "reprogramar") {
     if (!appointment) return;
+    revision.current++;
+    slotRevision.current++;
     setBusy(true);
     setError("");
     setMessage("");
@@ -128,10 +118,11 @@ export default function ManageAppointment() {
       setAppointment(j.data);
       setCancelConfirm(false);
       setSlots([]);
+      setShowSlots(false);
       setMessage(
         action === "cancelar"
           ? "Tu orientación fue cancelada."
-          : "El nuevo horario está guardado. Revisa abajo el estado de la actualización en Google.",
+          : "Tu orientación fue reprogramada.",
       );
     } catch (e) {
       setError(
@@ -183,24 +174,16 @@ export default function ManageAppointment() {
       )}
       {busy && <p role="status">Procesando…</p>}
       {appointment && (
-        <div className="clay-card space-y-5 rounded-3xl p-7">
+        <div className="material-card-tonal space-y-5 rounded-3xl p-7">
           <h2 className="font-title text-2xl">{appointment.nombre_paciente}</h2>
           <p>
             {appointment.fecha} · {appointment.hora} ·{" "}
             {appointment.estado_atencion}
           </p>
           {(appointment.estado_derivacion === "Derivada a Dentalink" || appointment.estado_atencion === "Derivada a Dentalink") && <DentalinkLink />}
-          {appointment.estado_sync === "Pendiente_Reintento" && (
-            <div className="space-y-3 rounded-xl border p-4">
-              <p role="status">{appointment.estado_atencion === "Cancelada"
-                ? "La cancelación está guardada y el cupo liberado. El aviso y la cancelación en Google siguen pendientes."
-                : "Tu horario está guardado. La videollamada y la actualización de la invitación de Google siguen pendientes. No necesitas volver a reservar."}</p>
-              <button type="button" disabled={busy} onClick={() => void refreshStatus()} className="btn-cado-secondary rounded-xl p-3">Consultar estado de Google</button>
-            </div>
-          )}
           {appointment.estado_atencion === "Programada" && (
             <>
-              {isVideoReady(appointment.estado_sync, appointment.meet_link) && (
+              {appointment.meet_link && (
                 <a
                   href={appointment.meet_link}
                   target="_blank"
@@ -212,7 +195,6 @@ export default function ManageAppointment() {
               )}
               <div className="flex flex-wrap gap-4">
                 <button
-                  disabled={!isVideoReady(appointment.estado_sync, appointment.meet_link)}
                   onClick={() => void download()}
                   className="btn-cado-secondary rounded-xl p-3"
                 >

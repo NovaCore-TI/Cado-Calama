@@ -1,3 +1,4 @@
+import { parseTesPreferences } from '@/lib/tes-preferences';
 import { randomUUID } from "node:crypto";
 import { NextRequest, after } from "next/server";
 import { getServerDatabase } from "@/lib/server-db";
@@ -106,6 +107,7 @@ export async function POST(request: NextRequest) {
     )
       throw new AccessError(400, "Preferencias inválidas.");
     const comfort = {
+      tes: parseTesPreferences(rawComfort.tes),
       anxietyLevel: ["tranquilo", "nervioso", "fobia", "no_responde"].includes(
         rawComfort.anxietyLevel,
       )
@@ -168,6 +170,9 @@ export async function PATCH(request: NextRequest) {
     if (body.tokenGestion || request.headers.has("x-management-token"))
       token = managementToken(request, body.tokenGestion);
     else doctorId = (await requireDoctor(request)).doctor.id;
+    const offlineOwner = request.headers.get("x-cado-offline-owner");
+    if (offlineOwner && (offlineOwner !== doctorId || body.action !== "derivacion"))
+      throw new AccessError(403, "La sincronización pertenece a otra cuenta o acción.");
     if (typeof body.codigo !== "string" || body.codigo.length > 80)
       throw new AccessError(400, "Referencia inválida.");
     if (

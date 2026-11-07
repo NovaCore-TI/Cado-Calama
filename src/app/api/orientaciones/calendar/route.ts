@@ -3,7 +3,6 @@ import { getServerDatabase } from "@/lib/server-db";
 import { managementToken } from "@/lib/patient-access";
 import { accessFailure, AccessError } from "@/lib/doctor-auth";
 import { generateIcsCalendarContent } from "@/lib/google-calendar";
-import { isVideoReady } from "@/lib/appointment-sync-status";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +10,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await getServerDatabase()
       .from("orientaciones_citas")
       .select(
-        "codigo,fecha,hora,nombre_paciente,meet_link,estado_atencion,estado_sync,doctor_id",
+        "codigo,fecha,hora,nombre_paciente,meet_link,estado_atencion,doctor_id",
       )
       .eq("token_gestion", token)
       .maybeSingle();
@@ -19,8 +18,6 @@ export async function GET(request: NextRequest) {
     if (!data) throw new AccessError(404, "Enlace no válido.");
     if (data.estado_atencion !== "Programada")
       throw new AccessError(409, "La orientación ya no está programada.");
-    if (!isVideoReady(data.estado_sync, data.meet_link))
-      throw new AccessError(409, "La videollamada sigue pendiente. Tu reserva está guardada; consulta nuevamente más tarde.");
     const profile = data.doctor_id
       ? await getServerDatabase()
           .from("doctores")

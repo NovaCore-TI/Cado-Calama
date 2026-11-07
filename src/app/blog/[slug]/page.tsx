@@ -1,4 +1,5 @@
 import { ArticleBody } from "@/components/ArticleBody";
+import { LiveArticleRefresh } from '@/components/LiveArticleRefresh';
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -61,6 +62,7 @@ export default async function ArticlePage({ params }: Props) {
   };
   return (
     <article className="mx-auto max-w-3xl px-6 py-16 text-[#513D49]">
+      <LiveArticleRefresh />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeStructuredData(crumbs) }}

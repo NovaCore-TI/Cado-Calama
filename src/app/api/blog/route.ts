@@ -78,7 +78,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { doctor } = await requireDoctor(request);
+    const offlineOwner = request.headers.get("x-cado-offline-owner");
+    if (offlineOwner && offlineOwner !== doctor.id) throw new AccessError(403, "La sesión pertenece a otra cuenta.");
     const payload = article(await request.json());
+    if (offlineOwner && payload.publicado) throw new AccessError(400, "Solo se pueden sincronizar borradores.");
     const { data, error } = await getServerDatabase()
       .from("articulos_blog")
       .insert({ ...payload, autor_id: doctor.id, autor_nombre: doctor.nombre })
@@ -94,16 +97,20 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const { doctor } = await requireDoctor(request);
+    const offlineOwner = request.headers.get("x-cado-offline-owner");
+    if (offlineOwner && offlineOwner !== doctor.id) throw new AccessError(403, "La sesión pertenece a otra cuenta.");
     const body = await request.json();
     if (typeof body.id !== "string")
       throw new AccessError(400, "Artículo inválido.");
-    const { data, error } = await getServerDatabase()
+    const payload = article(body);
+    if (offlineOwner && payload.publicado) throw new AccessError(400, "Solo se pueden sincronizar borradores.");
+    let query = getServerDatabase()
       .from("articulos_blog")
-      .update(article(body))
+      .update(payload)
       .eq("id", body.id)
-      .eq("autor_id", doctor.id)
-      .select()
-      .maybeSingle();
+      .eq("autor_id", doctor.id);
+    if (offlineOwner) query = query.eq("publicado", false);
+    const { data, error } = await query.select().maybeSingle();
     if (error?.code === "23505") throw new AccessError(409, "La URL del artículo ya está en uso. Elige otra.");
     if (error) throw error;
     if (!data) throw new AccessError(404, "Artículo no disponible.");
