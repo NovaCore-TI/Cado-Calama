@@ -10,11 +10,11 @@ for (const status of ["Sincronizado", "Pendiente_Reintento"]) {
     } : { id: "fixture" }, error: null }));
     const { synchronizeAppointment } = loadTs("src/lib/calendar-sync.ts", {
       "./server-db": { getServerDatabase: () => db },
-      "./google-calendar": { createGoogleAppointmentEvent: async () => ({ ok: status === "Sincronizado", status }) },
+      "./google-calendar": { createGoogleAppointmentEvent: async () => ({ ok: status === "Sincronizado", status, eventId: "event", meetLink: "https://meet.google.com/fixture" }) },
     });
     assert.equal((await synchronizeAppointment("fixture")).status, status === "Sincronizado" ? "synced" : "pending");
     assert.equal(db.calls[1].payload.estado_sync, status);
-    assert.equal(db.calls[2].payload.sync_lease_id, null);
+    assert.equal(db.calls.at(-1).payload.sync_lease_id, null);
   });
 }
 test("Calendar scheduler counts pending, skipped and failed results separately", async () => {
