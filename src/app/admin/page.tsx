@@ -5,6 +5,8 @@ import { Modal } from "@/components/Modal";
 import dynamic from "next/dynamic";
 import { ArticleBody } from "@/components/ArticleBody";
 import { articlePlainText } from "@/lib/article-content";
+import { standardWeekSlots, saveSlotBatch } from "@/lib/agenda-batch";
+import { futureChileSlot, VIRTUAL_TIMES } from "@/lib/booking-validation";
 import { articleVersion, clearSyncedArticle, clearSyncedDerivation, readDoctorOffline, saveDoctorOffline, type DerivationStatus, type OfflineArticle, type OfflineChanges } from "@/lib/doctor-offline";
 import { syncOfflineArticle, syncOfflineDerivation } from "@/lib/doctor-offline-sync";
 const TestimonialManager = dynamic(() => import("@/components/TestimonialManager"));
@@ -571,15 +573,34 @@ function DoctorDashboard() {
     finally { postSaving.current = false; setPostBusy(false); }
   }
 
-  function handleGenerateCalamaEveningSlots() {
+  const agendaRunning = useRef(false);
+  const [agendaBusy, setAgendaBusy] = useState(false);
+  const [agendaMessage, setAgendaMessage] = useState('');
+  async function saveAgenda(slots: string[], save = toggleSlotAvailability) {
+    if (agendaRunning.current) return false;
+    agendaRunning.current = true;
+    const owner = currentDoctorId.current;
+    setAgendaBusy(true);
+    setAgendaMessage('Guardando cambios de agenda…');
+    try {
+      const result = await saveSlotBatch(slots, async (slot) => {
+        if (currentDoctorId.current !== owner) return false;
+        return save(slot);
+      });
+      if (currentDoctorId.current !== owner) return false;
+      setAgendaMessage(`Se guardaron ${result.saved} cambios.${result.failed ? ` No se pudieron guardar ${result.failed}; revisa la conexión y vuelve a intentarlo.` : ''}`);
+      return result.failed === 0 && result.saved > 0;
+    } finally {
+      agendaRunning.current = false;
+      setAgendaBusy(false);
+    }
+  }
+  async function handleGenerateCalamaEveningSlots() {
     if (!newSlotDate) return;
-    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
-    standardTimes.forEach((t) => {
-      const slotKey = `${newSlotDate}|${t}`;
-      if (!availableSlots.includes(slotKey)) {
-        toggleSlotAvailability(slotKey);
-      }
-    });
+    const occupied = new Set(appointments.filter(a => a.status === 'Programada').map(a => `${a.date}|${a.time}`));
+    const slots = VIRTUAL_TIMES.map(t => `${newSlotDate}|${t}`).filter(key =>
+      futureChileSlot(newSlotDate, key.split('|')[1]) && !blockedDates.includes(newSlotDate) && !availableSlots.includes(key) && !occupied.has(key));
+    await saveAgenda(slots);
   }
 
   // Agrupación y gestión avanzada de agenda por fecha
@@ -660,7 +681,7 @@ function DoctorDashboard() {
     }
   }
 
-  function handleClearPastSlots() {
+  async function handleClearPastSlots() {
     const pastSlots = availableSlots.filter((slot) => {
       const [d] = slot.split('|');
       return d < today;
@@ -670,55 +691,36 @@ function DoctorDashboard() {
       return;
     }
     if (window.confirm(`¿Deseas eliminar ${pastSlots.length} bloque(s) anteriores a hoy?`)) {
-      pastSlots.forEach((slot) => toggleSlotAvailability(slot));
+      await saveAgenda(pastSlots);
     }
   }
 
-  function handleGenerateWeek() {
-    const now = new Date();
-    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
-    let count = 0;
-    for (let d = 0; d < 7; d++) {
-      const target = new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
-      const dayOfWeek = target.getDay();
-      if (dayOfWeek === 0) continue; // Omite domingos
-      const dateStr = target.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
-      if (blockedDates.includes(dateStr)) continue;
-      standardTimes.forEach((t) => {
-        const slotKey = `${dateStr}|${t}`;
-        if (!availableSlots.includes(slotKey)) {
-          toggleSlotAvailability(slotKey);
-          count++;
-        }
-      });
-    }
-    alert(`Se añadieron ${count} nuevos bloques vespertinos para los próximos 7 días.`);
+  async function handleGenerateWeek() {
+    const occupied = appointments.filter(a => a.status === 'Programada').map(a => `${a.date}|${a.time}`);
+    await saveAgenda(standardWeekSlots(availableSlots, blockedDates, occupied));
   }
 
-  function handleClearDateSlots(dateStr: string) {
+  async function handleClearDateSlots(dateStr: string) {
     const dateSlots = availableSlots.filter((s) => s.startsWith(`${dateStr}|`));
     if (dateSlots.length === 0) return;
     if (window.confirm(`¿Quitar los ${dateSlots.length} bloques disponibles para el ${dateStr}?`)) {
-      dateSlots.forEach((s) => toggleSlotAvailability(s));
+      await saveAgenda(dateSlots);
     }
   }
 
-  function handleAddStandardSlotsForDate(dateStr: string) {
-    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
-    standardTimes.forEach((t) => {
-      const key = `${dateStr}|${t}`;
-      if (!availableSlots.includes(key)) {
-        toggleSlotAvailability(key);
-      }
-    });
+  async function handleAddStandardSlotsForDate(dateStr: string) {
+    const occupied = new Set(appointments.filter(a => a.status === 'Programada').map(a => `${a.date}|${a.time}`));
+    await saveAgenda(VIRTUAL_TIMES.map(t => `${dateStr}|${t}`).filter(key =>
+      futureChileSlot(dateStr, key.split('|')[1]) && !blockedDates.includes(dateStr) && !availableSlots.includes(key) && !occupied.has(key)));
   }
 
-  function handleAddCustomSlotToDate(dateStr: string) {
+  async function handleAddCustomSlotToDate(dateStr: string) {
     const time = slotTimeInputByDate[dateStr] || '19:45';
     if (!time) return;
     const key = `${dateStr}|${time}`;
     if (!availableSlots.includes(key)) {
-      toggleSlotAvailability(key);
+      if (!futureChileSlot(dateStr, time)) { setAgendaMessage('Selecciona un bloque virtual futuro entre 19:00 y 20:00.'); return; }
+      if (!await saveAgenda([key])) return;
     }
     setSlotTimeInputByDate((prev) => ({ ...prev, [dateStr]: '' }));
   }
@@ -1253,7 +1255,9 @@ function DoctorDashboard() {
           {/* SECCIÓN 3: DISPONIBILIDAD HORARIA Y AGENDA                      */}
           {/* =============================================================== */}
           {section === 'disponibilidad' && (
-            <div className="space-y-8">
+            <fieldset disabled={agendaBusy} aria-busy={agendaBusy} className="space-y-8 min-w-0">
+              <legend className="sr-only">Gestión de disponibilidad horaria</legend>
+              <p role="status" aria-live="polite" className="text-sm font-semibold">{agendaMessage}</p>
               {/* BANNER EXPLICATIVO Y ACCIONES GLOBALES */}
               <div className="flex flex-col gap-4 rounded-3xl border border-[#A14B92]/30 bg-[#F8EFF6] p-6 text-xs text-[#513D49] sm:flex-row sm:items-center sm:justify-between shadow-xs">
                 <div className="space-y-1 max-w-xl">
@@ -1262,7 +1266,7 @@ function DoctorDashboard() {
                     <span>Control de Agenda Telemática · Calama</span>
                   </div>
                   <p className="leading-relaxed text-[#513D49]">
-                    Configura los bloques vespertinos de 15 minutos (18:00 a 19:45 hrs) para las orientaciones virtuales. Los pacientes solo podrán elegir los bloques habilitados aquí.
+                    Configura los bloques vespertinos de 15 minutos (19:00 a 19:45 hrs) para las orientaciones virtuales. Los pacientes solo podrán elegir los bloques habilitados aquí.
                   </p>
                 </div>
 
@@ -1273,7 +1277,7 @@ function DoctorDashboard() {
                     className="btn-cado-primary inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold shadow-sm active:scale-98"
                   >
                     <Zap className="h-3.5 w-3.5" />
-                    <span>Generar semana estándar (L–S 18:00–19:30)</span>
+                    <span>Generar semana estándar (L–S 19:00–19:45)</span>
                   </button>
 
                   <button
@@ -1328,7 +1332,7 @@ function DoctorDashboard() {
                         type="button"
                         onClick={() => {
                           if (newSlot && newSlotDate) {
-                            toggleSlotAvailability(`${newSlotDate}|${newSlot}`);
+                            void saveAgenda([`${newSlotDate}|${newSlot}`]);
                           }
                         }}
                         className="btn-cado-primary inline-flex h-9 items-center gap-1.5 rounded-xl px-4 text-xs font-semibold shadow-sm"
@@ -1346,7 +1350,7 @@ function DoctorDashboard() {
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-[#A14B92] hover:underline"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>Rellenar automáticamente 18:00, 18:15, 18:30 y 19:30 para {newSlotDate}</span>
+                      <span>Rellenar automáticamente 19:00, 19:15, 19:30 y 19:45 para {newSlotDate}</span>
                     </button>
                   </div>
                 </section>
@@ -1374,10 +1378,9 @@ function DoctorDashboard() {
                     />
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         if (newBlockedDate) {
-                          addBlockedDate(newBlockedDate);
-                          setNewBlockedDate('');
+                          if (await saveAgenda([newBlockedDate], addBlockedDate)) setNewBlockedDate('');
                         }
                       }}
                       className="btn-cado-secondary rounded-xl px-4 py-2 text-xs font-semibold hover:border-red-300"
@@ -1402,7 +1405,7 @@ function DoctorDashboard() {
                             <span>{date}</span>
                             <button
                               type="button"
-                              onClick={() => removeBlockedDate(date)}
+                              onClick={() => saveAgenda([date], removeBlockedDate)}
                               className="text-red-500 hover:text-red-800 font-black ml-0.5"
                               title="Desbloquear"
                             >
@@ -1643,7 +1646,7 @@ function DoctorDashboard() {
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        toggleSlotAvailability(`${dayItem.date}|${timeStr}`)
+                                        saveAgenda([`${dayItem.date}|${timeStr}`])
                                       }
                                       className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 hover:text-red-800 hover:underline pt-1 border-t border-gray-100"
                                     >
@@ -1688,7 +1691,7 @@ function DoctorDashboard() {
                   </div>
                 )}
               </section>
-            </div>
+            </fieldset>
           )}
 
           {/* =============================================================== */}

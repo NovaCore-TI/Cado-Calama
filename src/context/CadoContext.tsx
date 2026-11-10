@@ -137,10 +137,10 @@ export interface CadoContextType {
 
   // Doctor Availability & Blocked Days
   availableSlots: string[];
-  toggleSlotAvailability: (slot: string) => void;
+  toggleSlotAvailability: (slot: string) => Promise<boolean>;
   blockedDates: string[];
-  addBlockedDate: (date: string, reason?: string) => void;
-  removeBlockedDate: (date: string) => void;
+  addBlockedDate: (date: string, reason?: string) => Promise<boolean>;
+  removeBlockedDate: (date: string) => Promise<boolean>;
 
   // Blog Posts
   blogPosts: BlogPost[];
@@ -713,7 +713,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         }),
       });
     });
-  const addBlockedDate = (date: string) => {
+  const addBlockedDate = (date: string) =>
     mutate(async () => {
       await api("/api/bloques", {
         method: "PATCH",
@@ -721,8 +721,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ fecha: date, bloqueada: true }),
       });
     });
-  };
-  const removeBlockedDate = (date: string) => {
+  const removeBlockedDate = (date: string) =>
     mutate(async () => {
       await api("/api/bloques", {
         method: "PATCH",
@@ -730,7 +729,6 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ fecha: date, bloqueada: false }),
       });
     });
-  };
   const addBlogPost: CadoContextType["addBlogPost"] = (post) =>
     mutate(async () => {
       await api("/api/blog", {
