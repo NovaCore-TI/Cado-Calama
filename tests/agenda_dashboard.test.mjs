@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadTs } from './helpers/load-ts.mjs';
 
-function dashboard(save) {
+function dashboard(save, overrides = {}) {
   const values = [];
   let cursor = 0;
   const react = {
@@ -18,6 +18,7 @@ function dashboard(save) {
     doctorUser: { id: 'fixture', nombre: 'Fixture', email: 'fixture@example.invalid' },
     isDoctorLoggedIn: true, appointments: [], questionnaires: [], availableSlots: [], blockedDates: [],
     doctorBlogPosts: [], blogPosts: [], supabaseStatus: { connected: true }, toggleSlotAvailability: save,
+    ...overrides,
   };
   const Page = loadTs('src/app/admin/page.tsx', {
     react, '@/lib/doctor-offline': { readDoctorOffline: () => ({}) },
@@ -66,4 +67,24 @@ test('Agenda dashboard waits for persistence, disables controls and prevents dup
   assert.equal(nodes(tree).find(node => node.type === 'fieldset').props.disabled, false);
   assert.match(label(tree), /Se guardaron 1 cambios/);
   assert.match(label(tree), /No se pudieron guardar/);
+});
+
+test('Habilitar never removes an existing block or offers a blocked date or active booking', async () => {
+  const date = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  for (const [overrides, message] of [
+    [{ availableSlots: [`${date}|19:00`] }, /ya está habilitado/],
+    [{ blockedDates: [date] }, /fecha está bloqueada/],
+    [{ appointments: [{ id: 'booked', date, time: '19:00', status: 'Programada', comfortProfile: {} }] }, /tiene una reserva/],
+  ]) {
+    let calls = 0;
+    const render = dashboard(async () => { calls++; return true; }, overrides);
+    nodes(render()).find(node => node.type === 'button' && label(node) === 'Disponibilidad').props.onClick();
+    let tree = render();
+    const dateInput = nodes(tree).find(node => node.type === 'input' && node.props.type === 'date' && !node.props['aria-label']);
+    dateInput.props.onChange({ target: { value: date } });
+    tree = render();
+    await nodes(tree).find(node => node.type === 'button' && label(node) === 'Habilitar').props.onClick();
+    assert.equal(calls, 0);
+    assert.match(label(render()), message);
+  }
 });
