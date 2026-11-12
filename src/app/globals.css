@@ -322,3 +322,57 @@ footer li a { display: inline-block; min-height: 24px; }
 footer .font-script { content-visibility: auto; contain-intrinsic-size: auto 28px; }
 @font-face { font-family: 'CADO Home Title'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/cormorant-home-title.woff2') format('woff2'); }
 .home-page .font-title { font-family: 'CADO Home Title', var(--font-cormorant); }
+
+/* Motion is progressive enhancement. The hero's title and main image stay
+   immediate; only offscreen elements are prepared by ScrollReveal. */
+@keyframes cado-reveal-in {
+  from { opacity: 0; translate: 0 16px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes cado-panel-in {
+  from { opacity: .35; translate: 0 10px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes cado-confirm-in {
+  from { opacity: .4; scale: .85; }
+  to { opacity: 1; scale: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-reveal][data-reveal-state="pending"] { opacity: 0; translate: 0 16px; }
+  [data-reveal][data-reveal-state="visible"] {
+    animation: cado-reveal-in .6s cubic-bezier(.2, .7, .2, 1) backwards;
+    animation-delay: var(--cado-stagger, 0ms);
+  }
+  [data-reveal]:nth-child(2) { --cado-stagger: 65ms; }
+  [data-reveal]:nth-child(3) { --cado-stagger: 130ms; }
+  [data-reveal]:nth-child(4) { --cado-stagger: 195ms; }
+  .cado-flow-enter { animation: cado-panel-in .28s cubic-bezier(.2, .7, .2, 1); }
+  .cado-success-icon { animation: cado-confirm-in .42s cubic-bezier(.2, .7, .2, 1); }
+  .cado-hero-note { animation: cado-panel-in .65s cubic-bezier(.2, .7, .2, 1) .12s backwards; }
+  .cado-modal[open] > div > :first-child { animation: cado-panel-in .24s ease-out; }
+
+  .cado-hover-card { transition: transform .22s ease, border-color .22s ease; }
+  .cado-hover-card img { transition: transform .5s cubic-bezier(.2, .7, .2, 1); }
+  .cado-hover-card a > svg:last-child { transition: transform .22s ease; }
+  .btn-cado-primary, .btn-cado-secondary {
+    transition: transform .18s ease, background-color .2s ease, color .2s ease, border-color .2s ease;
+  }
+  .material-option, .cado-calendar-choice {
+    transition: transform .18s ease, background-color .18s ease, border-color .18s ease, color .18s ease;
+  }
+  .material-option:has(:checked), .cado-calendar-choice[aria-pressed="true"] { transform: translateY(-1px); }
+
+  @media (hover: hover) and (pointer: fine) {
+    .cado-hover-card:hover, .cado-hover-card:focus-within { transform: translateY(-4px); }
+    .cado-hover-card:hover img { transform: scale(1.035); }
+    .cado-hover-card a:hover > svg:last-child { transform: translateX(3px); }
+    :is(.btn-cado-primary, .btn-cado-secondary):not(:disabled):hover { transform: translateY(-2px); }
+    .material-option:hover, .cado-calendar-choice:not(:disabled):hover { transform: translateY(-2px); }
+  }
+  :is(.btn-cado-primary, .btn-cado-secondary, .cado-calendar-choice):not(:disabled):active { transform: scale(.98); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .material-option, .cado-calendar-choice { transition: none; }
+}
