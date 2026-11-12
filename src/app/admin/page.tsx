@@ -602,6 +602,26 @@ function DoctorDashboard() {
       futureChileSlot(newSlotDate, key.split('|')[1]) && !blockedDates.includes(newSlotDate) && !availableSlots.includes(key) && !occupied.has(key));
     await saveAgenda(slots);
   }
+  async function handleEnableSlot() {
+    if (!futureChileSlot(newSlotDate, newSlot)) {
+      setAgendaMessage('Selecciona un bloque virtual futuro entre 19:00 y 20:00.');
+      return;
+    }
+    if (blockedDates.includes(newSlotDate)) {
+      setAgendaMessage('Esta fecha está bloqueada. Desbloquéala antes de habilitar horarios.');
+      return;
+    }
+    if (appointments.some(app => app.date === newSlotDate && app.time === newSlot && app.status === 'Programada')) {
+      setAgendaMessage('Ese horario ya tiene una reserva. La cita se conserva.');
+      return;
+    }
+    const key = `${newSlotDate}|${newSlot}`;
+    if (availableSlots.includes(key)) {
+      setAgendaMessage('Ese bloque ya está habilitado.');
+      return;
+    }
+    await saveAgenda([key]);
+  }
 
   // Agrupación y gestión avanzada de agenda por fecha
   const scheduleByDate = useMemo(() => {
@@ -1330,11 +1350,7 @@ function DoctorDashboard() {
                     <div className="flex items-end">
                       <button
                         type="button"
-                        onClick={() => {
-                          if (newSlot && newSlotDate) {
-                            void saveAgenda([`${newSlotDate}|${newSlot}`]);
-                          }
-                        }}
+                        onClick={handleEnableSlot}
                         className="btn-cado-primary inline-flex h-9 items-center gap-1.5 rounded-xl px-4 text-xs font-semibold shadow-sm"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -1408,6 +1424,7 @@ function DoctorDashboard() {
                               onClick={() => saveAgenda([date], removeBlockedDate)}
                               className="text-red-500 hover:text-red-800 font-black ml-0.5"
                               title="Desbloquear"
+                              aria-label={`Desbloquear ${date}`}
                             >
                               ×
                             </button>
@@ -1434,7 +1451,7 @@ function DoctorDashboard() {
                   </div>
 
                   {/* FILTROS DE VISTA */}
-                  <div className="flex items-center gap-2 bg-[#F6F8F8] p-1 rounded-2xl border border-[#E2E7E7] text-xs">
+                  <div className="flex flex-wrap items-center gap-2 bg-[#F6F8F8] p-1 rounded-2xl border border-[#E2E7E7] text-xs">
                     <button
                       type="button"
                       onClick={() => setScheduleViewFilter('proximos')}
@@ -1659,8 +1676,8 @@ function DoctorDashboard() {
                             )}
 
                             {/* AGREGAR HORA RÁPIDA A ESTE DÍA */}
-                            <div className="mt-3 flex items-center gap-2 pt-2 border-t border-[#E2E7E7]/60 text-xs">
-                              <span className="text-[#766C75] text-[11px]">
+                            <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E7E7]/60 text-xs">
+                              <span className="w-full text-[#766C75] text-[11px] sm:w-auto">
                                 Añadir hora personalizada a este día:
                               </span>
                               <input
@@ -1673,12 +1690,12 @@ function DoctorDashboard() {
                                     [dayItem.date]: e.target.value,
                                   }))
                                 }
-                                className="rounded-lg border border-[#B3BFBF] bg-white px-2 py-1 text-xs"
+                                className="min-w-0 flex-1 rounded-lg border border-[#B3BFBF] bg-white px-2 py-1 text-xs sm:flex-none"
                               />
                               <button
                                 type="button"
                                 onClick={() => handleAddCustomSlotToDate(dayItem.date)}
-                                className="inline-flex items-center gap-1 rounded-lg bg-[#513D49] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#3E2D37]"
+                                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg bg-[#513D49] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#3E2D37]"
                               >
                                 <Plus className="h-3 w-3" />
                                 <span>Agregar</span>
