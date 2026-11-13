@@ -191,7 +191,7 @@ export default function ManageAppointment() {
         </p>
       )}
       {message && (
-        <p role="status" className="rounded-xl bg-green-50 p-4 text-green-800">
+        <p role="status" className="cado-flow-enter rounded-xl bg-green-50 p-4 text-green-800">
           {message}
         </p>
       )}
@@ -240,7 +240,7 @@ export default function ManageAppointment() {
                 </button>
               </div>
               {showSlots && (
-                <div className="space-y-3">
+                <div className="cado-flow-enter space-y-3">
                   <RescheduleCalendar slots={slots} value={selection} onChange={setSelection}
                     disabled={busy} loading={slotsLoading} onRefresh={() => void loadSlots()} />
                   <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -258,7 +258,7 @@ export default function ManageAppointment() {
                 </div>
               )}
               {cancelConfirm && (
-                <div className="space-y-3 rounded-xl border border-red-300 p-4">
+                <div className="cado-flow-enter space-y-3 rounded-xl border border-red-300 p-4">
                   <p>¿Confirmas que deseas cancelar tu orientación?</p>
                   <button
                     disabled={busy}

@@ -69,7 +69,7 @@ export function RescheduleCalendar({ slots, value, onChange, disabled = false, l
             return <button key={date} type="button" disabled={inactive || !available} aria-pressed={current && available}
               aria-label={`${appointmentDateLabel(date)}${available ? ", con horarios disponibles" : ", sin horarios disponibles"}`}
               onClick={() => { setChosenDate(date); onChange(""); }}
-              className={`relative flex min-h-11 min-w-0 flex-col items-center justify-center rounded-xl text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8A3D7D] ${current && available ? "bg-[#8A3D7D] text-white shadow-sm" : available ? "bg-[#F8EFF6] text-[#8A3D7D] hover:bg-[#EEDCEE]" : "text-[#B3ADB3]"}`}>
+              className={`cado-calendar-choice relative flex min-h-11 min-w-0 flex-col items-center justify-center rounded-xl text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8A3D7D] ${current && available ? "bg-[#8A3D7D] text-white shadow-sm" : available ? "bg-[#F8EFF6] text-[#8A3D7D] hover:bg-[#EEDCEE]" : "text-[#B3ADB3]"}`}>
               {i + 1}{available && <span aria-hidden="true" className={`mt-0.5 h-1 w-1 rounded-full ${current ? "bg-white" : "bg-[#8A3D7D]"}`} />}
             </button>;
           })}
@@ -83,13 +83,15 @@ export function RescheduleCalendar({ slots, value, onChange, disabled = false, l
         <div role="group" aria-label="Selecciona una hora" className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-2">
           {hours.map(slot => <button key={slot.slotKey} type="button" disabled={inactive} aria-pressed={slot.slotKey === value}
             onClick={() => onChange(slot.slotKey)}
-            className={`min-h-12 rounded-xl border px-3 py-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8A3D7D] ${slot.slotKey === value ? "border-[#8A3D7D] bg-[#8A3D7D] text-white" : "border-[#E2D6E1] bg-white hover:bg-[#F8EFF6]"}`}>
+            className={`cado-calendar-choice min-h-12 rounded-xl border px-3 py-3 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#8A3D7D] ${slot.slotKey === value ? "border-[#8A3D7D] bg-[#8A3D7D] text-white" : "border-[#E2D6E1] bg-white hover:bg-[#F8EFF6]"}`}>
             {slot.hora.slice(0, 5)}<span className="sr-only"> horas, hora de Chile</span>
           </button>)}
         </div>
         <div role="status" aria-live="polite" className="mt-5 rounded-2xl bg-[#F6F8F8] p-4 text-sm leading-6">
+          <div key={selected?.slotKey || "no-selection"} className="cado-flow-enter">
           {selected ? <><p className="font-semibold">Nuevo horario seleccionado</p><p className="mt-1 capitalize">{appointmentDateLabel(selected.fecha)}</p><p className="font-semibold text-[#8A3D7D]">{selected.hora.slice(0, 5)} hrs · Hora de Chile</p></> : <p>Selecciona una hora para continuar.</p>}
           <p className="mt-2 text-xs text-[#766C75]">Tu cita actual se conserva hasta confirmar el cambio.</p>
+          </div>
         </div>
       </div>
     </div>}

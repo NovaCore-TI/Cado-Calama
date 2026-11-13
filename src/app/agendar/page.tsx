@@ -365,7 +365,7 @@ function BookingWizard() {
         {/* PASO 1: CUESTIONARIO PREVIO DE SENSIBILIDAD & EXPLICACIÓN        */}
         {/* ================================================================= */}
         {currentStep === 1 && (
-          <div className="space-y-8">
+          <div key="history" className="cado-flow-enter space-y-8">
             {/* Banner de explicación y advertencia de personalización */}
             <div className="rounded-3xl border border-[#A14B92]/30 bg-[#F8EFF6] p-6 sm:p-8">
               <div className="flex items-start gap-4">
@@ -531,7 +531,7 @@ function BookingWizard() {
         {/* PASO 2: TEST DE CONFORT AMBIENTAL (BOX CLÍNICO)                  */}
         {/* ================================================================= */}
         {currentStep === 2 && (
-          <div id="tes" className="grid scroll-mt-40 gap-8 lg:grid-cols-[1.3fr_1fr]">
+          <div key="comfort" id="tes" className="cado-flow-enter grid scroll-mt-40 gap-8 lg:grid-cols-[1.3fr_1fr]">
             <div className="min-w-0 space-y-6">
               <h2 ref={stepHeading} tabIndex={-1} className="font-title text-2xl font-semibold">Encuesta de confort</h2>
               <div className="rounded-2xl border border-[#A14B92]/25 bg-[#F8EFF6] p-5 text-sm leading-7">
@@ -576,7 +576,7 @@ function BookingWizard() {
         {/* PASO 3: SELECCIÓN DE HORARIO Y DATOS DE CONTACTO                 */}
         {/* ================================================================= */}
         {currentStep === 3 && (
-          <div id="sav" className="material-card scroll-mt-40 rounded-[2rem] p-6 sm:p-9 space-y-8">
+          <div key="booking" id="sav" className="cado-flow-enter material-card scroll-mt-40 rounded-[2rem] p-6 sm:p-9 space-y-8">
             <div>
               <h2 ref={stepHeading} tabIndex={-1} className="font-title text-2xl font-semibold text-[#513D49]">
                 Selecciona tu horario de SAV
@@ -790,8 +790,8 @@ function BookingWizard() {
         {/* PASO 4: CONFIRMACIÓN FINAL CON ENLACE DE GOOGLE MEET              */}
         {/* ================================================================= */}
         {currentStep === 4 && createdAppointment && (
-          <div className="material-card rounded-[2rem] p-7 sm:p-10 space-y-6 text-center max-w-2xl mx-auto">
-            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#10B981]/15 text-[#10B981] shadow-inner">
+          <div key="confirmation" className="cado-flow-enter material-card rounded-[2rem] p-7 sm:p-10 space-y-6 text-center max-w-2xl mx-auto">
+            <span className="cado-success-icon mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#10B981]/15 text-[#10B981] shadow-inner">
               <CheckCircle2 className="h-9 w-9" aria-hidden="true" />
             </span>
 
