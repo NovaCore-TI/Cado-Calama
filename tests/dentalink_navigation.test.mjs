@@ -24,6 +24,17 @@ test('RF-22: a configured HTTPS agenda opens externally with an explicit warning
   assert.match(html, /href="https:\/\/agenda.example.invalid\/cado"/);
   assert.match(html, /target="_blank"/);
   assert.match(html, /rel="noopener noreferrer"/);
+  assert.match(html, /href="https:\/\/wa.me\/56944657815\?/);
+  assert.match(html, /Si la agenda no funciona/);
+});
+
+test('RF-22: compact agenda links retain the external warning and the professional WhatsApp contingency', () => {
+  const html = render('https://agenda.example.invalid/cado', { compact: true, phone: '56992295910', label: 'Agendar evaluación' });
+  assert.match(html, /href="https:\/\/agenda.example.invalid\/cado"/);
+  assert.match(html, /Agendar evaluación/);
+  assert.match(html, /Agenda externa en Dentalink/);
+  assert.match(html, /href="https:\/\/wa.me\/56992295910\?/);
+  assert.match(html, /Coordinar por WhatsApp/);
 });
 test('RF-22: compact professional links keep the correct WhatsApp fallback and accessible external-site notice', () => {
   const html = render('', { compact: true, phone: '56992295910', label: 'Coordinar evaluación' });
