@@ -107,7 +107,7 @@ function StatCard({
   icon: Icon,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   detail: string;
   icon: typeof CalendarDays;
 }) {
@@ -138,6 +138,8 @@ function DoctorDashboard() {
     supabaseStatus,
     refreshSupabaseData,
     appointments,
+    appointmentsError,
+    appointmentsLoading,
     addAppointment,
     updateAppointmentStatus,
     updateDerivationStatus,
@@ -166,6 +168,7 @@ function DoctorDashboard() {
   const [offlineMessage, setOfflineMessage] = useState('');
   const [syncingDerivation, setSyncingDerivation] = useState<string | null>(null);
   const online = browserOnline && supabaseStatus.connected;
+  const clinicalUnavailable = appointments.length === 0 && Boolean(appointmentsError || appointmentsLoading);
 
   useEffect(() => {
     const connection = () => setBrowserOnline(navigator.onLine);
@@ -973,24 +976,37 @@ function DoctorDashboard() {
           {/* =============================================================== */}
           {/* SECCIÓN 1: RESUMEN GENERAL                                      */}
           {/* =============================================================== */}
+          {appointmentsError && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+            <p className="font-semibold">{appointmentsError}</p>
+            <p className="mt-1">{appointments.length
+              ? 'Se muestran los últimos datos confirmados; pueden estar desactualizados.'
+              : 'El historial no está disponible. No se ha confirmado que esté vacío.'}</p>
+            <button type="button" disabled={appointmentsLoading} onClick={() => refreshSupabaseData()}
+              className="btn-cado-secondary mt-3 rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50">
+              {appointmentsLoading ? 'Reintentando historial…' : 'Reintentar historial'}
+            </button>
+          </div>}
+          {appointmentsLoading && <p role="status" className="text-sm text-[#766C75]">
+            {appointments.length ? 'Actualizando historial…' : 'Cargando historial…'}
+          </p>}
           {section === 'resumen' && (
             <div className="space-y-8">
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard
                   label="Orientaciones programadas"
-                  value={scheduled}
+                  value={clinicalUnavailable ? '—' : scheduled}
                   detail="Pendientes de realizar"
                   icon={CalendarDays}
                 />
                 <StatCard
                   label="Orientaciones realizadas"
-                  value={completed}
+                  value={clinicalUnavailable ? '—' : completed}
                   detail="Historial acumulado"
                   icon={CheckCircle2}
                 />
                 <StatCard
                   label="Derivadas a Dentalink"
-                  value={derived.length}
+                  value={clinicalUnavailable ? '—' : derived.length}
                   detail="Continuidad presencial"
                   icon={ArrowRight}
                 />
@@ -1027,10 +1043,10 @@ function DoctorDashboard() {
                     <div className="rounded-2xl bg-[#F6F8F8] p-8 text-center space-y-2">
                       <CalendarDays className="mx-auto h-8 w-8 text-[#B3BFBF]" />
                       <p className="text-sm font-semibold text-[#513D49]">
-                        No hay orientaciones pendientes
+                        {clinicalUnavailable ? 'Historial no disponible' : 'No hay orientaciones pendientes'}
                       </p>
                       <p className="text-xs text-[#766C75]">
-                        Las nuevas reservas aparecerán aquí automáticamente.
+                        {clinicalUnavailable ? 'Espera la carga o vuelve a intentarlo.' : 'Las nuevas reservas aparecerán aquí automáticamente.'}
                       </p>
                     </div>
                   ) : (
@@ -1136,7 +1152,7 @@ function DoctorDashboard() {
               </div>
 
               {/* LISTA DE CITAS */}
-              {filteredAppointments.length === 0 ? (
+              {filteredAppointments.length === 0 && clinicalUnavailable ? null : filteredAppointments.length === 0 ? (
                 <div className="rounded-3xl border border-[#E2E7E7] bg-white p-12 text-center space-y-3">
                   <Users className="mx-auto h-10 w-10 text-[#B3BFBF]" />
                   <h3 className="font-title text-2xl font-semibold text-[#513D49]">
@@ -1732,10 +1748,10 @@ function DoctorDashboard() {
                 <div className="rounded-2xl bg-[#F6F8F8] p-10 text-center space-y-2">
                   <ArrowRight className="mx-auto h-8 w-8 text-[#B3BFBF]" />
                   <p className="text-sm font-semibold text-[#513D49]">
-                    Aún no hay derivaciones marcadas
+                    {clinicalUnavailable ? 'Historial no disponible' : 'Aún no hay derivaciones marcadas'}
                   </p>
                   <p className="text-xs text-[#766C75]">
-                    Puedes derivar pacientes desde la sección de Orientaciones al finalizar la sesión virtual.
+                    {clinicalUnavailable ? 'Espera la carga o vuelve a intentarlo.' : 'Puedes derivar pacientes desde la sección de Orientaciones al finalizar la sesión virtual.'}
                   </p>
                 </div>
               ) : (

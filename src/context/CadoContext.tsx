@@ -98,6 +98,8 @@ export interface CadoContextType {
 
   // Appointments
   appointments: Appointment[];
+  appointmentsError: string;
+  appointmentsLoading: boolean;
   addAppointment: (
     app: Omit<Appointment, "id" | "createdAt" | "status"> & {
       id?: string;
@@ -222,6 +224,8 @@ async function api(url: string, init?: RequestInit) {
 }
 export function CadoProvider({ children }: { children: React.ReactNode }) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointmentsError, setAppointmentsError] = useState("");
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
   const [doctorBlogPosts, setDoctorBlogPosts] = useState<BlogPost[]>([]);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
@@ -260,6 +264,8 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     activeAuthUser.current = null;
     authorized.current = false;
     setAppointments([]);
+    setAppointmentsError("");
+    setAppointmentsLoading(false);
     setDoctorBlogPosts([]);
     setAvailableSlots([]);
     setBlockedDates([]);
@@ -292,134 +298,143 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     const isAuth = authorized.current;
     const current = () => version === privateVersion.current && request === refreshSequence.current;
     const started = performance.now();
-    const publicTask = Promise.all([
-      api("/api/blog"),
-      api(isAuth ? "/api/bloques?admin=1" : "/api/bloques"),
-    ]);
-    const privateTask = isAuth
-      ? Promise.all([
-          fetch("/api/auth/session", { cache: "no-store" }).catch(() => null),
-          api("/api/orientaciones").then(
-            (r) => ({ ok: true as const, data: r.data }),
-            () => ({ ok: false as const, data: null }),
-          ),
-          api("/api/blog?admin=1").then(
-            (r) => r.data as ArticleRow[],
-            () => null,
-          ),
-        ])
-      : null;
+    setAppointmentsLoading(isAuth);
     try {
-      const [result, blocks] = await publicTask;
-      if (!current()) return;
-      setSupabaseStatus({ connected: true, tablesReady: true, latencyMs: Math.round(performance.now() - started), message: "Contenido disponible." });
-      setBlogPosts(
-        result.data.map((r: Record<string, unknown>) => ({
-          id: String(r.id),
-          title: String(r.titulo),
-          slug: String(r.slug),
-          excerpt: String(r.resumen),
-          content: String(r.cuerpo),
-          category: r.categoria,
-          author: String(r.autor_nombre || ""),
-          readTime: String(r.tiempo_lectura || ""),
-          date: String(r.published_at || ""),
-          published: Boolean(r.publicado),
-        })),
-      );
-      if (availabilityRequest === availabilitySequence.current) {
-        if (authorized.current && blocks.blockedDates) setBlockedDates(blocks.blockedDates);
-        setAvailableSlots(blocks.slots.map((r: { slotKey: string }) => r.slotKey));
+      const publicTask = Promise.all([
+        api("/api/blog"),
+        api(isAuth ? "/api/bloques?admin=1" : "/api/bloques"),
+      ]);
+      const privateTask = isAuth
+        ? Promise.all([
+            fetch("/api/auth/session", { cache: "no-store" }).catch(() => null),
+            api("/api/orientaciones").then(
+              (r) => ({ ok: true as const, data: r.data }),
+              () => ({ ok: false as const, data: null }),
+            ),
+            api("/api/blog?admin=1").then(
+              (r) => r.data as ArticleRow[],
+              () => null,
+            ),
+          ])
+        : null;
+      try {
+        const [result, blocks] = await publicTask;
+        if (!current()) return;
+        setSupabaseStatus({ connected: true, tablesReady: true, latencyMs: Math.round(performance.now() - started), message: "Contenido disponible." });
+        setBlogPosts(
+          result.data.map((r: Record<string, unknown>) => ({
+            id: String(r.id),
+            title: String(r.titulo),
+            slug: String(r.slug),
+            excerpt: String(r.resumen),
+            content: String(r.cuerpo),
+            category: r.categoria,
+            author: String(r.autor_nombre || ""),
+            readTime: String(r.tiempo_lectura || ""),
+            date: String(r.published_at || ""),
+            published: Boolean(r.publicado),
+          })),
+        );
+        if (availabilityRequest === availabilitySequence.current) {
+          if (authorized.current && blocks.blockedDates) setBlockedDates(blocks.blockedDates);
+          setAvailableSlots(blocks.slots.map((r: { slotKey: string }) => r.slotKey));
+        }
+      } catch {
+        if (!current()) return;
+        if (availabilityRequest === availabilitySequence.current) setAvailableSlots([]);
+        setSupabaseStatus({ connected: false, tablesReady: false, latencyMs: Math.round(performance.now() - started), message: "No se pudieron cargar los datos." });
       }
-    } catch {
+      if (!privateTask || !authorized.current) {
+        setAppointments([]);
+        return;
+      }
+      const [session, orientacionesResult, posts] = await privateTask;
       if (!current()) return;
-      if (availabilityRequest === availabilitySequence.current) setAvailableSlots([]);
-      setSupabaseStatus({ connected: false, tablesReady: false, latencyMs: Math.round(performance.now() - started), message: "No se pudieron cargar los datos." });
-    }
-    if (!privateTask || !authorized.current) {
-      setAppointments([]);
-      return;
-    }
-    const [session, orientacionesResult, posts] = await privateTask;
-    if (!current()) return;
-    if (!session || !session.ok) {
-      clearPrivate();
-      return;
-    }
-    const profile = (await session.json()).doctor as DoctorUser;
-    if (!current()) return;
-    if (profile.id !== activeDoctor.current) {
-      clearPrivate();
-      return;
-    }
-    setDoctorUser(profile);
-    if (!orientacionesResult.ok) {
-      setSupabaseStatus((s) => ({
-        ...s,
-        message: "No se pudieron cargar las orientaciones.",
-      }));
-      return;
-    }
-    const rows = orientacionesResult.data;
-    if (!current() || !authorized.current) return;
-    const mappedAppointments: Appointment[] = (rows || []).map(
-      (r: AppointmentRow) => {
-        const q = r.cuestionarios_perfilamiento;
-        const extra = q?.respuestas_adicionales || {};
-        return {
-          id: r.codigo,
-          patientName: r.nombre_paciente,
-          email: r.email_paciente,
-          phone: r.telefono_paciente,
-          date: r.fecha,
-          time: String(r.hora).slice(0, 5),
-          comfortProfile: r.preferencias_confort || defaultComfort,
-          status: r.estado_atencion,
-          derivationStatus: r.estado_derivacion,
-          meetLink: r.meet_link || "",
-          createdAt: r.created_at,
-          syncedToSupabase: true,
-          syncStatus: r.estado_sync,
-          dentalinkAudit: r.fecha_derivacion
-            ? { derivedAt: r.fecha_derivacion, notes: r.notas_derivacion || "" }
-            : undefined,
-          questionnaire: q
-            ? {
-                id: q.id,
-                reason: q.motivo_consulta,
-                feeling: q.nivel_temor,
-                previousExperience: extra.previousExperience || "",
-                painSensitivity: extra.painSensitivity || "",
-                communicationPreference: extra.communicationPreference || "",
-                consent: q.consentimiento_privacidad,
-                createdAt: q.created_at,
-              }
-            : undefined,
-        };
-      },
-    );
-    setAppointments(mappedAppointments);
-    setQuestionnaires(
-      mappedAppointments.flatMap((a) =>
-        a.questionnaire ? [a.questionnaire] : [],
-      ),
-    );
-    // Drafts are visible only to the verified professional.
-    if (current() && authorized.current && posts)
-      setDoctorBlogPosts(
-        posts.map((r: ArticleRow) => ({
-          id: r.id,
-          title: r.titulo,
-          slug: r.slug,
-          excerpt: r.resumen,
-          content: r.cuerpo,
-          category: r.categoria,
-          author: r.autor_nombre,
-          readTime: r.tiempo_lectura,
-          date: r.published_at || r.created_at,
-          published: r.publicado,
-        })),
+      if (!session || !session.ok) {
+        clearPrivate();
+        return;
+      }
+      const profile = (await session.json()).doctor as DoctorUser;
+      if (!current()) return;
+      if (profile.id !== activeDoctor.current) {
+        clearPrivate();
+        return;
+      }
+      setDoctorUser(profile);
+      if (!orientacionesResult.ok) {
+        setAppointmentsError("No se pudieron cargar las orientaciones.");
+        setSupabaseStatus((s) => ({
+          ...s,
+          message: "No se pudieron cargar las orientaciones.",
+        }));
+        return;
+      }
+      const rows = orientacionesResult.data;
+      if (!current() || !authorized.current) return;
+      const mappedAppointments: Appointment[] = (rows || []).map(
+        (r: AppointmentRow) => {
+          const q = r.cuestionarios_perfilamiento;
+          const extra = q?.respuestas_adicionales || {};
+          return {
+            id: r.codigo,
+            patientName: r.nombre_paciente,
+            email: r.email_paciente,
+            phone: r.telefono_paciente,
+            date: r.fecha,
+            time: String(r.hora).slice(0, 5),
+            comfortProfile: r.preferencias_confort || defaultComfort,
+            status: r.estado_atencion,
+            derivationStatus: r.estado_derivacion,
+            meetLink: r.meet_link || "",
+            createdAt: r.created_at,
+            syncedToSupabase: true,
+            syncStatus: r.estado_sync,
+            dentalinkAudit: r.fecha_derivacion
+              ? { derivedAt: r.fecha_derivacion, notes: r.notas_derivacion || "" }
+              : undefined,
+            questionnaire: q
+              ? {
+                  id: q.id,
+                  reason: q.motivo_consulta,
+                  feeling: q.nivel_temor,
+                  previousExperience: extra.previousExperience || "",
+                  painSensitivity: extra.painSensitivity || "",
+                  communicationPreference: extra.communicationPreference || "",
+                  consent: q.consentimiento_privacidad,
+                  createdAt: q.created_at,
+                }
+              : undefined,
+          };
+        },
       );
+      setAppointments(mappedAppointments);
+      setAppointmentsError("");
+      setQuestionnaires(
+        mappedAppointments.flatMap((a) =>
+          a.questionnaire ? [a.questionnaire] : [],
+        ),
+      );
+      // Drafts are visible only to the verified professional.
+      if (current() && authorized.current && posts)
+        setDoctorBlogPosts(
+          posts.map((r: ArticleRow) => ({
+            id: r.id,
+            title: r.titulo,
+            slug: r.slug,
+            excerpt: r.resumen,
+            content: r.cuerpo,
+            category: r.categoria,
+            author: r.autor_nombre,
+            readTime: r.tiempo_lectura,
+            date: r.published_at || r.created_at,
+            published: r.publicado,
+          })),
+        );
+    } catch {
+      if (current() && authorized.current) setAppointmentsError("No se pudieron cargar las orientaciones.");
+    } finally {
+      if (current()) setAppointmentsLoading(false);
+    }
   }, [clearPrivate]);
   const refreshAvailability = useCallback(async () => {
     const version = privateVersion.current;
@@ -775,6 +790,8 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
         supabaseStatus,
         refreshSupabaseData,
         appointments,
+        appointmentsError,
+        appointmentsLoading,
         addAppointment,
         updateAppointmentStatus,
         updateDerivationStatus,
