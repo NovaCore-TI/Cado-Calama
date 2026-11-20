@@ -1,3 +1,4 @@
+import { publicMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -14,11 +15,13 @@ import {
   Zap,
 } from 'lucide-react';
 
-export const metadata = {
+export const metadata = publicMetadata({
+  path: '/urgencias',
+  absolute: true,
   title: 'Atención de Urgencias Dentales en Calama | CADO Odontología',
   description:
     'Guía de primeros auxilios y contacto rápido para dolor de muelas intenso, traumatismos dentales, flemones o sangrado en Calama.',
-};
+});
 
 const emergencyProtocols = [
   {

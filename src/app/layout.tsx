@@ -37,21 +37,6 @@ export const metadata: Metadata = {
     address: true,
     email: true,
   },
-  openGraph: {
-    type: 'website',
-    locale: 'es_CL',
-    url: SITE_URL,
-    siteName: 'CADO Odontología Calama',
-    title: 'CADO | Centro Avanzado de Dolor Orofacial en Calama',
-    description:
-      'Atención del dolor orofacial, endodoncia, urgencias y TTM con un trato cercano y humano en Calama.',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'CADO | Centro Avanzado de Dolor Orofacial en Calama',
-    description:
-      'Información y orientación inicial para cuidar tu salud oral a tu ritmo en Calama.',
-  },
   robots: {
     index: true,
     follow: true,

@@ -1,3 +1,4 @@
+import { publicMetadata } from '@/lib/seo';
 import Image from 'next/image';
 import { CLINIC, TES_URL, SAV_URL, whatsappUrl } from '@/lib/clinic';
 import { SavSteps } from '@/components/SavSteps';
@@ -20,12 +21,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-export const metadata = {
-  alternates: { canonical: '/equipo/dr-javier-beiza' },
-  title: { absolute: 'Dr. Javier Beiza | Dentista para Pacientes con Miedo en Calama' },
+export const metadata = publicMetadata({
+  path: '/equipo/dr-javier-beiza',
+  title: 'Dr. Javier Beiza | Dentista para Pacientes con Miedo en Calama',
+  absolute: true,
   description:
     'Atención odontológica cercana, sin juicios y a tu ritmo en Calama. Videollamada previa de 15 min (SAV), cuestionario TES y más de 13 años de experiencia clínica.',
-};
+});
 
 const clinicalPillars = [
   {

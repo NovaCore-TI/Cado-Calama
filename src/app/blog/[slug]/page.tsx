@@ -1,3 +1,4 @@
+import { publicMetadata } from '@/lib/seo';
 import { ArticleBody } from "@/components/ArticleBody";
 import { LiveArticleRefresh } from '@/components/LiveArticleRefresh';
 import Link from "next/link";
@@ -5,6 +6,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPublishedArticle } from "@/lib/articles";
 import { SITE_URL, serializeStructuredData } from "@/lib/site";
+export const dynamic = 'force-dynamic';
+
 type Props = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -14,20 +17,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: "Artículo no encontrado",
       robots: { index: false, follow: false },
     };
-  return {
+  return publicMetadata({
+    path: '/blog/' + article.slug,
     title: article.titulo,
     description: article.resumen,
-    alternates: { canonical: SITE_URL + "/blog/" + article.slug },
-    robots: { index: true, follow: true },
-    openGraph: {
-      type: "article",
-      title: article.titulo,
-      description: article.resumen,
-      url: SITE_URL + "/blog/" + article.slug,
-      publishedTime: article.published_at,
-      authors: [article.autor_nombre],
-    },
-  };
+    article: { publishedTime: article.published_at || undefined, author: article.autor_nombre },
+  });
 }
 export default async function ArticlePage({ params }: Props) {
   const { slug } = await params;

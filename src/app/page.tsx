@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import { preload } from 'react-dom';
 import { Activity, ArrowRight, CheckCircle2, HeartHandshake, MapPin, Quote, ShieldCheck, Users } from 'lucide-react';
 import { CLINIC, JAVIER_PROFILE, TES_URL, whatsappUrl } from '@/lib/clinic';
@@ -9,12 +9,12 @@ import { Testimonials } from '@/components/Testimonials';
 import { WhatsAppIcon } from '@/components/WhatsAppIcon';
 import { ScrollReveal } from '@/components/ScrollReveal';
 
-export const metadata: Metadata = {
-  title: { absolute: 'CADO | Dolor Orofacial y Urgencias Dentales en Calama' },
+export const metadata = publicMetadata({
+  path: '/',
+  title: 'CADO | Dolor Orofacial y Urgencias Dentales en Calama',
   description: 'Centro odontológico en Calama dedicado al dolor orofacial, urgencias dentales, endodoncia y TTM. Atención especializada con un trato cercano y humano.',
-  alternates: { canonical: '/' },
-  openGraph: { title: 'CADO · Centro Avanzado de Dolor Orofacial en Calama', description: 'Diagnóstico de precisión, especialidades coordinadas y atención humana en Calama.', url: '/' },
-};
+  absolute: true,
+});
 
 const services = [
   { badge: 'Alivio oportuno', title: 'Urgencias Dentales y Dolor Severo', description: 'Atención prioritaria para pulpitis agudas, infecciones, inflamación facial o fracturas imprevistas. Cortamos el dolor de raíz con resolución clínica definitiva.', image: '/brand/atencion-dental-cado-calama.webp', alt: 'Conversación entre un profesional y un paciente en CADO', href: '/urgencias', link: 'Ver protocolo de urgencias' },

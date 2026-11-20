@@ -1,6 +1,13 @@
+import { publicMetadata } from '@/lib/seo';
 import BlogListing from '@/components/BlogListing';
 import type { BlogPost } from '@/context/CadoContext';
 import { supabase } from '@/lib/supabase';
+
+export const metadata = publicMetadata({
+  path: '/blog',
+  title: 'Blog de salud oral',
+  description: 'Artículos educativos de salud oral revisados por CADO Odontología.',
+});
 
 export const dynamic = 'force-dynamic';
 
