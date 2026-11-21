@@ -1,3 +1,4 @@
+import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { publicMetadata } from '@/lib/seo';
 import { ArticleBody } from "@/components/ArticleBody";
 import { LiveArticleRefresh } from '@/components/LiveArticleRefresh';
@@ -28,25 +29,6 @@ export default async function ArticlePage({ params }: Props) {
   const { slug } = await params;
   const article = await getPublishedArticle(slug);
   if (!article) notFound();
-  const crumbs = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Inicio", item: SITE_URL },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: "Blog",
-        item: SITE_URL + "/blog",
-      },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: article.titulo,
-        item: SITE_URL + "/blog/" + article.slug,
-      },
-    ],
-  };
   const medical = {
     "@context": "https://schema.org",
     "@type": "MedicalWebPage",
@@ -60,22 +42,12 @@ export default async function ArticlePage({ params }: Props) {
       <LiveArticleRefresh />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeStructuredData(crumbs) }}
-      />
-      <script
-        type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeStructuredData(medical) }}
       />
-      <nav aria-label="Ruta de navegación" className="text-sm">
-        <Link href="/" className="underline">
-          Inicio
-        </Link>{" "}
-        /{" "}
-        <Link href="/blog" className="underline">
-          Blog
-        </Link>{" "}
-        / <span aria-current="page">{article.titulo}</span>
-      </nav>
+      <Breadcrumbs siteUrl={SITE_URL} items={[
+        { href: '/blog', label: 'Blog' },
+        { href: '/blog/' + article.slug, label: article.titulo },
+      ]} />
       <header className="mt-8 space-y-4 border-b pb-8">
         <p className="section-eyebrow">{article.categoria}</p>
         <h1 className="font-title text-4xl sm:text-5xl">{article.titulo}</h1>

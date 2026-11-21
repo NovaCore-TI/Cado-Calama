@@ -1,0 +1,16 @@
+export const publicPageLabels: Readonly<Record<string, string>> = {
+  '/': 'Inicio',
+  '/equipo': 'Equipo',
+  '/equipo/dr-javier-beiza': 'Dr. Javier Beiza',
+  '/equipo/dr-juan-cruz-mandiola': 'Dr. Juan Cruz Mandiola',
+  '/equipo/dr-oscar-albanes-hidalgo': 'Dr. Óscar Albanés Hidalgo',
+  '/dolor-orofacial': 'Dolor orofacial',
+  '/endodoncia-calama': 'Endodoncia',
+  '/trastornos-ttm-bruxismo': 'TTM y bruxismo',
+  '/contacto': 'Contacto',
+  '/urgencias': 'Urgencias dentales',
+  '/agendar': 'Encuesta TES y reserva',
+  '/faq': 'Preguntas frecuentes',
+  '/recursos': 'Recursos para pacientes',
+  '/blog': 'Blog',
+};

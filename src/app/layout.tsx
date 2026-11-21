@@ -118,7 +118,7 @@ export default function RootLayout({
         >
           Saltar al contenido principal
         </a>
-        <SiteShell footer={<Footer />}><CadoBoundary>{children}</CadoBoundary></SiteShell>
+        <SiteShell footer={<Footer />} siteUrl={SITE_URL}><CadoBoundary>{children}</CadoBoundary></SiteShell>
       </body>
     </html>
   );
