@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async headers() {
+    return ['/admin/:path*', '/gestionar/:path*'].map(source => ({
+      source,
+      headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+    }));
+  },
   async redirects() {
     return [
       { source: '/cuestionario', destination: '/agendar', permanent: true },
