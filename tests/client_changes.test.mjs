@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server.js';
 import { loadTs, database } from './helpers/load-ts.mjs';
+import sharp from 'sharp';
 
 const doctor = { id: '11111111-1111-4111-8111-111111111111' };
 const id = '22222222-2222-4222-8222-222222222222';
@@ -75,6 +76,28 @@ test('unpublished review images are inaccessible through the public image route'
   const response = await api.GET(new NextRequest(`https://cado.example/api/testimonios/${id}/imagen`), { params: Promise.resolve({ id }) });
   assert.equal(response.status, 404);
   assert.ok(db.calls[0].filters.some(filter => filter[0] === 'eq' && filter[1] === 'publicado' && filter[2] === true));
+});
+
+test('published review images serve sized WebP variants without caching after withdrawal', async () => {
+  const original = await sharp({
+    create: { width: 1000, height: 500, channels: 3, background: '#513d49' },
+  }).jpeg().toBuffer();
+  let published = true;
+  const db = database(() => ({ data: published ? { object_path: 'fixture.jpg', content_type: 'image/jpeg' } : null, error: null }));
+  db.storage = { from: () => ({ download: async () => ({ data: new Blob([original]), error: null }) }) };
+  const route = loadTs('src/app/api/testimonios/[id]/imagen/route.ts', { '@/lib/server-db': { getServerDatabase: () => db } });
+  const get = width => route.GET(new NextRequest(`https://cado.example/api/testimonios/${id}/imagen?w=${width}`),
+    { params: Promise.resolve({ id }) });
+
+  const response = await get(384);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'image/webp');
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+  const result = await sharp(Buffer.from(await response.arrayBuffer())).metadata();
+  assert.deepEqual([result.width, result.height], [384, 192]);
+  assert.equal((await get(5000)).status, 400);
+  published = false;
+  assert.equal((await get(384)).status, 404);
 });
 
 test('testimonial upload rejects non-image bytes before storage writes', async () => {
