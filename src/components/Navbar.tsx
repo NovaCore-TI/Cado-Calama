@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -19,6 +19,17 @@ const links = [
 export const Navbar = () => {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      setOpen(false);
+      menuButton.current?.focus();
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [open]);
   return <header className="relative z-40 xl:sticky xl:top-0 border-b border-white/80 bg-white/95 shadow-sm backdrop-blur-xl">
     <div className="bg-[#513D49] px-4 py-2 text-white sm:px-8">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-5 gap-y-2 text-[11px]">
@@ -31,7 +42,7 @@ export const Navbar = () => {
       <nav aria-label="Navegación principal" className="hidden items-center gap-4 text-xs font-medium text-[#513D49] xl:flex">
         {links.map(item => <Link key={item.path} href={item.path} aria-current={pathname === item.path ? 'page' : undefined} className={`hover:text-[#8A3D7D] ${pathname === item.path ? 'font-bold text-[#8A3D7D]' : ''}`}>{item.label}</Link>)}
       </nav>
-      <div className="flex items-center gap-2"><Link href={TES_URL} className="btn-cado-primary rounded-xl px-3 py-3 text-center text-xs font-bold shadow-sm sm:px-5">¿Temor al dentista?</Link><button type="button" onClick={() => setOpen(!open)} className="rounded-xl p-2 text-[#513D49] hover:bg-[#F6F8F8] xl:hidden" aria-label={open ? 'Cerrar menú' : 'Abrir menú'} aria-expanded={open} aria-controls="mobile-navigation">{open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}</button></div>
+      <div className="flex items-center gap-2"><Link href={TES_URL} onClick={() => setOpen(false)} className="btn-cado-primary rounded-xl px-3 py-3 text-center text-xs font-bold shadow-sm sm:px-5">¿Temor al dentista?</Link><button ref={menuButton} type="button" onClick={() => setOpen(!open)} className="rounded-xl p-2 text-[#513D49] hover:bg-[#F6F8F8] xl:hidden" aria-label={open ? 'Cerrar menú' : 'Abrir menú'} aria-expanded={open} aria-controls={open ? 'mobile-navigation' : undefined}>{open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}</button></div>
     </div>
     {open && <nav id="mobile-navigation" aria-label="Navegación móvil" className="max-h-[65dvh] overflow-y-auto border-t border-[#E2E7E7] bg-white px-5 py-4 xl:hidden"><div className="grid gap-1">{[...links, { label: 'Preguntas frecuentes', path: '/faq' }].map(item => <Link key={item.path} href={item.path} onClick={() => setOpen(false)} aria-current={pathname === item.path ? 'page' : undefined} className="rounded-xl px-4 py-3 text-sm font-medium text-[#513D49] hover:bg-[#F8EFF6]">{item.label}</Link>)}</div></nav>}
   </header>;
