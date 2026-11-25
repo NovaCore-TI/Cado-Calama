@@ -60,3 +60,30 @@ test("RF-11: availability fails closed on database errors", async () => {
   });
   assert.equal((await api.GET(request())).status, 503);
 });
+
+test("Reprogramming uses the professional assigned to the private orientation", async () => {
+  const token = "a".repeat(64);
+  const fecha = "2099-01-01";
+  const db = database((query) => {
+    if (query.table === "orientaciones_citas") {
+      const match = query.filters.find((filter) => filter[1] === "token_gestion");
+      if (match) return { data: match[2] === token ? { doctor_id: "doctor-a", estado_atencion: "Programada" } : null, error: null };
+      return { data: [], error: null };
+    }
+    if (query.table === "bloques_disponibilidad") return { error: null, data: [
+      { fecha, hora_inicio: "19:00:00", hora_fin: "19:15:00", doctor_id: "doctor-a" },
+      { fecha, hora_inicio: "19:15:00", hora_fin: "19:30:00", doctor_id: "doctor-b" },
+    ] };
+    return { error: null, data: query.table === "doctores" ? [{ id: "doctor-a" }, { id: "doctor-b" }] : [] };
+  });
+  const api = loadTs("src/app/api/bloques/route.ts", {
+    "@/lib/server-db": { getServerDatabase: () => db },
+  });
+  const scoped = (key) => new NextRequest("https://cado.example/api/bloques", {
+    headers: { "x-management-token": key },
+  });
+  const body = await (await api.GET(scoped(token))).json();
+  assert.deepEqual(body.slots.map((slot) => slot.hora), ["19:00"]);
+  assert.equal((await api.GET(scoped("b".repeat(64)))).status, 404);
+  assert.equal((await (await api.GET(request())).json()).slots.length, 2);
+});

@@ -291,19 +291,49 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     },
     [clearPrivate],
   );
+  const refreshAvailability = useCallback(async () => {
+    const version = privateVersion.current;
+    const request = ++availabilitySequence.current;
+    const current = () => version === privateVersion.current && request === availabilitySequence.current;
+    const started = performance.now();
+    const latency = () => Math.max(1, Math.round(performance.now() - started));
+    try {
+      const result = await api(authorized.current ? "/api/bloques?admin=1" : "/api/bloques");
+      if (!current()) return;
+      setAvailableSlots(result.slots.map((slot: { slotKey: string }) => slot.slotKey));
+      if (authorized.current) setBlockedDates(result.blockedDates || []);
+      setSupabaseStatus({ connected: true, tablesReady: true, latencyMs: latency(), message: "Disponibilidad consultada." });
+    } catch {
+      if (!current()) return;
+      setAvailableSlots([]);
+      setSupabaseStatus({ connected: false, tablesReady: false, latencyMs: latency(), message: "No se pudo consultar la agenda." });
+    }
+  }, []);
   const refreshSupabaseData = useCallback(async () => {
     const version = privateVersion.current;
     const request = ++refreshSequence.current;
-    const availabilityRequest = ++availabilitySequence.current;
     const isAuth = authorized.current;
     const current = () => version === privateVersion.current && request === refreshSequence.current;
-    const started = performance.now();
     setAppointmentsLoading(isAuth);
+    const availabilityTask = refreshAvailability();
+    const blogTask = api("/api/blog").then((result) => {
+      if (!current()) return;
+      setBlogPosts(
+        result.data.map((r: Record<string, unknown>) => ({
+          id: String(r.id),
+          title: String(r.titulo),
+          slug: String(r.slug),
+          excerpt: String(r.resumen),
+          content: String(r.cuerpo),
+          category: r.categoria,
+          author: String(r.autor_nombre || ""),
+          readTime: String(r.tiempo_lectura || ""),
+          date: String(r.published_at || ""),
+          published: Boolean(r.publicado),
+        })),
+      );
+    }).catch(() => {}); // Keep the last published list during a blog outage.
     try {
-      const publicTask = Promise.all([
-        api("/api/blog"),
-        api(isAuth ? "/api/bloques?admin=1" : "/api/bloques"),
-      ]);
       const privateTask = isAuth
         ? Promise.all([
             fetch("/api/auth/session", { cache: "no-store" }).catch(() => null),
@@ -317,33 +347,6 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
             ),
           ])
         : null;
-      try {
-        const [result, blocks] = await publicTask;
-        if (!current()) return;
-        setSupabaseStatus({ connected: true, tablesReady: true, latencyMs: Math.round(performance.now() - started), message: "Contenido disponible." });
-        setBlogPosts(
-          result.data.map((r: Record<string, unknown>) => ({
-            id: String(r.id),
-            title: String(r.titulo),
-            slug: String(r.slug),
-            excerpt: String(r.resumen),
-            content: String(r.cuerpo),
-            category: r.categoria,
-            author: String(r.autor_nombre || ""),
-            readTime: String(r.tiempo_lectura || ""),
-            date: String(r.published_at || ""),
-            published: Boolean(r.publicado),
-          })),
-        );
-        if (availabilityRequest === availabilitySequence.current) {
-          if (authorized.current && blocks.blockedDates) setBlockedDates(blocks.blockedDates);
-          setAvailableSlots(blocks.slots.map((r: { slotKey: string }) => r.slotKey));
-        }
-      } catch {
-        if (!current()) return;
-        if (availabilityRequest === availabilitySequence.current) setAvailableSlots([]);
-        setSupabaseStatus({ connected: false, tablesReady: false, latencyMs: Math.round(performance.now() - started), message: "No se pudieron cargar los datos." });
-      }
       if (!privateTask || !authorized.current) {
         setAppointments([]);
         return;
@@ -434,20 +437,9 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
       if (current() && authorized.current) setAppointmentsError("No se pudieron cargar las orientaciones.");
     } finally {
       if (current()) setAppointmentsLoading(false);
+      await Promise.all([availabilityTask, blogTask]);
     }
-  }, [clearPrivate]);
-  const refreshAvailability = useCallback(async () => {
-    const version = privateVersion.current;
-    const request = ++availabilitySequence.current;
-    try {
-      const result = await api(authorized.current ? '/api/bloques?admin=1' : '/api/bloques');
-      if (version !== privateVersion.current || request !== availabilitySequence.current) return;
-      setAvailableSlots(result.slots.map((slot: { slotKey: string }) => slot.slotKey));
-      if (authorized.current) setBlockedDates(result.blockedDates || []);
-    } catch {
-      if (version === privateVersion.current && request === availabilitySequence.current) setAvailableSlots([]);
-    }
-  }, []);
+  }, [clearPrivate, refreshAvailability]);
   const publicRealtime = useLiveUpdates({ resources: ['availability', 'blog'], pollMs: 15_000 }, async (resource, reason) => {
     if (reason === 'change') setLastRealtimeEvent(new Date().toISOString());
     if (resource === 'availability' || (reason === 'poll' && authorized.current)) await refreshAvailability();
@@ -628,7 +620,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
   const saveComfortPreferences = async (profile: ComfortProfile) => {
     setActiveComfortProfile(profile);
   };
-  const addAppointment: CadoContextType["addAppointment"] = (data) => {
+  const addAppointment: CadoContextType["addAppointment"] = useCallback((data) => {
     // Only adopt a confirmed server response; there is no local booking fallback.
     if (!data.id || !data.skipSupabaseSync)
       throw new Error("La reserva debe confirmarse en el servidor.");
@@ -646,7 +638,7 @@ export function CadoProvider({ children }: { children: React.ReactNode }) {
     // may populate the professional appointment collection.
     void refreshSupabaseData();
     return app;
-  };
+  }, [refreshSupabaseData]);
   const mutate = async (operation: () => Promise<void>): Promise<boolean> => {
     const version = privateVersion.current;
     try {

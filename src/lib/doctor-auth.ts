@@ -22,6 +22,11 @@ function sessionKey() {
     throw new AccessError(503, "La sesión del servidor no está configurada.");
   return key;
 }
+export function signBookingAttempt(attempt: string) {
+  return createHmac("sha256", sessionKey())
+    .update("cado-booking:" + attempt)
+    .digest("hex");
+}
 export function issueProfessionalSession(token: string, now = Date.now()) {
   const payload = Buffer.from(
     JSON.stringify({ token, expiresAt: now + SESSION_SECONDS * 1000 }),

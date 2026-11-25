@@ -32,30 +32,44 @@ export default function ManageAppointment() {
   const changeRunning = useRef(false);
   const revision = useRef(0);
   const slotRevision = useRef(0);
-  useLiveUpdates({ resources: ['availability'], enabled: Boolean(appointment) && /^[a-f0-9]{32,64}$/.test(token), pollMs: 15_000 }, async () => {
-    if (busy) return;
+  const linkToken = useRef("");
+  const validToken = /^[a-f0-9]{32,64}$/.test(token);
+  useLiveUpdates({ resources: ['availability'], enabled: Boolean(appointment) && validToken, pollMs: 15_000 }, async () => {
+    if (busy || changeRunning.current) return;
     const request = ++revision.current;
     const response = await fetch('/api/orientaciones', { headers: { 'x-management-token': token }, cache: 'no-store' });
     const result = await response.json();
-    if (request !== revision.current) return;
+    if (request !== revision.current || linkToken.current !== token) return;
     if (!response.ok) {
-      if (response.status === 401 || response.status === 404) setAppointment(null);
+      if (response.status === 401 || response.status === 404) {
+        setAppointment(null);
+        setError("El enlace es inválido o ya no está disponible. Contacta a CADO para obtener ayuda.");
+      }
       return;
     }
     setAppointment(result.data);
     if (showSlots) await loadSlots(true);
   });
   useEffect(() => {
-    const secret = new URLSearchParams(window.location.hash.slice(1)).get(
-      "token",
-    );
-    if (secret) setToken(secret);
+    const readLink = () => {
+      linkToken.current = new URLSearchParams(window.location.hash.slice(1)).get("token") || "";
+      setToken(linkToken.current);
+    };
+    readLink();
+    window.addEventListener("hashchange", readLink);
+    return () => window.removeEventListener("hashchange", readLink);
   }, []);
   useEffect(() => {
-    if (!/^[a-f0-9]{32,64}$/.test(token)) return;
-    let active = true;
-    setBusy(true);
+    setAppointment(null);
+    setShowSlots(false);
+    setCancelConfirm(false);
+    setSlotsLoading(false);
+    setSelection("");
+    setMessage("");
     setError("");
+    setBusy(validToken);
+    if (!validToken) return;
+    let active = true;
     void fetch("/api/orientaciones", {
       headers: { "x-management-token": token },
       cache: "no-store",
@@ -76,7 +90,7 @@ export default function ManageAppointment() {
       revision.current++;
       slotRevision.current++;
     };
-  }, [token]);
+  }, [token, validToken]);
   async function loadSlots(preserveSelection = false) {
     const request = ++slotRevision.current;
     setError("");
@@ -84,7 +98,10 @@ export default function ManageAppointment() {
     setCancelConfirm(false);
     setSlotsLoading(true);
     try {
-      const r = await fetch("/api/bloques", { cache: "no-store" });
+      const r = await fetch("/api/bloques", {
+        headers: { "x-management-token": token },
+        cache: "no-store",
+      });
       const j = await r.json();
       if (!r.ok) throw Error(j.error);
       if (request !== slotRevision.current) return;
@@ -120,6 +137,7 @@ export default function ManageAppointment() {
       const [nuevaFecha, nuevaHora] = selection.split("|");
       const r = await fetch("/api/orientaciones", {
         method: "PATCH",
+        signal: AbortSignal.timeout(12_000),
         headers: {
           "Content-Type": "application/json",
           "x-management-token": token,
@@ -132,6 +150,7 @@ export default function ManageAppointment() {
         }),
       });
       const j = await r.json();
+      if (linkToken.current !== token) return;
       if (!r.ok) {
         if (r.status === 409 && action === 'reprogramar') await loadSlots(true);
         throw Error(j.error || 'No se pudo guardar el cambio.');
@@ -147,12 +166,13 @@ export default function ManageAppointment() {
           : "Tu orientación fue reprogramada.",
       );
     } catch (e) {
+      if (linkToken.current !== token) return;
       setError(
         e instanceof Error ? e.message : "No se pudo guardar el cambio.",
       );
     } finally {
       changeRunning.current = false;
-      setBusy(false);
+      if (linkToken.current === token) setBusy(false);
     }
   }
   async function download() {
@@ -179,11 +199,11 @@ export default function ManageAppointment() {
         Usa el enlace privado que recibiste al confirmar tu reserva. El código
         de cita por sí solo no permite consultar ni modificar tus datos.
       </p>
-      {!token && (
-        <p className="rounded-xl border p-4">
-          Abre tu enlace privado de gestión. Si lo perdiste, comunícate con CADO
-          por los canales oficiales.
-        </p>
+      {!validToken && (
+        <div className="rounded-xl border p-4" role={token ? "alert" : undefined}>
+          {token && <p className="font-semibold">El enlace privado está incompleto o no es válido.</p>}
+          <p>Abre el enlace completo que recibiste con tu reserva. Si lo perdiste, <Link className="underline" href="/contacto">contacta a CADO</Link>.</p>
+        </div>
       )}
       {error && (
         <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">

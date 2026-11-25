@@ -11,6 +11,7 @@ import {
   validDate,
   VIRTUAL_TIMES,
 } from "@/lib/booking-validation";
+import { managementToken } from "@/lib/patient-access";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
@@ -18,6 +19,17 @@ export async function GET(request: NextRequest) {
     const date = request.nextUrl.searchParams.get("fecha");
     const admin = request.nextUrl.searchParams.get("admin") === "1";
     const doctor = admin ? (await requireDoctor(request)).doctor : null;
+    let doctorId = doctor?.id;
+    if (!admin && request.headers.has("x-management-token")) {
+      const token = managementToken(request);
+      const { data, error } = await db.from("orientaciones_citas")
+        .select("doctor_id,estado_atencion").eq("token_gestion", token).maybeSingle();
+      if (error) throw error;
+      if (!data) throw new AccessError(404, "Enlace inválido o caducado.");
+      if (!data.doctor_id || data.estado_atencion !== "Programada")
+        throw new AccessError(409, "La orientación ya no está disponible para reprogramar.");
+      doctorId = data.doctor_id;
+    }
     if (date && !validDate(date)) throw new AccessError(400, "Fecha inválida.");
     const today = new Date().toLocaleDateString("en-CA", {
       timeZone: "America/Santiago",
@@ -71,7 +83,7 @@ export async function GET(request: NextRequest) {
     const slots = (blocks.data || [])
       .filter(
         (b) =>
-          (!doctor || b.doctor_id === doctor.id) &&
+          (!doctorId || b.doctor_id === doctorId) &&
           activeDoctors.has(b.doctor_id) &&
           futureChileSlot(b.fecha, String(b.hora_inicio).slice(0, 5)) &&
           !blockedByDoctor.has(b.doctor_id + "|" + b.fecha) &&

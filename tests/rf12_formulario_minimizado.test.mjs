@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server.js";
 import { loadTs, database } from "./helpers/load-ts.mjs";
 
@@ -22,8 +23,48 @@ test("RF-12: RUT and missing consent are rejected before persistence", async () 
   for (const body of [
     { ...payload, rut: "fake" },
     { ...payload, consent: false },
+    { ...payload, phone: "--------" },
   ])
     assert.equal((await api.POST(request(body))).status, 400);
+});
+
+test("A saved reservation can be recovered and replayed by its own attempt, with one write", async () => {
+  const attempt = randomBytes(32).toString("hex");
+  const inbox = new Map();
+  const jobs = [];
+  let inserts = 0;
+  const db = database((query) => ({
+    data: inbox.get(query.filters.find((filter) => filter[1] === "token_gestion")?.[2]) ?? null,
+    error: null,
+  }));
+  db.rpc = async (_name, args) => {
+    if (inbox.has(args.p_token)) return { data: null, error: { code: "23505" } };
+    const data = { id: "fixture", codigo: args.p_code, nombre_paciente: args.p_name, token_gestion: args.p_token };
+    inserts++;
+    inbox.set(args.p_token, data);
+    return { data, error: null };
+  };
+  const api = loadTs("src/app/api/orientaciones/route.ts", {
+    "next/server": { NextResponse, after: (job) => jobs.push(job) },
+    "@/lib/server-db": { getServerDatabase: () => db },
+  }, { CADO_SESSION_SECRET: "fixture-session-key-with-at-least-32-characters" });
+  const url = "https://cado.example/api/orientaciones";
+  const post = () => api.POST(new NextRequest(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-booking-attempt": attempt },
+    body: JSON.stringify(payload),
+  }));
+  const lookup = (key) => api.GET(new NextRequest(url, { headers: { "x-booking-attempt": key } }));
+
+  const [first, second] = await Promise.all([post(), post()]);
+  assert.deepEqual([first.status, second.status].sort(), [200, 201]);
+  const original = (await first.json()).data;
+  assert.deepEqual((await second.json()).data, original);
+  assert.equal(inserts, 1);
+  assert.equal(jobs.length, 1);
+  assert.notEqual(original.token_gestion, attempt);
+  assert.deepEqual((await (await lookup(attempt)).json()).data, original);
+  assert.equal((await lookup(randomBytes(32).toString("hex"))).status, 404);
 });
 test("RF-11/12: database collision yields 409 and creates no Google event", async () => {
   let syncs = 0;

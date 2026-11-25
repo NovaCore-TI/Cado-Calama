@@ -45,7 +45,10 @@ export function validContactEmail(email: unknown) {
 }
 
 export function validContactPhone(phone: unknown) {
-  return typeof phone === "string" && /^[+0-9 ()-]{8,25}$/.test(phone);
+  if (typeof phone !== "string" || phone.length > 25 || !/^\+?[0-9 ()-]+$/.test(phone))
+    return false;
+  const digits = phone.replace(/\D/g, "").length;
+  return digits >= 8 && digits <= 15;
 }
 
 export function formatChileanPhone(phone: string) {
