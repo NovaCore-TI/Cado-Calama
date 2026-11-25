@@ -7,7 +7,7 @@ import { WhatsAppIcon } from '@/components/WhatsAppIcon';
 export const Footer = () => <footer className="mt-auto border-t border-[#3D2C37] bg-[#513D49] text-white">
   <div className="mx-auto max-w-7xl space-y-10 px-6 py-12 sm:px-8">
     <div className="grid gap-9 md:grid-cols-2 lg:grid-cols-4">
-      <div className="space-y-4"><Link href="/"><Image src="/brand/image4.png" alt="CADO Centro Avanzado de Dolor Orofacial" width={220} height={74} className="h-16 w-auto object-contain" /></Link><p className="font-title text-2xl font-semibold">CADO · Centro Avanzado de Dolor Orofacial</p><p className="text-xs leading-6 text-gray-200">Espacio clínico integral en Calama dedicado al tratamiento del dolor orofacial, urgencias, endodoncia, TTM y rehabilitación con vocación humana.</p></div>
+      <div className="space-y-4"><Link href="/"><Image src="/brand/image4.png" alt="CADO Centro Avanzado de Dolor Orofacial" width={777} height={303} sizes="164px" className="h-16 w-auto object-contain" /></Link><p className="font-title text-2xl font-semibold">CADO · Centro Avanzado de Dolor Orofacial</p><p className="text-xs leading-6 text-gray-200">Espacio clínico integral en Calama dedicado al tratamiento del dolor orofacial, urgencias, endodoncia, TTM y rehabilitación con vocación humana.</p></div>
       <div className="space-y-4 text-xs">
         <h2 className="font-bold uppercase tracking-wider text-[#E2E7E7]">Ubicación y atención</h2>
         <a href={CLINIC.directionsUrl} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 leading-6 hover:underline"><MapPin className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />{CLINIC.address}<span className="sr-only"> (Google Maps, abre otra pestaña)</span></a>
