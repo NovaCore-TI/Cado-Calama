@@ -10,17 +10,18 @@ const jsonRequest = (method, body) => new NextRequest('https://cado.example/api/
 
 test('search canonicals remain public when OAuth uses a local development URL', () => {
   const { resolveSiteUrl } = loadTs('src/lib/site.ts');
-  assert.equal(resolveSiteUrl({ NEXT_PUBLIC_APP_URL: 'http://localhost:3000' }), 'https://www.cadoodontologia.cl');
-  assert.equal(resolveSiteUrl({ NEXT_PUBLIC_SITE_URL: 'https://localhost:3000' }), 'https://www.cadoodontologia.cl');
-  assert.equal(resolveSiteUrl({ NEXT_PUBLIC_SITE_URL: 'https://cadoodontologia.cl/' }), 'https://cadoodontologia.cl');
+  assert.equal(resolveSiteUrl({ NEXT_PUBLIC_APP_URL: 'http://localhost:3000' }), 'https://cado-calama.vercel.app');
+  assert.equal(resolveSiteUrl({ NEXT_PUBLIC_SITE_URL: 'https://localhost:3000' }), 'https://cado-calama.vercel.app');
+  assert.equal(resolveSiteUrl({ NEXT_PUBLIC_SITE_URL: 'https://www.cadoodontologia.cl/' }), 'https://cado-calama.vercel.app');
+  assert.equal(resolveSiteUrl({ NEXT_PUBLIC_SITE_URL: 'https://clinica.example/' }), 'https://clinica.example');
 });
 
 test('sitemap retains real public pages when the article database is unavailable', async () => {
   const db = database(() => ({ data: null, error: { code: '08006' } }));
   const { default: sitemap } = loadTs('src/app/sitemap.ts', { '@/lib/supabase': { supabase: db } });
   const entries = await sitemap();
-  assert.ok(entries.some(entry => entry.url === 'https://www.cadoodontologia.cl/equipo/dr-oscar-albanes-hidalgo'));
-  assert.ok(entries.some(entry => entry.url === 'https://www.cadoodontologia.cl/endodoncia-calama'));
+  assert.ok(entries.some(entry => entry.url === 'https://cado-calama.vercel.app/equipo/dr-oscar-albanes-hidalgo'));
+  assert.ok(entries.some(entry => entry.url === 'https://cado-calama.vercel.app/endodoncia-calama'));
   assert.ok(entries.every(entry => !entry.url.includes('localhost') && !entry.url.includes('/cuestionario')));
 });
 
