@@ -1,6 +1,6 @@
 import { Breadcrumbs } from '@/components/Breadcrumbs';
 import { publicMetadata } from '@/lib/seo';
-import { ArticleBody } from "@/components/ArticleBody";
+import { ArticleContent } from "@/components/ArticleContent";
 import { LiveArticleRefresh } from '@/components/LiveArticleRefresh';
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return publicMetadata({
     path: '/blog/' + article.slug,
     title: article.titulo,
-    description: article.resumen,
+    description: article.resumen?.trim() || article.titulo,
     article: { publishedTime: article.published_at || undefined, author: article.autor_nombre },
   });
 }
@@ -48,15 +48,10 @@ export default async function ArticlePage({ params }: Props) {
         { href: '/blog', label: 'Blog' },
         { href: '/blog/' + article.slug, label: article.titulo },
       ]} />
-      <header className="mt-8 space-y-4 border-b pb-8">
-        <p className="section-eyebrow">{article.categoria}</p>
-        <h1 className="font-title text-4xl sm:text-5xl">{article.titulo}</h1>
-        <p>{article.resumen}</p>
-        <p className="text-sm">
-          {article.autor_nombre} · {article.tiempo_lectura}
-        </p>
-      </header>
-      <div className="py-10 leading-8"><ArticleBody content={article.cuerpo} /></div>
+      <div className="mt-8">
+        <ArticleContent title={article.titulo} category={article.categoria} excerpt={article.resumen}
+          author={article.autor_nombre} readTime={article.tiempo_lectura} content={article.cuerpo} />
+      </div>
       <Link
         href="/agendar"
         className="btn-cado-primary inline-block rounded-xl p-4"

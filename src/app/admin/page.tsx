@@ -3,7 +3,7 @@ import { DentalinkLink } from "@/components/DentalinkLink";
 import { GuideLibrary } from "@/components/GuideLibrary";
 import { Modal } from "@/components/Modal";
 import dynamic from "next/dynamic";
-import { ArticleBody } from "@/components/ArticleBody";
+import { ArticleContent } from "@/components/ArticleContent";
 import { articlePlainText } from "@/lib/article-content";
 import { standardWeekSlots, saveSlotBatch } from "@/lib/agenda-batch";
 import { futureChileSlot, VIRTUAL_TIMES } from "@/lib/booking-validation";
@@ -251,6 +251,8 @@ function DoctorDashboard() {
   const [postContent, setPostContent] = useState('');
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
+  const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
+  const [deleteError, setDeleteError] = useState('');
   const [restoredArticle, setRestoredArticle] = useState<OfflineArticle | null>(null);
   const editingBaseline = useRef<string | null>(null);
   const hasUnsavedChanges = postDirty && (Boolean(editingPostId) || Boolean(postTitle || postSlug || postExcerpt || articlePlainText(postContent).trim()) || postCategory !== 'Cuidados');
@@ -362,11 +364,14 @@ function DoctorDashboard() {
     document.addEventListener('click', leave, true);
     return () => { window.removeEventListener('beforeunload', warn); document.removeEventListener('click', leave, true); };
   }, [hasUnsavedChanges]);
+  function resetPostEditor() {
+    editingBaseline.current = null;
+    setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage(''); setRestoredArticle(null);
+  }
   function discardPost() {
     if (postSaving.current) return false;
     if (hasUnsavedChanges && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return false;
-    editingBaseline.current = null;
-    setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage(''); setRestoredArticle(null);
+    resetPostEditor();
     return true;
   }
   function navigateSection(next: Section) {
@@ -574,6 +579,25 @@ function DoctorDashboard() {
     postSaving.current = true; setPostBusy(true);
     try { setPostMessage(await action() ? 'Cambio guardado.' : 'No se pudo guardar el cambio.'); }
     finally { postSaving.current = false; setPostBusy(false); }
+  }
+
+  async function confirmDeletePost() {
+    if (!postToDelete || postSaving.current) return;
+    postSaving.current = true;
+    setPostBusy(true);
+    setDeleteError('');
+    try {
+      if (!await deleteBlogPost(postToDelete.id)) throw new Error();
+      if (editingPostId === postToDelete.id) resetPostEditor();
+      setPostToDelete(null);
+      setPostMessage('Artículo eliminado.');
+      requestAnimationFrame(() => sectionHeading.current?.focus({ preventScroll: true }));
+    } catch {
+      setDeleteError('No se pudo eliminar el artículo. Vuelve a intentarlo.');
+    } finally {
+      postSaving.current = false;
+      setPostBusy(false);
+    }
   }
 
   const agendaRunning = useRef(false);
@@ -1951,9 +1975,8 @@ function DoctorDashboard() {
                           type="button"
                           disabled={postBusy}
                           onClick={() => {
-                            if (window.confirm(`¿Eliminar «${post.title}»?`)) {
-                              void mutatePost(() => deleteBlogPost(post.id));
-                            }
+                            setDeleteError('');
+                            setPostToDelete(post);
                           }}
                           className="ml-auto font-semibold text-red-600 hover:underline"
                         >
@@ -2304,15 +2327,8 @@ function DoctorDashboard() {
       {previewPost && (
         <Modal labelledBy="post-preview-title" onClose={() => setPreviewPost(null)}>
           <article className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl sm:p-9 space-y-4">
-            <div className="flex items-start justify-between gap-4 border-b border-[#E2E7E7] pb-3">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-[#A14B92]">
-                  {previewPost.category} · {previewPost.published ? 'Publicado' : 'Borrador'}
-                </span>
-                <h2 id="post-preview-title" className="mt-1 font-title text-3xl font-semibold text-[#513D49]">
-                  {previewPost.title}
-                </h2>
-              </div>
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm font-semibold">Vista previa · {previewPost.published ? 'Publicado' : 'Borrador'}</p>
               <button
                 type="button"
                 onClick={() => setPreviewPost(null)}
@@ -2323,8 +2339,7 @@ function DoctorDashboard() {
               </button>
             </div>
 
-            <p className="text-sm font-semibold text-[#513D49]">{previewPost.excerpt}</p>
-            <ArticleBody content={previewPost.content} />
+            <ArticleContent heading="h2" headingId="post-preview-title" {...previewPost} />
 
             <div className="pt-3 border-t border-[#E2E7E7] flex justify-end">
               <button
@@ -2336,6 +2351,23 @@ function DoctorDashboard() {
               </button>
             </div>
           </article>
+        </Modal>
+      )}
+      {postToDelete && (
+        <Modal labelledBy="delete-post-title" onClose={() => { if (!postSaving.current) setPostToDelete(null); }}>
+          <section className="w-full max-w-lg space-y-4 rounded-3xl bg-white p-6 shadow-xl">
+            <h2 id="delete-post-title" className="font-title text-3xl font-semibold">Eliminar artículo</h2>
+            <p className="text-sm">«{postToDelete.title}» se eliminará de forma permanente.</p>
+            {postToDelete.published && <p className="text-sm">El artículo se retirará del blog público y del sitemap.</p>}
+            {deleteError && <p role="alert" className="text-sm text-red-700">{deleteError}</p>}
+            {postBusy && <p role="status" className="text-sm">Eliminando artículo…</p>}
+            <div className="flex flex-wrap justify-end gap-3">
+              <button type="button" disabled={postBusy} onClick={() => setPostToDelete(null)}
+                className="btn-cado-secondary px-4 py-2 text-sm font-semibold disabled:opacity-50">Cancelar</button>
+              <button type="button" disabled={postBusy} onClick={() => void confirmDeletePost()}
+                className="rounded-full bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Eliminar artículo</button>
+            </div>
+          </section>
         </Modal>
       )}
     </div>
