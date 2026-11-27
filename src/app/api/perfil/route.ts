@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { CLINIC, whatsappUrl } from "@/lib/clinic";
 
 const PERFIL_INSTITUCIONAL = {
-  clinica: "CADO · Centro Avanzado de Dolor Orofacial",
+  clinica: CLINIC.fullName,
   doctor: {
     nombre: "Dr. Javier Beiza Ayala",
     especialidad:
@@ -10,15 +11,15 @@ const PERFIL_INSTITUCIONAL = {
     ciudad: "Calama, Región de Antofagasta, Chile",
   },
   ubicacion: {
-    direccion: "Vivar #1580, Oficina 203, Edificio Espacio Parque",
+    direccion: CLINIC.streetAddress,
     comuna: "Calama",
     referencia: "Sector céntrico, frente a Parque El Loa",
-    googleMaps: "https://share.google/Af4IcUf6FfpfVmbTX",
+    googleMaps: CLINIC.mapsUrl,
   },
   canalesContacto: {
-    telefono: "+56944657815",
-    whatsappUrl: "https://wa.me/56944657815",
-    email: "contacto@cado.cl",
+    telefono: "+" + CLINIC.phones[0].number,
+    whatsappUrl: whatsappUrl(),
+    email: CLINIC.email,
     horarioPresencialReferencia:
       "Consultas presenciales coordinadas y urgencias.",
   },

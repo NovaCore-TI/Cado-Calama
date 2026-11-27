@@ -1,7 +1,7 @@
-import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import { ClinicalPage } from '@/components/ClinicalPage';
 
-export const metadata: Metadata = { title: 'Endodoncia y tratamientos de conducto en Calama', description: 'Evaluación y tratamiento del dolor dental y tejido pulpar en CADO Calama. Endodoncia orientada a preservar tus dientes naturales.', alternates: { canonical: '/endodoncia-calama' } };
+export const metadata = publicMetadata({ path: '/endodoncia-calama', title: 'Endodoncia y tratamientos de conducto en Calama', description: 'Evaluación y tratamiento del dolor dental y tejido pulpar en CADO Calama. Endodoncia orientada a preservar tus dientes naturales.' });
 export default function Page() {
   return <ClinicalPage title="Endodoncia y dolor dental complejo en Calama" eyebrow="Preservación dental" intro="Tratamiento especializado del tejido pulpar infectado o inflamado para abordar las infecciones internas del diente y conservar tus piezas naturales." image="/brand/tecnologia-digital-cado-calama.webp" sections={[
     { title: 'Comprender el origen de la molestia', text: 'La evaluación clínica y los exámenes que indique el profesional permiten estudiar el estado del diente y definir si corresponde un tratamiento de conducto.' },

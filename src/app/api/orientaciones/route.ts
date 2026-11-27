@@ -8,6 +8,7 @@ import {
   checkSameOrigin,
   privateJson,
   requireDoctor,
+  signBookingAttempt,
 } from "@/lib/doctor-auth";
 import {
   DRAFT_COOKIE,
@@ -19,6 +20,39 @@ import {
 import { futureChileSlot, validContact } from "@/lib/booking-validation";
 import { synchronizeAppointment } from "@/lib/calendar-sync";
 import { readDoctorRecords } from "@/lib/doctor-records";
+
+function bookingAttemptToken(request: NextRequest) {
+  const attempt = request.headers.get("x-booking-attempt");
+  if (attempt === null) return null;
+  if (!/^[a-f0-9]{64}$/.test(attempt))
+    throw new AccessError(400, "La referencia de reserva es inválida.");
+  return signBookingAttempt(attempt);
+}
+
+async function readBookingAttempt(token: string) {
+  const { data, error } = await getServerDatabase()
+    .from("orientaciones_citas")
+    .select("*")
+    .eq("token_gestion", token)
+    .maybeSingle();
+  if (error) databaseFailure(error);
+  return data;
+}
+
+function bookingResponse(data: Record<string, unknown>, token: string, status: number) {
+  const response = privateJson({
+    ok: true,
+    syncedToSupabase: true,
+    data: { ...publicAppointment(data), token_gestion: token },
+  }, status);
+  if (status === 201) response.cookies.set(DRAFT_COOKIE, "", {
+    httpOnly: true,
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
+}
+
 function scheduleSync(id: string) {
   // Pending work is durable in PostgreSQL even if the immediate attempt cannot run.
   try {
@@ -49,6 +83,13 @@ function databaseFailure(error: { code?: string } | null): never {
 }
 export async function GET(request: NextRequest) {
   try {
+    if (request.headers.has("x-booking-attempt")) {
+      checkSameOrigin(request);
+      const token = bookingAttemptToken(request)!;
+      const booking = await readBookingAttempt(token);
+      if (!booking) throw new AccessError(404, "La reserva todavía no se ha confirmado.");
+      return bookingResponse(booking, token, 200);
+    }
     const code = request.nextUrl.searchParams.get("codigo");
     if (request.headers.has("x-management-token")) {
       const token = managementToken(request);
@@ -73,6 +114,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     checkSameOrigin(request);
+    const attemptToken = bookingAttemptToken(request);
+    if (attemptToken) {
+      const booking = await readBookingAttempt(attemptToken);
+      if (booking) return bookingResponse(booking, attemptToken, 200);
+    }
     const body = await request.json();
     if (
       !body ||
@@ -95,10 +141,16 @@ export async function POST(request: NextRequest) {
         400,
         "Revisa tus datos y selecciona un bloque virtual futuro.",
       );
-    const questionnaire = await verifyQuestionnaireDraft(
-      request,
-      body.cuestionarioId,
-    );
+    let questionnaire;
+    try {
+      questionnaire = await verifyQuestionnaireDraft(request, body.cuestionarioId);
+    } catch (error) {
+      if (attemptToken) {
+        const booking = await readBookingAttempt(attemptToken);
+        if (booking) return bookingResponse(booking, attemptToken, 200);
+      }
+      throw error;
+    }
     const rawComfort = body.comfortProfile || {};
     if (
       typeof rawComfort !== "object" ||
@@ -124,7 +176,7 @@ export async function POST(request: NextRequest) {
           ? rawComfort.notes.slice(0, 500)
           : "",
     };
-    const token = newSecret();
+    const token = attemptToken || newSecret();
     const code = "CADO-" + randomUUID();
     const { data, error } = await getServerDatabase().rpc(
       "reserve_orientation",
@@ -140,23 +192,16 @@ export async function POST(request: NextRequest) {
         p_comfort: comfort,
       },
     );
-    if (error || !data) databaseFailure(error);
+    if (error || !data) {
+      if (attemptToken) {
+        const booking = await readBookingAttempt(attemptToken);
+        if (booking) return bookingResponse(booking, attemptToken, 200);
+      }
+      databaseFailure(error);
+    }
     // External availability cannot delay or turn a committed reservation into an error.
     scheduleSync(data.id);
-    const response = privateJson(
-      {
-        ok: true,
-        syncedToSupabase: true,
-        data: { ...publicAppointment(data), token_gestion: token },
-      },
-      201,
-    );
-    response.cookies.set(DRAFT_COOKIE, "", {
-      httpOnly: true,
-      path: "/",
-      maxAge: 0,
-    });
-    return response;
+    return bookingResponse(data, token, 201);
   } catch (error) {
     return accessFailure(error);
   }

@@ -37,21 +37,6 @@ export const metadata: Metadata = {
     address: true,
     email: true,
   },
-  openGraph: {
-    type: 'website',
-    locale: 'es_CL',
-    url: SITE_URL,
-    siteName: 'CADO Odontología Calama',
-    title: 'CADO | Centro Avanzado de Dolor Orofacial en Calama',
-    description:
-      'Atención del dolor orofacial, endodoncia, urgencias y TTM con un trato cercano y humano en Calama.',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'CADO | Centro Avanzado de Dolor Orofacial en Calama',
-    description:
-      'Información y orientación inicial para cuidar tu salud oral a tu ritmo en Calama.',
-  },
   robots: {
     index: true,
     follow: true,
@@ -91,12 +76,12 @@ export default function RootLayout({
     hasMap: CLINIC.directionsUrl,
     image: `${SITE_URL}/brand/clinica-cado-calama.webp`,
     logo: `${SITE_URL}/brand/image2.png`,
-    telephone: '+56944657815',
-    email: 'javierbeizaayala@gmail.com',
+    telephone: `+${CLINIC.phones[0].number}`,
+    email: CLINIC.email,
     url: SITE_URL,
     address: {
       '@type': 'PostalAddress',
-      streetAddress: 'Vivar #1580, Oficina 203, Edificio Espacio Parque',
+      streetAddress: CLINIC.streetAddress,
       addressLocality: 'Calama',
       addressRegion: 'Antofagasta',
       postalCode: '1390000',
@@ -133,7 +118,7 @@ export default function RootLayout({
         >
           Saltar al contenido principal
         </a>
-        <SiteShell footer={<Footer />}><CadoBoundary>{children}</CadoBoundary></SiteShell>
+        <SiteShell footer={<Footer />} siteUrl={SITE_URL}><CadoBoundary>{children}</CadoBoundary></SiteShell>
       </body>
     </html>
   );

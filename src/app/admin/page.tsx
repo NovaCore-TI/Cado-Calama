@@ -3,8 +3,10 @@ import { DentalinkLink } from "@/components/DentalinkLink";
 import { GuideLibrary } from "@/components/GuideLibrary";
 import { Modal } from "@/components/Modal";
 import dynamic from "next/dynamic";
-import { ArticleBody } from "@/components/ArticleBody";
+import { ArticleContent } from "@/components/ArticleContent";
 import { articlePlainText } from "@/lib/article-content";
+import { standardWeekSlots, saveSlotBatch } from "@/lib/agenda-batch";
+import { futureChileSlot, VIRTUAL_TIMES } from "@/lib/booking-validation";
 import { articleVersion, clearSyncedArticle, clearSyncedDerivation, readDoctorOffline, saveDoctorOffline, type DerivationStatus, type OfflineArticle, type OfflineChanges } from "@/lib/doctor-offline";
 import { syncOfflineArticle, syncOfflineDerivation } from "@/lib/doctor-offline-sync";
 const TestimonialManager = dynamic(() => import("@/components/TestimonialManager"));
@@ -105,7 +107,7 @@ function StatCard({
   icon: Icon,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   detail: string;
   icon: typeof CalendarDays;
 }) {
@@ -136,6 +138,8 @@ function DoctorDashboard() {
     supabaseStatus,
     refreshSupabaseData,
     appointments,
+    appointmentsError,
+    appointmentsLoading,
     addAppointment,
     updateAppointmentStatus,
     updateDerivationStatus,
@@ -164,6 +168,7 @@ function DoctorDashboard() {
   const [offlineMessage, setOfflineMessage] = useState('');
   const [syncingDerivation, setSyncingDerivation] = useState<string | null>(null);
   const online = browserOnline && supabaseStatus.connected;
+  const clinicalUnavailable = appointments.length === 0 && Boolean(appointmentsError || appointmentsLoading);
 
   useEffect(() => {
     const connection = () => setBrowserOnline(navigator.onLine);
@@ -246,6 +251,8 @@ function DoctorDashboard() {
   const [postContent, setPostContent] = useState('');
   const [editingPostId, setEditingPostId] = useState<string | null>(null);
   const [previewPost, setPreviewPost] = useState<BlogPost | null>(null);
+  const [postToDelete, setPostToDelete] = useState<BlogPost | null>(null);
+  const [deleteError, setDeleteError] = useState('');
   const [restoredArticle, setRestoredArticle] = useState<OfflineArticle | null>(null);
   const editingBaseline = useRef<string | null>(null);
   const hasUnsavedChanges = postDirty && (Boolean(editingPostId) || Boolean(postTitle || postSlug || postExcerpt || articlePlainText(postContent).trim()) || postCategory !== 'Cuidados');
@@ -357,11 +364,14 @@ function DoctorDashboard() {
     document.addEventListener('click', leave, true);
     return () => { window.removeEventListener('beforeunload', warn); document.removeEventListener('click', leave, true); };
   }, [hasUnsavedChanges]);
+  function resetPostEditor() {
+    editingBaseline.current = null;
+    setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage(''); setRestoredArticle(null);
+  }
   function discardPost() {
     if (postSaving.current) return false;
     if (hasUnsavedChanges && !window.confirm('Hay cambios sin guardar. ¿Quieres descartarlos?')) return false;
-    editingBaseline.current = null;
-    setEditingPostId(null); setPostTitle(''); setPostSlug(''); setPostExcerpt(''); setPostContent(''); setPostCategory('Cuidados'); setPostDirty(false); setPostMessage(''); setRestoredArticle(null);
+    resetPostEditor();
     return true;
   }
   function navigateSection(next: Section) {
@@ -571,15 +581,73 @@ function DoctorDashboard() {
     finally { postSaving.current = false; setPostBusy(false); }
   }
 
-  function handleGenerateCalamaEveningSlots() {
+  async function confirmDeletePost() {
+    if (!postToDelete || postSaving.current) return;
+    postSaving.current = true;
+    setPostBusy(true);
+    setDeleteError('');
+    try {
+      if (!await deleteBlogPost(postToDelete.id)) throw new Error();
+      if (editingPostId === postToDelete.id) resetPostEditor();
+      setPostToDelete(null);
+      setPostMessage('Artículo eliminado.');
+      requestAnimationFrame(() => sectionHeading.current?.focus({ preventScroll: true }));
+    } catch {
+      setDeleteError('No se pudo eliminar el artículo. Vuelve a intentarlo.');
+    } finally {
+      postSaving.current = false;
+      setPostBusy(false);
+    }
+  }
+
+  const agendaRunning = useRef(false);
+  const [agendaBusy, setAgendaBusy] = useState(false);
+  const [agendaMessage, setAgendaMessage] = useState('');
+  async function saveAgenda(slots: string[], save = toggleSlotAvailability) {
+    if (agendaRunning.current) return false;
+    agendaRunning.current = true;
+    const owner = currentDoctorId.current;
+    setAgendaBusy(true);
+    setAgendaMessage('Guardando cambios de agenda…');
+    try {
+      const result = await saveSlotBatch(slots, async (slot) => {
+        if (currentDoctorId.current !== owner) return false;
+        return save(slot);
+      });
+      if (currentDoctorId.current !== owner) return false;
+      setAgendaMessage(`Se guardaron ${result.saved} cambios.${result.failed ? ` No se pudieron guardar ${result.failed}; revisa la conexión y vuelve a intentarlo.` : ''}`);
+      return result.failed === 0 && result.saved > 0;
+    } finally {
+      agendaRunning.current = false;
+      setAgendaBusy(false);
+    }
+  }
+  async function handleGenerateCalamaEveningSlots() {
     if (!newSlotDate) return;
-    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
-    standardTimes.forEach((t) => {
-      const slotKey = `${newSlotDate}|${t}`;
-      if (!availableSlots.includes(slotKey)) {
-        toggleSlotAvailability(slotKey);
-      }
-    });
+    const occupied = new Set(appointments.filter(a => a.status === 'Programada').map(a => `${a.date}|${a.time}`));
+    const slots = VIRTUAL_TIMES.map(t => `${newSlotDate}|${t}`).filter(key =>
+      futureChileSlot(newSlotDate, key.split('|')[1]) && !blockedDates.includes(newSlotDate) && !availableSlots.includes(key) && !occupied.has(key));
+    await saveAgenda(slots);
+  }
+  async function handleEnableSlot() {
+    if (!futureChileSlot(newSlotDate, newSlot)) {
+      setAgendaMessage('Selecciona un bloque virtual futuro entre 19:00 y 20:00.');
+      return;
+    }
+    if (blockedDates.includes(newSlotDate)) {
+      setAgendaMessage('Esta fecha está bloqueada. Desbloquéala antes de habilitar horarios.');
+      return;
+    }
+    if (appointments.some(app => app.date === newSlotDate && app.time === newSlot && app.status === 'Programada')) {
+      setAgendaMessage('Ese horario ya tiene una reserva. La cita se conserva.');
+      return;
+    }
+    const key = `${newSlotDate}|${newSlot}`;
+    if (availableSlots.includes(key)) {
+      setAgendaMessage('Ese bloque ya está habilitado.');
+      return;
+    }
+    await saveAgenda([key]);
   }
 
   // Agrupación y gestión avanzada de agenda por fecha
@@ -660,7 +728,7 @@ function DoctorDashboard() {
     }
   }
 
-  function handleClearPastSlots() {
+  async function handleClearPastSlots() {
     const pastSlots = availableSlots.filter((slot) => {
       const [d] = slot.split('|');
       return d < today;
@@ -670,55 +738,36 @@ function DoctorDashboard() {
       return;
     }
     if (window.confirm(`¿Deseas eliminar ${pastSlots.length} bloque(s) anteriores a hoy?`)) {
-      pastSlots.forEach((slot) => toggleSlotAvailability(slot));
+      await saveAgenda(pastSlots);
     }
   }
 
-  function handleGenerateWeek() {
-    const now = new Date();
-    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
-    let count = 0;
-    for (let d = 0; d < 7; d++) {
-      const target = new Date(now.getTime() + d * 24 * 60 * 60 * 1000);
-      const dayOfWeek = target.getDay();
-      if (dayOfWeek === 0) continue; // Omite domingos
-      const dateStr = target.toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
-      if (blockedDates.includes(dateStr)) continue;
-      standardTimes.forEach((t) => {
-        const slotKey = `${dateStr}|${t}`;
-        if (!availableSlots.includes(slotKey)) {
-          toggleSlotAvailability(slotKey);
-          count++;
-        }
-      });
-    }
-    alert(`Se añadieron ${count} nuevos bloques vespertinos para los próximos 7 días.`);
+  async function handleGenerateWeek() {
+    const occupied = appointments.filter(a => a.status === 'Programada').map(a => `${a.date}|${a.time}`);
+    await saveAgenda(standardWeekSlots(availableSlots, blockedDates, occupied));
   }
 
-  function handleClearDateSlots(dateStr: string) {
+  async function handleClearDateSlots(dateStr: string) {
     const dateSlots = availableSlots.filter((s) => s.startsWith(`${dateStr}|`));
     if (dateSlots.length === 0) return;
     if (window.confirm(`¿Quitar los ${dateSlots.length} bloques disponibles para el ${dateStr}?`)) {
-      dateSlots.forEach((s) => toggleSlotAvailability(s));
+      await saveAgenda(dateSlots);
     }
   }
 
-  function handleAddStandardSlotsForDate(dateStr: string) {
-    const standardTimes = ['19:00', '19:15', '19:30', '19:45'];
-    standardTimes.forEach((t) => {
-      const key = `${dateStr}|${t}`;
-      if (!availableSlots.includes(key)) {
-        toggleSlotAvailability(key);
-      }
-    });
+  async function handleAddStandardSlotsForDate(dateStr: string) {
+    const occupied = new Set(appointments.filter(a => a.status === 'Programada').map(a => `${a.date}|${a.time}`));
+    await saveAgenda(VIRTUAL_TIMES.map(t => `${dateStr}|${t}`).filter(key =>
+      futureChileSlot(dateStr, key.split('|')[1]) && !blockedDates.includes(dateStr) && !availableSlots.includes(key) && !occupied.has(key)));
   }
 
-  function handleAddCustomSlotToDate(dateStr: string) {
+  async function handleAddCustomSlotToDate(dateStr: string) {
     const time = slotTimeInputByDate[dateStr] || '19:45';
     if (!time) return;
     const key = `${dateStr}|${time}`;
     if (!availableSlots.includes(key)) {
-      toggleSlotAvailability(key);
+      if (!futureChileSlot(dateStr, time)) { setAgendaMessage('Selecciona un bloque virtual futuro entre 19:00 y 20:00.'); return; }
+      if (!await saveAgenda([key])) return;
     }
     setSlotTimeInputByDate((prev) => ({ ...prev, [dateStr]: '' }));
   }
@@ -951,24 +1000,37 @@ function DoctorDashboard() {
           {/* =============================================================== */}
           {/* SECCIÓN 1: RESUMEN GENERAL                                      */}
           {/* =============================================================== */}
+          {appointmentsError && <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+            <p className="font-semibold">{appointmentsError}</p>
+            <p className="mt-1">{appointments.length
+              ? 'Se muestran los últimos datos confirmados; pueden estar desactualizados.'
+              : 'El historial no está disponible. No se ha confirmado que esté vacío.'}</p>
+            <button type="button" disabled={appointmentsLoading} onClick={() => refreshSupabaseData()}
+              className="btn-cado-secondary mt-3 rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50">
+              {appointmentsLoading ? 'Reintentando historial…' : 'Reintentar historial'}
+            </button>
+          </div>}
+          {appointmentsLoading && <p role="status" className="text-sm text-[#766C75]">
+            {appointments.length ? 'Actualizando historial…' : 'Cargando historial…'}
+          </p>}
           {section === 'resumen' && (
             <div className="space-y-8">
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard
                   label="Orientaciones programadas"
-                  value={scheduled}
+                  value={clinicalUnavailable ? '—' : scheduled}
                   detail="Pendientes de realizar"
                   icon={CalendarDays}
                 />
                 <StatCard
                   label="Orientaciones realizadas"
-                  value={completed}
+                  value={clinicalUnavailable ? '—' : completed}
                   detail="Historial acumulado"
                   icon={CheckCircle2}
                 />
                 <StatCard
                   label="Derivadas a Dentalink"
-                  value={derived.length}
+                  value={clinicalUnavailable ? '—' : derived.length}
                   detail="Continuidad presencial"
                   icon={ArrowRight}
                 />
@@ -1005,10 +1067,10 @@ function DoctorDashboard() {
                     <div className="rounded-2xl bg-[#F6F8F8] p-8 text-center space-y-2">
                       <CalendarDays className="mx-auto h-8 w-8 text-[#B3BFBF]" />
                       <p className="text-sm font-semibold text-[#513D49]">
-                        No hay orientaciones pendientes
+                        {clinicalUnavailable ? 'Historial no disponible' : 'No hay orientaciones pendientes'}
                       </p>
                       <p className="text-xs text-[#766C75]">
-                        Las nuevas reservas aparecerán aquí automáticamente.
+                        {clinicalUnavailable ? 'Espera la carga o vuelve a intentarlo.' : 'Las nuevas reservas aparecerán aquí automáticamente.'}
                       </p>
                     </div>
                   ) : (
@@ -1114,7 +1176,7 @@ function DoctorDashboard() {
               </div>
 
               {/* LISTA DE CITAS */}
-              {filteredAppointments.length === 0 ? (
+              {filteredAppointments.length === 0 && clinicalUnavailable ? null : filteredAppointments.length === 0 ? (
                 <div className="rounded-3xl border border-[#E2E7E7] bg-white p-12 text-center space-y-3">
                   <Users className="mx-auto h-10 w-10 text-[#B3BFBF]" />
                   <h3 className="font-title text-2xl font-semibold text-[#513D49]">
@@ -1253,7 +1315,9 @@ function DoctorDashboard() {
           {/* SECCIÓN 3: DISPONIBILIDAD HORARIA Y AGENDA                      */}
           {/* =============================================================== */}
           {section === 'disponibilidad' && (
-            <div className="space-y-8">
+            <fieldset disabled={agendaBusy} aria-busy={agendaBusy} className="space-y-8 min-w-0">
+              <legend className="sr-only">Gestión de disponibilidad horaria</legend>
+              <p role="status" aria-live="polite" className="text-sm font-semibold">{agendaMessage}</p>
               {/* BANNER EXPLICATIVO Y ACCIONES GLOBALES */}
               <div className="flex flex-col gap-4 rounded-3xl border border-[#A14B92]/30 bg-[#F8EFF6] p-6 text-xs text-[#513D49] sm:flex-row sm:items-center sm:justify-between shadow-xs">
                 <div className="space-y-1 max-w-xl">
@@ -1262,7 +1326,7 @@ function DoctorDashboard() {
                     <span>Control de Agenda Telemática · Calama</span>
                   </div>
                   <p className="leading-relaxed text-[#513D49]">
-                    Configura los bloques vespertinos de 15 minutos (18:00 a 19:45 hrs) para las orientaciones virtuales. Los pacientes solo podrán elegir los bloques habilitados aquí.
+                    Configura los bloques vespertinos de 15 minutos (19:00 a 19:45 hrs) para las orientaciones virtuales. Los pacientes solo podrán elegir los bloques habilitados aquí.
                   </p>
                 </div>
 
@@ -1273,7 +1337,7 @@ function DoctorDashboard() {
                     className="btn-cado-primary inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold shadow-sm active:scale-98"
                   >
                     <Zap className="h-3.5 w-3.5" />
-                    <span>Generar semana estándar (L–S 18:00–19:30)</span>
+                    <span>Generar semana estándar (L–S 19:00–19:45)</span>
                   </button>
 
                   <button
@@ -1326,11 +1390,7 @@ function DoctorDashboard() {
                     <div className="flex items-end">
                       <button
                         type="button"
-                        onClick={() => {
-                          if (newSlot && newSlotDate) {
-                            toggleSlotAvailability(`${newSlotDate}|${newSlot}`);
-                          }
-                        }}
+                        onClick={handleEnableSlot}
                         className="btn-cado-primary inline-flex h-9 items-center gap-1.5 rounded-xl px-4 text-xs font-semibold shadow-sm"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -1346,7 +1406,7 @@ function DoctorDashboard() {
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-[#A14B92] hover:underline"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>Rellenar automáticamente 18:00, 18:15, 18:30 y 19:30 para {newSlotDate}</span>
+                      <span>Rellenar automáticamente 19:00, 19:15, 19:30 y 19:45 para {newSlotDate}</span>
                     </button>
                   </div>
                 </section>
@@ -1374,10 +1434,9 @@ function DoctorDashboard() {
                     />
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         if (newBlockedDate) {
-                          addBlockedDate(newBlockedDate);
-                          setNewBlockedDate('');
+                          if (await saveAgenda([newBlockedDate], addBlockedDate)) setNewBlockedDate('');
                         }
                       }}
                       className="btn-cado-secondary rounded-xl px-4 py-2 text-xs font-semibold hover:border-red-300"
@@ -1402,9 +1461,10 @@ function DoctorDashboard() {
                             <span>{date}</span>
                             <button
                               type="button"
-                              onClick={() => removeBlockedDate(date)}
+                              onClick={() => saveAgenda([date], removeBlockedDate)}
                               className="text-red-500 hover:text-red-800 font-black ml-0.5"
                               title="Desbloquear"
+                              aria-label={`Desbloquear ${date}`}
                             >
                               ×
                             </button>
@@ -1431,7 +1491,7 @@ function DoctorDashboard() {
                   </div>
 
                   {/* FILTROS DE VISTA */}
-                  <div className="flex items-center gap-2 bg-[#F6F8F8] p-1 rounded-2xl border border-[#E2E7E7] text-xs">
+                  <div className="flex flex-wrap items-center gap-2 bg-[#F6F8F8] p-1 rounded-2xl border border-[#E2E7E7] text-xs">
                     <button
                       type="button"
                       onClick={() => setScheduleViewFilter('proximos')}
@@ -1643,7 +1703,7 @@ function DoctorDashboard() {
                                     <button
                                       type="button"
                                       onClick={() =>
-                                        toggleSlotAvailability(`${dayItem.date}|${timeStr}`)
+                                        saveAgenda([`${dayItem.date}|${timeStr}`])
                                       }
                                       className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 hover:text-red-800 hover:underline pt-1 border-t border-gray-100"
                                     >
@@ -1656,8 +1716,8 @@ function DoctorDashboard() {
                             )}
 
                             {/* AGREGAR HORA RÁPIDA A ESTE DÍA */}
-                            <div className="mt-3 flex items-center gap-2 pt-2 border-t border-[#E2E7E7]/60 text-xs">
-                              <span className="text-[#766C75] text-[11px]">
+                            <div className="mt-3 flex flex-wrap items-center gap-2 pt-2 border-t border-[#E2E7E7]/60 text-xs">
+                              <span className="w-full text-[#766C75] text-[11px] sm:w-auto">
                                 Añadir hora personalizada a este día:
                               </span>
                               <input
@@ -1670,12 +1730,12 @@ function DoctorDashboard() {
                                     [dayItem.date]: e.target.value,
                                   }))
                                 }
-                                className="rounded-lg border border-[#B3BFBF] bg-white px-2 py-1 text-xs"
+                                className="min-w-0 flex-1 rounded-lg border border-[#B3BFBF] bg-white px-2 py-1 text-xs sm:flex-none"
                               />
                               <button
                                 type="button"
                                 onClick={() => handleAddCustomSlotToDate(dayItem.date)}
-                                className="inline-flex items-center gap-1 rounded-lg bg-[#513D49] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#3E2D37]"
+                                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg bg-[#513D49] px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-[#3E2D37]"
                               >
                                 <Plus className="h-3 w-3" />
                                 <span>Agregar</span>
@@ -1688,7 +1748,7 @@ function DoctorDashboard() {
                   </div>
                 )}
               </section>
-            </div>
+            </fieldset>
           )}
 
           {/* =============================================================== */}
@@ -1712,10 +1772,10 @@ function DoctorDashboard() {
                 <div className="rounded-2xl bg-[#F6F8F8] p-10 text-center space-y-2">
                   <ArrowRight className="mx-auto h-8 w-8 text-[#B3BFBF]" />
                   <p className="text-sm font-semibold text-[#513D49]">
-                    Aún no hay derivaciones marcadas
+                    {clinicalUnavailable ? 'Historial no disponible' : 'Aún no hay derivaciones marcadas'}
                   </p>
                   <p className="text-xs text-[#766C75]">
-                    Puedes derivar pacientes desde la sección de Orientaciones al finalizar la sesión virtual.
+                    {clinicalUnavailable ? 'Espera la carga o vuelve a intentarlo.' : 'Puedes derivar pacientes desde la sección de Orientaciones al finalizar la sesión virtual.'}
                   </p>
                 </div>
               ) : (
@@ -1915,9 +1975,8 @@ function DoctorDashboard() {
                           type="button"
                           disabled={postBusy}
                           onClick={() => {
-                            if (window.confirm(`¿Eliminar «${post.title}»?`)) {
-                              void mutatePost(() => deleteBlogPost(post.id));
-                            }
+                            setDeleteError('');
+                            setPostToDelete(post);
                           }}
                           className="ml-auto font-semibold text-red-600 hover:underline"
                         >
@@ -2268,15 +2327,8 @@ function DoctorDashboard() {
       {previewPost && (
         <Modal labelledBy="post-preview-title" onClose={() => setPreviewPost(null)}>
           <article className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl sm:p-9 space-y-4">
-            <div className="flex items-start justify-between gap-4 border-b border-[#E2E7E7] pb-3">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-[#A14B92]">
-                  {previewPost.category} · {previewPost.published ? 'Publicado' : 'Borrador'}
-                </span>
-                <h2 id="post-preview-title" className="mt-1 font-title text-3xl font-semibold text-[#513D49]">
-                  {previewPost.title}
-                </h2>
-              </div>
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm font-semibold">Vista previa · {previewPost.published ? 'Publicado' : 'Borrador'}</p>
               <button
                 type="button"
                 onClick={() => setPreviewPost(null)}
@@ -2287,8 +2339,7 @@ function DoctorDashboard() {
               </button>
             </div>
 
-            <p className="text-sm font-semibold text-[#513D49]">{previewPost.excerpt}</p>
-            <ArticleBody content={previewPost.content} />
+            <ArticleContent heading="h2" headingId="post-preview-title" {...previewPost} />
 
             <div className="pt-3 border-t border-[#E2E7E7] flex justify-end">
               <button
@@ -2300,6 +2351,23 @@ function DoctorDashboard() {
               </button>
             </div>
           </article>
+        </Modal>
+      )}
+      {postToDelete && (
+        <Modal labelledBy="delete-post-title" onClose={() => { if (!postSaving.current) setPostToDelete(null); }}>
+          <section className="w-full max-w-lg space-y-4 rounded-3xl bg-white p-6 shadow-xl">
+            <h2 id="delete-post-title" className="font-title text-3xl font-semibold">Eliminar artículo</h2>
+            <p className="text-sm">«{postToDelete.title}» se eliminará de forma permanente.</p>
+            {postToDelete.published && <p className="text-sm">El artículo se retirará del blog público y del sitemap.</p>}
+            {deleteError && <p role="alert" className="text-sm text-red-700">{deleteError}</p>}
+            {postBusy && <p role="status" className="text-sm">Eliminando artículo…</p>}
+            <div className="flex flex-wrap justify-end gap-3">
+              <button type="button" disabled={postBusy} onClick={() => setPostToDelete(null)}
+                className="btn-cado-secondary px-4 py-2 text-sm font-semibold disabled:opacity-50">Cancelar</button>
+              <button type="button" disabled={postBusy} onClick={() => void confirmDeletePost()}
+                className="rounded-full bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Eliminar artículo</button>
+            </div>
+          </section>
         </Modal>
       )}
     </div>

@@ -11,5 +11,9 @@ export function CadoBoundary({ children }: { children: ReactNode }) {
   // Once a care journey starts, retain its in-memory draft across navigation.
   useEffect(() => { if (required) setActivated(true); }, [required]);
   if (!required && !activated) return children;
-  return <Suspense fallback={<div role="status" className="min-h-[60vh] bg-[#F6F8F8] p-8 text-sm text-[#513D49]">Cargando tu espacio CADO…</div>}><Provider>{children}</Provider></Suspense>;
+  return (
+    <Suspense fallback={<div role="status" className="min-h-screen bg-[#F6F8F8] p-8 text-sm text-[#513D49]">Cargando tu espacio CADO…</div>}>
+      <Provider>{children}</Provider>
+    </Suspense>
+  );
 }

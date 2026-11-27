@@ -1,11 +1,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import { ArrowRight, Users } from 'lucide-react';
 import { JAVIER_PROFILE } from '@/lib/clinic';
 import { SavSteps } from '@/components/SavSteps';
 
-export const metadata: Metadata = { title: 'Conoce a nuestro equipo de odontólogos', description: 'Conoce a Javier Beiza, Juan y Oscar, el equipo de CADO en Calama. Atención odontológica cercana, coordinación clínica y cuidado humano.', alternates: { canonical: '/equipo' } };
+export const metadata = publicMetadata({ path: '/equipo', title: 'Conoce a nuestro equipo de odontólogos', description: 'Conoce a Javier Beiza, Juan y Oscar, el equipo de CADO en Calama. Atención odontológica cercana, coordinación clínica y cuidado humano.' });
 const team = [
   { name: 'Dr. Javier Beiza Ayala', role: 'Cirujano Dentista · Más de 13 años de experiencia', detail: 'Atención con acompañamiento a pacientes con miedo dental, urgencias y exodoncias. Conoce su enfoque de atención sin juicios y a tu propio ritmo.', href: JAVIER_PROFILE, initial: 'JB', photo: '/brand/atencion-dental-cado-calama.webp' },
   { name: 'Dr. Juan Cruz Mandiola', role: 'Trastornos Temporomandibulares y Dolor Orofacial', detail: 'Conoce a Juan y coordina tu evaluación con el equipo de CADO en Calama.', href: '/equipo/dr-juan-cruz-mandiola', initial: 'J', photo: null },

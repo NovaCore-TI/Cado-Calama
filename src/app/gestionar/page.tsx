@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { DentalinkLink } from "@/components/DentalinkLink";
+import { RescheduleCalendar, appointmentDateLabel } from "@/components/RescheduleCalendar";
 import { useLiveUpdates } from '@/hooks/useLiveUpdates';
 interface Appointment {
   codigo: string;
@@ -27,32 +28,48 @@ export default function ManageAppointment() {
   const [busy, setBusy] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
   const [showSlots, setShowSlots] = useState(false);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const changeRunning = useRef(false);
   const revision = useRef(0);
   const slotRevision = useRef(0);
-  useLiveUpdates({ resources: ['availability'], enabled: Boolean(appointment) && /^[a-f0-9]{32,64}$/.test(token), pollMs: 15_000 }, async () => {
-    if (busy) return;
+  const linkToken = useRef("");
+  const validToken = /^[a-f0-9]{32,64}$/.test(token);
+  useLiveUpdates({ resources: ['availability'], enabled: Boolean(appointment) && validToken, pollMs: 15_000 }, async () => {
+    if (busy || changeRunning.current) return;
     const request = ++revision.current;
     const response = await fetch('/api/orientaciones', { headers: { 'x-management-token': token }, cache: 'no-store' });
     const result = await response.json();
-    if (request !== revision.current) return;
+    if (request !== revision.current || linkToken.current !== token) return;
     if (!response.ok) {
-      if (response.status === 401 || response.status === 404) setAppointment(null);
+      if (response.status === 401 || response.status === 404) {
+        setAppointment(null);
+        setError("El enlace es inválido o ya no está disponible. Contacta a CADO para obtener ayuda.");
+      }
       return;
     }
     setAppointment(result.data);
     if (showSlots) await loadSlots(true);
   });
   useEffect(() => {
-    const secret = new URLSearchParams(window.location.hash.slice(1)).get(
-      "token",
-    );
-    if (secret) setToken(secret);
+    const readLink = () => {
+      linkToken.current = new URLSearchParams(window.location.hash.slice(1)).get("token") || "";
+      setToken(linkToken.current);
+    };
+    readLink();
+    window.addEventListener("hashchange", readLink);
+    return () => window.removeEventListener("hashchange", readLink);
   }, []);
   useEffect(() => {
-    if (!/^[a-f0-9]{32,64}$/.test(token)) return;
-    let active = true;
-    setBusy(true);
+    setAppointment(null);
+    setShowSlots(false);
+    setCancelConfirm(false);
+    setSlotsLoading(false);
+    setSelection("");
+    setMessage("");
     setError("");
+    setBusy(validToken);
+    if (!validToken) return;
+    let active = true;
     void fetch("/api/orientaciones", {
       headers: { "x-management-token": token },
       cache: "no-store",
@@ -73,28 +90,46 @@ export default function ManageAppointment() {
       revision.current++;
       slotRevision.current++;
     };
-  }, [token]);
+  }, [token, validToken]);
   async function loadSlots(preserveSelection = false) {
     const request = ++slotRevision.current;
     setError("");
+    setShowSlots(true);
+    setCancelConfirm(false);
+    setSlotsLoading(true);
     try {
-      const r = await fetch("/api/bloques", { cache: "no-store" });
+      const r = await fetch("/api/bloques", {
+        headers: { "x-management-token": token },
+        cache: "no-store",
+      });
       const j = await r.json();
       if (!r.ok) throw Error(j.error);
       if (request !== slotRevision.current) return;
+      if (!Array.isArray(j.slots)) throw Error('No se pudo comprobar la disponibilidad.');
       setSlots(j.slots);
       setShowSlots(true);
       setSelection(previous => preserveSelection && j.slots.some((slot: Slot) => slot.slotKey === previous) ? previous : '');
     } catch (e) {
+      if (request !== slotRevision.current) return;
+      setSlots([]);
+      setSelection('');
       setError(
         e instanceof Error ? e.message : "No se pudo cargar la disponibilidad.",
       );
+    } finally {
+      if (request === slotRevision.current) setSlotsLoading(false);
     }
   }
   async function change(action: "cancelar" | "reprogramar") {
-    if (!appointment) return;
+    if (!appointment || busy || changeRunning.current) return;
+    if (action === 'reprogramar' && !slots.some(slot => slot.slotKey === selection)) {
+      setError('Selecciona un horario disponible antes de confirmar.');
+      return;
+    }
+    changeRunning.current = true;
     revision.current++;
     slotRevision.current++;
+    setSlotsLoading(false);
     setBusy(true);
     setError("");
     setMessage("");
@@ -102,6 +137,7 @@ export default function ManageAppointment() {
       const [nuevaFecha, nuevaHora] = selection.split("|");
       const r = await fetch("/api/orientaciones", {
         method: "PATCH",
+        signal: AbortSignal.timeout(12_000),
         headers: {
           "Content-Type": "application/json",
           "x-management-token": token,
@@ -114,22 +150,29 @@ export default function ManageAppointment() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) throw Error(j.error);
+      if (linkToken.current !== token) return;
+      if (!r.ok) {
+        if (r.status === 409 && action === 'reprogramar') await loadSlots(true);
+        throw Error(j.error || 'No se pudo guardar el cambio.');
+      }
       setAppointment(j.data);
       setCancelConfirm(false);
       setSlots([]);
       setShowSlots(false);
+      setSelection('');
       setMessage(
         action === "cancelar"
           ? "Tu orientación fue cancelada."
           : "Tu orientación fue reprogramada.",
       );
     } catch (e) {
+      if (linkToken.current !== token) return;
       setError(
         e instanceof Error ? e.message : "No se pudo guardar el cambio.",
       );
     } finally {
-      setBusy(false);
+      changeRunning.current = false;
+      if (linkToken.current === token) setBusy(false);
     }
   }
   async function download() {
@@ -150,17 +193,17 @@ export default function ManageAppointment() {
     }
   }
   return (
-    <section className="mx-auto max-w-3xl space-y-6 px-6 py-16 text-[#513D49]">
+    <section className="mx-auto max-w-4xl space-y-6 px-4 py-10 text-[#513D49] sm:px-6 sm:py-16">
       <h1 className="font-title text-4xl">Gestionar mi orientación</h1>
       <p>
         Usa el enlace privado que recibiste al confirmar tu reserva. El código
         de cita por sí solo no permite consultar ni modificar tus datos.
       </p>
-      {!token && (
-        <p className="rounded-xl border p-4">
-          Abre tu enlace privado de gestión. Si lo perdiste, comunícate con CADO
-          por los canales oficiales.
-        </p>
+      {!validToken && (
+        <div className="rounded-xl border p-4" role={token ? "alert" : undefined}>
+          {token && <p className="font-semibold">El enlace privado está incompleto o no es válido.</p>}
+          <p>Abre el enlace completo que recibiste con tu reserva. Si lo perdiste, <Link className="underline" href="/contacto">contacta a CADO</Link>.</p>
+        </div>
       )}
       {error && (
         <p role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">
@@ -168,18 +211,19 @@ export default function ManageAppointment() {
         </p>
       )}
       {message && (
-        <p role="status" className="rounded-xl bg-green-50 p-4 text-green-800">
+        <p role="status" className="cado-flow-enter rounded-xl bg-green-50 p-4 text-green-800">
           {message}
         </p>
       )}
       {busy && <p role="status">Procesando…</p>}
       {appointment && (
-        <div className="material-card-tonal space-y-5 rounded-3xl p-7">
+        <div className="material-card-tonal min-w-0 space-y-5 rounded-3xl p-4 sm:p-7">
           <h2 className="font-title text-2xl">{appointment.nombre_paciente}</h2>
-          <p>
-            {appointment.fecha} · {appointment.hora} ·{" "}
-            {appointment.estado_atencion}
-          </p>
+          <div className="rounded-2xl border border-[#E2D6E1] bg-white p-4 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#766C75]">Tu horario actual</p>
+            <p className="mt-2 font-semibold capitalize">{appointmentDateLabel(appointment.fecha)}</p>
+            <p className="mt-1">{appointment.hora.slice(0, 5)} hrs · Hora de Chile · {appointment.estado_atencion}</p>
+          </div>
           {(appointment.estado_derivacion === "Derivada a Dentalink" || appointment.estado_atencion === "Derivada a Dentalink") && <DentalinkLink />}
           {appointment.estado_atencion === "Programada" && (
             <>
@@ -201,7 +245,7 @@ export default function ManageAppointment() {
                   Descargar calendario
                 </button>
                 <button
-                  disabled={busy}
+                  disabled={busy || slotsLoading}
                   onClick={() => void loadSlots()}
                   className="btn-cado-secondary rounded-xl p-3"
                 >
@@ -209,40 +253,32 @@ export default function ManageAppointment() {
                 </button>
                 <button
                   disabled={busy}
-                  onClick={() => setCancelConfirm(true)}
+                  onClick={() => { slotRevision.current++; setSlotsLoading(false); setShowSlots(false); setCancelConfirm(true); }}
                   className="rounded-xl border border-red-300 p-3 text-red-800"
                 >
                   Cancelar orientación
                 </button>
               </div>
-              {slots.length > 0 && (
-                <div className="space-y-3">
-                  <label className="block">
-                    Nuevo horario
-                    <select
-                      value={selection}
-                      onChange={(e) => setSelection(e.target.value)}
-                      className="mt-2 block w-full rounded-xl border p-3"
-                    >
-                      <option value="">Selecciona un bloque</option>
-                      {slots.map((s) => (
-                        <option key={s.slotKey} value={s.slotKey}>
-                          {s.fecha} · {s.hora}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+              {showSlots && (
+                <div className="cado-flow-enter space-y-3">
+                  <RescheduleCalendar slots={slots} value={selection} onChange={setSelection}
+                    disabled={busy} loading={slotsLoading} onRefresh={() => void loadSlots()} />
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <button
-                    disabled={busy || !selection}
+                    disabled={busy || slotsLoading || !selection || !slots.some(slot => slot.slotKey === selection)}
                     onClick={() => void change("reprogramar")}
-                    className="btn-cado-primary rounded-xl p-3"
+                    className="btn-cado-primary min-h-12 rounded-xl px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Confirmar reprogramación
                   </button>
+                  <button type="button" disabled={busy} onClick={() => {
+                    slotRevision.current++; setSlotsLoading(false); setShowSlots(false); setSelection('');
+                  }} className="btn-cado-secondary min-h-12 rounded-xl px-5 py-3 text-sm font-semibold">Conservar horario actual</button>
+                  </div>
                 </div>
               )}
               {cancelConfirm && (
-                <div className="space-y-3 rounded-xl border border-red-300 p-4">
+                <div className="cado-flow-enter space-y-3 rounded-xl border border-red-300 p-4">
                   <p>¿Confirmas que deseas cancelar tu orientación?</p>
                   <button
                     disabled={busy}

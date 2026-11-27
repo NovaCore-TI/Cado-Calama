@@ -1,3 +1,4 @@
+import { publicMetadata } from '@/lib/seo';
 import type { Metadata } from 'next';
 import { CheckCircle2, ImageIcon } from 'lucide-react';
 import { CLINIC, whatsappUrl } from '@/lib/clinic';
@@ -80,11 +81,12 @@ export const profiles = {
 type Profile = typeof profiles[keyof typeof profiles];
 
 export function doctorMetadata(profile: Profile): Metadata {
-  return {
-    title: { absolute: profile.seoTitle },
+  return publicMetadata({
+    path: profile.path,
+    title: profile.seoTitle,
     description: profile.description,
-    alternates: { canonical: profile.path },
-  };
+    absolute: true,
+  });
 }
 
 export function DoctorProfile({ profile }: { profile: Profile }) {

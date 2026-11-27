@@ -1,3 +1,5 @@
+import { publicMetadata } from '@/lib/seo';
+import { UrgencyContactLink } from '@/components/UrgencyContactLink';
 import Link from 'next/link';
 import {
   AlertTriangle,
@@ -14,11 +16,13 @@ import {
   Zap,
 } from 'lucide-react';
 
-export const metadata = {
+export const metadata = publicMetadata({
+  path: '/urgencias',
+  absolute: true,
   title: 'Atención de Urgencias Dentales en Calama | CADO Odontología',
   description:
     'Guía de primeros auxilios y contacto rápido para dolor de muelas intenso, traumatismos dentales, flemones o sangrado en Calama.',
-};
+});
 
 const emergencyProtocols = [
   {
@@ -40,7 +44,8 @@ const emergencyProtocols = [
     steps: [
       'Toma el diente únicamente por la corona (la parte blanca), nunca toques la raíz.',
       'Si está sucio, enjuágalo brevemente con leche o suero fisiológico (sin frotar).',
-      'Intenta reposicionarlo en el alveolo suavemente si es posible, o guárdalo en un vaso con leche entera o saliva propia.',
+      'Si es un diente de leche, no lo vuelvas a colocar. Si no sabes si es de leche o permanente, consulta de inmediato con un odontólogo antes de intentar reinsertarlo.',
+      'Si es permanente y puedes hacerlo suavemente, intenta colocarlo de nuevo. Si no entra con facilidad, consérvalo en leche mientras consigues atención.',
       'Acude de inmediato a consulta odontológica urgente.',
     ],
     tag: 'Crítico (< 60 min)',
@@ -80,15 +85,17 @@ export default function UrgenciasPage() {
 
           {/* BOTONES DE UN TOQUE */}
           <div className="flex flex-wrap gap-3.5 pt-2">
-            <a
+            <UrgencyContactLink
+              channel="telefono"
               href="tel:+56944657815"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-red-600 px-7 py-3 text-sm font-bold text-white shadow-md transition hover:bg-red-700 active:scale-[0.98]"
             >
               <PhoneCall className="h-4 w-4" aria-hidden="true" />
               <span>Llamar al Dr. Javier Beiza (+56 9 4465 7815)</span>
-            </a>
+            </UrgencyContactLink>
 
-            <a
+            <UrgencyContactLink
+              channel="whatsapp"
               href="https://wa.me/56944657815?text=URGENCIA%20DENTAL:%20Tengo%20un%20dolor%20agudo%20y%20necesito%20asistencia%20en%20Calama."
               target="_blank"
               rel="noopener noreferrer"
@@ -96,7 +103,7 @@ export default function UrgenciasPage() {
             >
               <MessageCircle className="h-4 w-4 text-red-600" aria-hidden="true" />
               <span>WhatsApp Prioritario Urgencias</span>
-            </a>
+            </UrgencyContactLink>
           </div>
 
           <p className="text-xs text-[#766C75]">

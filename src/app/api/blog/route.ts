@@ -41,8 +41,8 @@ function article(body: Record<string, unknown>) {
     cuerpo: safeContent,
     tiempo_lectura: Math.max(1, Math.ceil(articlePlainText(safeContent).split(/\s+/).length / 180)) + " min de lectura",
     resumen:
-      typeof body.resumen === "string"
-        ? body.resumen.slice(0, 500)
+      typeof body.resumen === "string" && body.resumen.trim()
+        ? body.resumen.trim().slice(0, 500)
         : articlePlainText(safeContent).slice(0, 140),
     categoria: typeof body.categoria === "string" ? body.categoria : "Cuidados",
     publicado: body.publicado === true,

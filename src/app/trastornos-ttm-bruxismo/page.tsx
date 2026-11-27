@@ -1,7 +1,7 @@
-import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import { ClinicalPage } from '@/components/ClinicalPage';
 
-export const metadata: Metadata = { title: 'TTM, bruxismo y dolor mandibular en Calama', description: 'Evaluación del dolor muscular y articular, trastornos temporomandibulares y bruxismo en CADO Calama. Atención cercana y diagnóstico individual.', alternates: { canonical: '/trastornos-ttm-bruxismo' } };
+export const metadata = publicMetadata({ path: '/trastornos-ttm-bruxismo', title: 'TTM, bruxismo y dolor mandibular en Calama', description: 'Evaluación del dolor muscular y articular, trastornos temporomandibulares y bruxismo en CADO Calama. Atención cercana y diagnóstico individual.' });
 export default function Page() {
   return <ClinicalPage title="Trastornos temporomandibulares y bruxismo" eyebrow="Función articular y bienestar orofacial en Calama" intro="Evaluamos las molestias de la mandíbula y de los músculos de la masticación para comprender su origen y planificar un cuidado adaptado a cada persona." image="/brand/escucha-clinica-cado-calama.webp" sections={[
     { title: 'Dolor muscular y articular', text: 'En la consulta revisamos tus síntomas, antecedentes y función mandibular. El objetivo es distinguir las posibles causas del dolor antes de proponer un tratamiento.' },

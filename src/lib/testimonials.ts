@@ -1,5 +1,6 @@
 export const TESTIMONIAL_BUCKET = 'cado-testimonios';
 export const MAX_TESTIMONIAL_BYTES = 2 * 1024 * 1024;
+export const TESTIMONIAL_IMAGE_WIDTHS = [384, 640, 960, 1280] as const;
 export const TESTIMONIAL_FIELDS = 'id,titulo,texto_alternativo,source_url,publicado,created_at';
 export interface Testimonial {
   id: string;
