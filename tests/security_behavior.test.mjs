@@ -15,6 +15,35 @@ const request = (url = "/api", body, headers = {}) =>
     headers: { "Content-Type": "application/json", ...headers },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
+test("Document CSP replaces untrusted request values and issues a fresh nonce", async () => {
+  let authChecks = 0;
+  const { proxy } = loadTs("src/proxy.ts", {
+    "@/lib/doctor-auth": { requireDoctor: async () => { authChecks++; throw Error("No session"); } },
+  }, { NODE_ENV: "production", NEXT_PUBLIC_SUPABASE_URL: "https://fixture.supabase.co" });
+  const first = await proxy(request("/", undefined, {
+    "Content-Security-Policy": "script-src *",
+    "x-nonce": "from-client",
+  }));
+  const csp = first.headers.get("Content-Security-Policy");
+  const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+  assert.match(nonce, /^[A-Za-z0-9+/]{24}$/);
+  assert.equal(first.headers.get("x-middleware-request-x-nonce"), nonce);
+  assert.equal(first.headers.get("x-middleware-request-content-security-policy"), csp);
+  assert.match(csp, /script-src 'self' 'nonce-[^']+' 'strict-dynamic';/);
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(csp, /connect-src 'self' https:\/\/fixture\.supabase\.co wss:\/\/fixture\.supabase\.co;/);
+  assert.match(csp, /frame-src https:\/\/maps\.google\.com https:\/\/www\.google\.com;/);
+  assert.doesNotMatch(csp, /unsafe-eval|from-client/);
+  assert.notEqual((await proxy(request("/"))).headers.get("Content-Security-Policy"), csp);
+  assert.equal((await proxy(request("/admin/login"))).status, 200);
+  assert.equal(authChecks, 0);
+  const denied = await proxy(request("/admin"));
+  assert.equal(denied.status, 307);
+  assert.equal(denied.headers.get("location"), "https://cado.example/admin/login");
+  assert.match(denied.headers.get("Content-Security-Policy"), /frame-ancestors 'none'/);
+  assert.equal(authChecks, 1);
+});
+
 const routes = ["doctores", "cuestionario", "confort", "auth/status"];
 for (const name of routes)
   test(`Private GET ${name} rejects a missing session`, async () => {

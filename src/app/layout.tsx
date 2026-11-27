@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { SITE_URL, serializeStructuredData } from '@/lib/site';
 import { CLINIC } from '@/lib/clinic';
 import './globals.css';
@@ -61,11 +62,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Reading request headers opts HTML into rendering with its own nonce.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': ['Dentist', 'MedicalClinic', 'LocalBusiness'],
@@ -108,6 +111,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon.png" />
         <script
           type="application/ld+json"
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: serializeStructuredData(jsonLd) }}
         />
       </head>

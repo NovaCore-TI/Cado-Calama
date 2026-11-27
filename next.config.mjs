@@ -2,10 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   async headers() {
-    return ['/admin/:path*', '/gestionar/:path*'].map(source => ({
-      source,
-      headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
-    }));
+    return [
+      { source: '/:path*', headers: [{ key: 'X-Frame-Options', value: 'DENY' }] },
+      ...['/admin/:path*', '/gestionar/:path*'].map(source => ({
+        source,
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      })),
+    ];
   },
   async redirects() {
     return [
