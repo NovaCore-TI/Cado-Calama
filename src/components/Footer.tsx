@@ -44,6 +44,10 @@ export const Footer = () => <footer className="mt-auto border-t border-[#3D2C37]
       ].map(([label, href]) => <li key={href}><Link href={href} className="hover:underline">{label}</Link></li>)}</ul></div>
     </div>
     <p className="rounded-2xl border border-white/15 bg-black/10 p-4 text-[11px] leading-6 text-gray-200"><strong className="text-white">Información para pacientes:</strong> La Sesión de Acercamiento Virtual (SAV) y la encuesta TES permiten conocerte y preparar tu atención. No constituyen un diagnóstico definitivo ni una prescripción de fármacos. Los tratamientos requieren evaluación presencial.</p>
+    <nav aria-label="Privacidad y condiciones" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+      <Link href="/privacidad" className="underline underline-offset-4">Política de privacidad</Link>
+      <Link href="/condiciones" className="underline underline-offset-4">Condiciones de servicio</Link>
+    </nav>
     <div className="flex flex-col justify-between gap-3 border-t border-white/15 pt-6 text-[11px] text-gray-200 sm:flex-row"><p>© 2026 CADO · Centro Avanzado de Dolor Orofacial · Calama.</p><p>Desarrollado por NovaCore · Proyecto de Integración INACAP Calama</p></div>
   </div>
 </footer>;

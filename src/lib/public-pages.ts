@@ -13,4 +13,6 @@ export const publicPageLabels: Readonly<Record<string, string>> = {
   '/faq': 'Preguntas frecuentes',
   '/recursos': 'Recursos para pacientes',
   '/blog': 'Blog',
+  '/privacidad': 'Política de privacidad',
+  '/condiciones': 'Condiciones de servicio',
 };
