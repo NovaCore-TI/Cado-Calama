@@ -15,6 +15,28 @@ import {
   Sparkles
 } from 'lucide-react';
 
+const publicationDateFormat = new Intl.DateTimeFormat('es-CL', {
+  timeZone: 'America/Santiago',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+});
+
+function PublicationTime({ value }: { value: string }) {
+  const publishedAt = new Date(value);
+  if (Number.isNaN(publishedAt.getTime())) return null;
+
+  return (
+    <time dateTime={publishedAt.toISOString()} className="text-[11px] tabular-nums text-gray-600">
+      {publicationDateFormat.format(publishedAt)}
+    </time>
+  );
+}
+
 export default function BlogListing({ initialPosts }: { initialPosts: BlogPost[] }) {
   const [blogPosts, setBlogPosts] = useState(initialPosts);
   const [error, setError] = useState('');
@@ -153,11 +175,11 @@ export default function BlogListing({ initialPosts }: { initialPosts: BlogPost[]
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-[#E2E7E7] flex items-center justify-between font-sans">
-                <span className="text-[11px] text-gray-600">{post.date}</span>
+              <div className="pt-3 border-t border-[#E2E7E7] flex items-center gap-2 font-sans">
+                <PublicationTime value={post.date} />
                 <Link
                   href={`/blog/${post.slug}`}
-                  className="text-xs font-bold text-[#A14B92] hover:underline flex items-center gap-1"
+                  className="ml-auto flex shrink-0 items-center gap-1 text-xs font-bold text-[#A14B92] hover:underline"
                 >
                   <span>Leer</span>
                   <ArrowRight className="w-3.5 h-3.5" />
